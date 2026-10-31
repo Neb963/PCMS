@@ -328,5 +328,12 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    return {ok:true,page:{complete:snapshot.complete,text:snapshot.text,challenge:snapshot.challenge,rootOutput:snapshot.rootOutput,requiredFrames:frames}};
   }catch(error){return fail(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'SLUG_TRANSPORT_ERROR');}
  }
- return Object.freeze({observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ async function releaseSlugObservation(tab){
+  if(tab?.tabId==null)return;
+  try{const tag=await api.sessions.getTabValue(tab.tabId,'pcmsDiscoverTab');if(tag?.accountId!==tab.accountId||tag.role!=='checking')return;
+   await api.scripting.executeScript({target:{tabId:tab.tabId,frameIds:[0]},world:'ISOLATED',func:captureSlugDocument,args:[{dispose:true}]});
+   await api.sessions.setTabValue(tab.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});
+  }catch{}
+ }
+ return Object.freeze({releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

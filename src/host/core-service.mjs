@@ -40,7 +40,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       lifecycle=createLifecycle({core:value,host:{...host,
         instances:async m=>[...await host.instances(m),...scripts.instances(m)],
         unregister:m=>scripts.unregister(m),
-        stopModule:async(m,l,recordReceipt)=>[...await host.stopModule(m,{...l,instances:l.instances.filter(i=>i.type!=='website')},recordReceipt),...await scripts.stop(m,l,recordReceipt)],
+        stopModule:async(m,l,recordReceipt)=>{const receipts=[...await host.stopModule(m,{...l,instances:l.instances.filter(i=>i.type!=='website')},recordReceipt),...await scripts.stop(m,l,recordReceipt)];if(m.id==='pcms-discover')await discover.stop();return receipts;},
         rebuild:async m=>{await host.rebuild(m);await scripts.configure(m);}
       }});
       await lifecycle.recover();await scripts.rebuild();await modules.start();await modules.turn();
