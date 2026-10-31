@@ -218,11 +218,12 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
  async function checkBinding(scope,{operationId,stage,identity=false}={}){
   if(stage==='PREREQUISITES')return prerequisites();await initialize();const found=await bound(scope);if(found.code)return fail(found.code);const p=found.profile;
   if(stage==='CREATE')return p.personaUid===scope.accountId?{ok:true,operationId,stage,...tuple(p)}:fail('ACCOUNT_CONTEXT_CHANGED');
+  if(stage==='DOCUMENT_READY'){try{const tab=await api.tabs.get(scope.tabId);if(tab.cookieStoreId!==scope.containerId)return fail('ACCOUNT_CONTEXT_CHANGED');if(tab.status==='loading'||!ownOrigin(tab.url)&&['about:blank','about:newtab'].includes(tab.url))return fail('ACCOUNT_DOCUMENT_LOADING',{pending:true});return ownOrigin(tab.url)?{ok:true}:fail('ACCOUNT_CONTEXT_CHANGED');}catch{return fail('ACCOUNT_LOGIN_TAB_MISSING');}}
   if(identity){
-   const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);let tab;try{tab=await api.tabs.get(scope.tabId);}catch{return fail('ACCOUNT_LOGIN_TAB_MISSING');}if(tab.cookieStoreId!==scope.containerId||!ownOrigin(tab.url))return fail('ACCOUNT_CONTEXT_CHANGED');
+   const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);let tab;try{tab=await api.tabs.get(scope.tabId);}catch{const owned=await ownedTabs(scope);if(owned.length!==1)return fail(owned.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING');tab=owned[0].tab;}if(tab.cookieStoreId!==scope.containerId||!ownOrigin(tab.url))return fail('ACCOUNT_CONTEXT_CHANGED');
    const target={tabId:tab.id,frameIds:[0]},run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target,world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('ACCOUNT_DOCUMENT_CHANGED');return rows[0].result;};
    try{const witness=await run(accountDocumentWitness),value=await run(observePerchanceIdentity,[witness]),after=await run(accountDocumentWitness),final=await protectedProfile(scope),current=await api.tabs.get(tab.id);
-    if(witness!==after||value?.ok&&value.documentWitness!==witness)return fail('ACCOUNT_DOCUMENT_CHANGED');if(final.code||current.cookieStoreId!==scope.containerId||!ownOrigin(current.url))return fail(final.code??'ACCOUNT_CONTEXT_CHANGED');if(!value?.ok)return value;return {ok:true,...tuple(final.profile),identity:value};
+    if(witness!==after||value?.ok&&value.documentWitness!==witness)return fail('ACCOUNT_DOCUMENT_CHANGED');if(final.code||current.cookieStoreId!==scope.containerId||!ownOrigin(current.url))return fail(final.code??'ACCOUNT_CONTEXT_CHANGED');if(!value?.ok)return value;return {ok:true,...tuple(final.profile),tabId:tab.id,identity:value};
    }catch(error){return fail(/^[A-Z_]+$/.test(error.message)?error.message:'ACCOUNT_IDENTITY_UNKNOWN');}
   }
   const op=saved(p,operationId,stage);if(!op)return fail('ACCOUNT_OUTCOME_UNKNOWN');if(op.phase==='FAILED')return op.value;
@@ -239,5 +240,32 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   }
   return fail('ACCOUNT_OUTCOME_UNKNOWN');
  }
- return Object.freeze({preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ // Local removal uses donor services only. Explicit tab closure precedes
+ // container/session deletion; no provider or native route call is made.
+ async function removalState(scope){
+  await initialize();const state=await getState(),p=pcmsBoundProfile(state,scope.accountId);
+  if(p===false)return {code:'ACCOUNT_PERSONA_AMBIGUOUS'};
+  const containers=await api.contextualIdentities.query({});
+  if(p&&(scope.personaUid&&p.personaUid!==scope.personaUid||scope.containerId&&p.containerId!==scope.containerId||p.rotationRole||p.rotationOperationId))return {code:'ACCOUNT_CONTEXT_CHANGED'};
+  const containerId=p?.containerId??scope.containerId;
+  if(!p&&containerId&&containers.some(c=>c.cookieStoreId===containerId))return {code:'ACCOUNT_CONTEXT_CHANGED'};
+  return {state,profile:p||null,containerPresent:!!containerId&&containers.some(c=>c.cookieStoreId===containerId)};
+ }
+ async function observeClosedTabs(scope){try{await initialize();if(!scope.containerId){const found=await removalState(scope);return found.profile?fail('ACCOUNT_CONTEXT_CHANGED'):{ok:true};}return (await api.tabs.query({cookieStoreId:scope.containerId})).length?fail('ACCOUNT_TABS_STILL_OPEN'):{ok:true};}catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}}
+ async function closeTabs(scope){const found=await removalState(scope);if(found.code)return fail(found.code);if(!scope.containerId)return found.profile?fail('ACCOUNT_CONTEXT_CHANGED'):{ok:true};try{return await localMutationFence(scope.containerId,async()=>{const fresh=await removalState(scope);if(fresh.code)return fail(fresh.code);const tabs=await api.tabs.query({cookieStoreId:scope.containerId});if(tabs.length)await api.tabs.remove(tabs.map(t=>t.id));return observeClosedTabs(scope);});}catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}}
+ async function observeRemoval(scope){
+  try{const found=await removalState(scope);if(found.code)return fail(found.code);if(found.containerPresent)return fail('ACCOUNT_REMOVAL_UNKNOWN');if(!(await observeClosedTabs(scope)).ok)return fail('ACCOUNT_TABS_STILL_OPEN');
+   // The destructive API can complete before its donor metadata commit.
+   // Absence is independently established; finish only that local metadata.
+   if(found.profile)await localMutationFence(found.profile.containerId,()=>stateManager.mutate(draft=>{const p=draft.profiles[found.profile.containerId];if(!p)return;if(p.personaUid!==found.profile.personaUid||p.pcmsAccountId!==scope.accountId)throw Error('ACCOUNT_CONTEXT_CHANGED');delete draft.profiles[p.containerId];for(const script of Object.values(draft.scripts??{}))script.profileIds=(script.profileIds??[]).filter(id=>id!==p.containerId);for(const workflow of Object.values(draft.workflows??{}))for(const step of workflow.steps??[])if(step.profileId===p.containerId)step.profileId='';}));
+   const after=await removalState(scope);return !after.code&&!after.profile&&!after.containerPresent?{ok:true}:fail(after.code??'ACCOUNT_REMOVAL_UNKNOWN');
+  }catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}
+ }
+ async function removePersona(scope){
+  const found=await removalState(scope);if(found.code)return fail(found.code);
+  if(!found.containerPresent)return observeRemoval(scope);
+  const p=found.profile;if(!(await observeClosedTabs(scope)).ok)return fail('ACCOUNT_TABS_STILL_OPEN');
+  try{await localMutationFence(p.containerId,async()=>{const fresh=await removalState(scope);if(fresh.code||fresh.profile?.personaUid!==p.personaUid)throw Error('ACCOUNT_CONTEXT_CHANGED');await personaPlatform.remove(p.containerId,{expectedRevision:fresh.state.__stateMeta?.revision,expectedBootId:fresh.state.__stateMeta?.bootId});});return observeRemoval(scope);}catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}
+ }
+ return Object.freeze({closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

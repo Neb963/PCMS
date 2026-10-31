@@ -51,9 +51,10 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'host.status':result=await hostStatus(api);break;
         case 'accounts.status':result=await accounts.status();break;
         case 'accounts.list':result=await accounts.list(message);break;
+        case 'accounts.related':result=await accounts.related(message.id,message.table,message.cursor);break;
         case 'accounts.get':result=await accounts.get(message.id);break;
         case 'accounts.add':result=await accounts.add({label:message.label,requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
-        case 'accounts.command':result=await accounts.command({id:message.id,kind:message.kind,requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'accounts.command':result=await accounts.command({id:message.id,kind:message.kind,requestId:message.requestId,confirmed:message.confirmed});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'accounts.check':result=await accounts.check(message.id);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'journal.check':await journal.changed();if(modules)await modules.turn();await schedule(value);result=await journal.status();break;
         case 'journal.status':result=await journal.status();break;
@@ -82,7 +83,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'view.get':result=await value.view('shell-view');break;
         case 'view.save': {
           const v=message.value;
-          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
+          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
           result=await value.saveView('shell-view',v,message.requestId);break;
         }
         default:return {ok:false,code:'OPERATION_DENIED'};

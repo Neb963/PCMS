@@ -2,6 +2,8 @@ import {requireCore as check,project,publicError} from '../core/records.mjs';
 import {bindingObservation} from './account-observations.mjs';
 const MODULE='pcms-accounts',UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const END=new Set(['LOGIN_REQUIRED','READY']);
+const errorCode=e=>typeof e?.code==='string'&&/^[A-Z][A-Z_]*$/.test(e.code)?e.code:publicError(e);
+const lifecycleStates={ARCHIVED:'ARCHIVED',REACTIVATING:'HELD',REMOVING:'REMOVING'};
 // Finite Accounts policy. Donor owns all Persona/routing operations; Core's
 // one queue owns dispatch, generation/Pause admission and uncertain outcomes.
 export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
@@ -17,15 +19,16 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
  }
  async function ensure(a){
   if(a.flow.jobId||END.has(a.flow.stage))return a;
-  const job=await core.queue.enqueue({requestId:'account-'+a.flow.requestId,logicalKey:'account:'+a.flow.requestId,moduleId:MODULE,targetId:a.id,accountId:a.id,kind:a.flow.purpose,jobSchema:(await module()).manifest.jobSchema,input:{requestId:a.flow.requestId},dueAt:clock()});
+  const job=await core.queue.enqueue({requestId:'account-'+a.flow.requestId,logicalKey:'account:'+a.flow.requestId,moduleId:MODULE,targetId:a.id,accountId:a.id,kind:a.admission==='REACTIVATING'?'REACTIVATE':a.flow.purpose,jobSchema:(await module()).manifest.jobSchema,input:{requestId:a.flow.requestId},dueAt:clock()});
   a=await core.read('accounts',a.id);if(a.flow.requestId!==job.input.requestId)return a;
   return save(a,{flow:{...a.flow,jobId:job.id}},'ACCOUNT_JOB_LINK');
  }
  const scope=a=>({accountId:a.id,label:a.label,rejectedRouteId:a.flow?.rejectedRouteId,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,preparationId:a.preparationId,tabId:a.tabId,exitAddresses:a.exitAddresses,expectedPrincipal:a.expectedPrincipal});
  const result=async(job,state,code=null)=>({value:{state,code,accountId:job.accountId},jobRevision:(await core.read('jobs',job.id)).rev});
- async function hold(a,job,code){if(a.holdCode!==code||a.state!=='HELD')await save(a,{state:'HELD',holdCode:code},'ACCOUNT_HOLD','HELD');return result(job,'HELD',code);}
+ async function hold(a,job,code){if(a.admission&&a.flow.jobId!==job.id)return result(job,'HELD','ACCOUNT_ADMISSION_HELD');if(a.holdCode!==code||a.state!=='HELD')await save(a,{state:lifecycleStates[a.admission]??'HELD',holdCode:code},'ACCOUNT_HOLD','HELD');return result(job,'HELD',code);}
  async function apply(a,job,stage,value){
   check(value?.ok===true&&value.stage===stage&&value.operationId===job.id+'-'+stage,'ACCOUNT_OPERATION_UNVERIFIED');
+  check(!a.admission||['REACTIVATING','ARCHIVED'].includes(a.admission),'ACCOUNT_ADMISSION_HELD');
   const patch={holdCode:null},flow={...a.flow};
   if(stage==='CREATE'){
    check(UUID.test(value.personaUid??'')&&/^firefox-container-[1-9][0-9]*$/.test(value.containerId??''),'ACCOUNT_CONTEXT_UNVERIFIED');
@@ -38,16 +41,17 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    check(binding.routeObservedAt>=flow.startedAt&&binding.routeObservedAt<=clock(),'ACCOUNT_ROUTE_STALE');
    // A verified existing account never silently acquires a different exit.
    if(a.expectedPrincipal)check(JSON.stringify(binding.exitAddresses)===JSON.stringify(a.exitAddresses),'ACCOUNT_EXIT_CHANGED');
-   Object.assign(patch,binding);flow.stage=flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
+   Object.assign(patch,binding);flow.stage=['LOGIN','OPEN'].includes(flow.purpose)?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
   }else if(stage==='OPEN'){
-   check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.stage=flow.wasReady?'READY':'LOGIN_REQUIRED';
+   check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.openedAt=clock();flow.stage=flow.purpose==='OPEN'?'IDENTITY':flow.purpose==='LOGIN'?'LOGIN_REQUIRED':flow.wasReady?'READY':'LOGIN_REQUIRED';
   }else check(false,'ACCOUNT_STAGE_INVALID');
-  patch.flow=flow;patch.state=END.has(flow.stage)?flow.stage:'PREPARING';await save(a,patch,'ACCOUNT_'+stage);return result(job,END.has(flow.stage)?'COMPLETE':'CONTINUE');
+  patch.flow=flow;patch.state=a.admission==='ARCHIVED'?'ARCHIVED':END.has(flow.stage)?flow.stage:'PREPARING';await save(a,patch,'ACCOUNT_'+stage);return result(job,END.has(flow.stage)?'COMPLETE':'CONTINUE');
  }
  async function identity(a,job,reconcile){
   const operationId=job.id+'-IDENTITY',current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);let value;
   if(reconcile&&!possible&&!observed)return result(job,'READY');await admit();
   const prerequisites=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!prerequisites?.ok)return hold(a,job,prerequisites?.code??'DONOR_UNAVAILABLE');
+  const document=await donor.checkBinding(scope(a),{stage:'DOCUMENT_READY',readOnly:true});if(!document?.ok){if(document?.pending&&clock()-(a.flow.openedAt??a.flow.startedAt)<15000)return result(job,'CONTINUE');return hold(a,job,document?.code??'ACCOUNT_LOGIN_TAB_MISSING');}
   const read=()=>donor.checkBinding(scope(a),{stage:'IDENTITY',operationId,identity:true,readOnly:true});
   if(possible||observed){
    check(!possible||current.effect.operationId===operationId,'ACCOUNT_OPERATION_CHANGED');value=await read();
@@ -60,15 +64,18 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   const m=await admit(),after=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!after?.ok)return hold(a,job,after?.code??'DONOR_UNAVAILABLE');check(m.generation===job.generation,'STALE_GENERATION');
   check(value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');
   if(!a.flow.wasReady)check(Number.isFinite(a.flow.confirmationAt),'ACCOUNT_CONFIRM_REQUIRED');
+  check(value.tabId==null||Number.isSafeInteger(value.tabId)&&value.tabId>=0,'ACCOUNT_CONTEXT_CHANGED');
   const p=value.identity;check(p?.ok===true&&p.source==='PERCHANCE_AUTHENTICATED_IDENTITY'&&/^[a-f0-9]{64}$/.test(p.principalFingerprint??'')&&typeof p.principalLabel==='string','ACCOUNT_IDENTITY_UNKNOWN');
   check(p.observedAt>=a.flow.startedAt&&p.observedAt<=clock()&&a.routeObservedAt>=a.flow.startedAt,'ACCOUNT_CONFIRM_STALE');
   if(a.expectedPrincipal)check(a.expectedPrincipal===p.principalFingerprint,'ACCOUNT_PRINCIPAL_CHANGED');
-  const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');const next=a.flow.purpose==='OPEN'?'OPEN':'READY';
-  await save(a,{expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
+  const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');const next='READY';
+  if(a.admission==='REACTIVATING'){const jobs=await accountRows('jobs',a.id);check(!jobs.some(j=>j.id!==job.id&&j.effect?.boundary==='POSSIBLE'),'ACCOUNT_WORK_UNRESOLVED');}
+  await save(a,{admission:null,archive:null,tabId:value.tabId??a.tabId,expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
+  if(a.admission==='REACTIVATING'&&next==='READY'){core.queue.unfenceAccount(a.id);await resumeArchivedJobs(a.id,job.id);}
   return result(job,next==='READY'?'COMPLETE':'CONTINUE');
  }
  async function effect(job,reconcile=false){
-  check(job.moduleId===MODULE&&job.accountId===job.targetId,'ACCOUNT_SCOPE_DENIED');let a=await core.read('accounts',job.accountId);check(a,'ACCOUNT_MISSING');check(a.state!=='ARCHIVED','ACCOUNT_ARCHIVED');
+  check(job.moduleId===MODULE&&job.accountId===job.targetId,'ACCOUNT_SCOPE_DENIED');let a=await core.read('accounts',job.accountId);check(a,'ACCOUNT_MISSING');if(job.kind==='REMOVE')return removal(a,job,reconcile);if(a.admission&&!(a.admission==='REACTIVATING'&&a.flow.jobId===job.id)&&!(reconcile&&a.admission==='ARCHIVED'&&a.flow.jobId===job.id&&job.effect?.boundary==='POSSIBLE'))return result(job,'HELD','ACCOUNT_ARCHIVED');
   if(job.state==='FAILED')return result(job,'HELD',job.recovery?.code??'ACCOUNT_OPERATION_FAILED');
   if(a.flow.jobId!==job.id||a.flow.requestId!==job.input.requestId)return result(job,'HELD','ACCOUNT_COMMAND_SUPERSEDED');
   if(END.has(a.flow.stage))return result(job,'COMPLETE');
@@ -92,7 +99,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   }
  }
  async function command({id,kind,requestId}){
-  check(UUID.test(requestId??''),'INVALID_REQUEST');await admit();let a=await core.read('accounts',id);check(a,'ACCOUNT_MISSING');check(a.state!=='ARCHIVED','ACCOUNT_ARCHIVED');
+  check(UUID.test(requestId??''),'INVALID_REQUEST');await admit();let a=await core.read('accounts',id);check(a,'ACCOUNT_MISSING');check(!['ARCHIVED','REMOVING'].includes(a.admission)&&a.state!=='ARCHIVED','ACCOUNT_ARCHIVED');
   const prior=await core.command('account-command:'+requestId);if(prior){check(prior.signature===JSON.stringify([id,kind]),'REQUEST_CONFLICT');return project('accounts',await ensure(a));}
   if(a.flow.jobId&&!END.has(a.flow.stage)){
    const job=await core.read('jobs',a.flow.jobId);if(job?.effect?.boundary==='POSSIBLE'){const observation=await effect(job,true),latest=await core.read('jobs',job.id);if(['CONTINUE','READY','COMPLETE'].includes(observation.value.state)&&latest.effect?.boundary!=='POSSIBLE'&&latest.state==='HELD')await core.queue.transition(job.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});return project('accounts',await core.read('accounts',id));}
@@ -105,14 +112,58 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   const changeCandidate=kind==='REPAIR'&&!a.expectedPrincipal&&a.flow.stage==='VERIFY'&&['ACCOUNT_BINDING_RESERVED','ROUTE_CONNECTION_FAILED','DNS_LEAK_DETECTED','NOT_A_MULLVAD_EXIT','IPV6_EVIDENCE_UNVERIFIED'].includes(a.holdCode),wasReady=!!a.expectedPrincipal,stage=changeCandidate?'SELECT':a.holdCode==='ACCOUNT_ROUTE_RECHECK_REQUIRED'?'VERIFY':kind==='REPAIR'&&!END.has(a.flow.stage)&&a.flow.stage!=='IDENTITY'?a.flow.stage:'VERIFY',confirmationAt=kind==='CONFIRM'?clock():kind==='REPAIR'?a.flow.confirmationAt??null:null;
   a=await save(a,{state:'PREPARING',holdCode:null,flow:{requestId,jobId:null,purpose:kind,stage,startedAt:clock(),wasReady,confirmationAt,rejectedRouteId:changeCandidate?a.routeId:null}},'ACCOUNT_COMMAND','COMPLETE',{id:'account-command:'+requestId,signature:JSON.stringify([id,kind])});return project('accounts',await ensure(a));
  }
+ async function accountRows(table,id){let cursor=null,rows=[];do{const page=await core.list({table,filters:{accountId:id},cursor});for(const p of page.rows)rows.push(await core.read(table,p.id));cursor=page.cursor;}while(cursor);return rows;}
+ async function parkJobs(id,except=null){for(let j of await accountRows('jobs',id))if(j.id!==except&&!['HELD','COMPLETE','FAILED'].includes(j.state)&&j.effect?.boundary!=='POSSIBLE'){try{await core.queue.transition(j.id,j.rev,{state:'HELD',recovery:{action:'OPEN_ACCOUNT',code:'ACCOUNT_ARCHIVED'}});}catch(error){if(error.code!=='STALE_REVISION'&&error.code!=='RECONCILE_REQUIRED')throw error;}}}
+ async function resumeArchivedJobs(id,except){for(const j of await accountRows('jobs',id))if(j.id!==except&&j.state==='HELD'&&j.recovery?.code==='ACCOUNT_ARCHIVED'&&j.effect?.boundary!=='POSSIBLE')await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});}
+ async function lifecycleCommand({id,kind,requestId,confirmed=false}){
+  check(UUID.test(requestId??''),'INVALID_REQUEST');if(kind==='REMOVE')check(confirmed===true,'ACCOUNT_REMOVE_CONFIRM_REQUIRED');await admit();
+  const signature=JSON.stringify([id,kind]),prior=await core.command('account-command:'+requestId);let a=await core.read('accounts',id);
+  if(prior){check(prior.signature===signature,'REQUEST_CONFLICT');return a?project('accounts',await ensure(a)):{id,state:'REMOVED'};}
+  check(a,'ACCOUNT_MISSING');check(a.admission!=='REMOVING','ACCOUNT_REMOVING');
+  if(kind==='REACTIVATE'){check(!core.queue.accountActive(id),'ACCOUNT_EFFECT_DRAINING');const old=a.flow?.jobId?await core.read('jobs',a.flow.jobId):null;if(old?.effect?.boundary==='POSSIBLE'){await effect(old,true);check((await core.read('jobs',old.id)).effect?.boundary!=='POSSIBLE','ACCOUNT_WORK_UNRESOLVED');a=await core.read('accounts',id);}}
+  core.queue.fenceAccount(id);
+  if(kind==='ARCHIVE'){
+   a=await save(a,{state:'ARCHIVED',admission:'ARCHIVED',archive:a.archive??{at:clock(),previousState:a.state},holdCode:null},'ARCHIVE_ACCOUNT','COMPLETE',{id:'account-command:'+requestId,signature});await parkJobs(id);return project('accounts',a);
+  }
+  check(kind==='REMOVE'||kind==='REACTIVATE'&&a.admission==='ARCHIVED','ACCOUNT_COMMAND_DENIED');
+  if(kind==='REMOVE'){
+   a=await save(a,{state:'REMOVING',admission:'REMOVING',holdCode:null,flow:{requestId,jobId:null,purpose:'REMOVE',stage:'REMOVE_TABS',startedAt:clock(),confirmedAt:clock()}},'CONFIRM_LOCAL_REMOVE','COMPLETE',{id:'account-command:'+requestId,signature});
+  }else{
+   const wasReady=!!a.expectedPrincipal,stage=a.routeId?'VERIFY':a.personaUid?'SELECT':'CREATE';
+   a=await save(a,{state:'PREPARING',admission:'REACTIVATING',holdCode:null,flow:{requestId,jobId:null,purpose:'REACTIVATE',stage,wasReady,startedAt:clock(),confirmationAt:wasReady?clock():null}},'REACTIVATE_ACCOUNT','COMPLETE',{id:'account-command:'+requestId,signature});
+  }
+  await parkJobs(id);return project('accounts',await ensure(a));
+ }
+ async function removal(a,job,reconcile){
+  check(a.admission==='REMOVING'&&a.flow.jobId===job.id&&a.flow.requestId===job.input.requestId,'ACCOUNT_REMOVAL_SCOPE_DENIED');
+  if(core.queue.accountActive(a.id))return hold(a,job,'ACCOUNT_EFFECT_DRAINING');
+  if(a.flow.stage==='REMOVE_DATA'){
+   if(reconcile)return result(job,'READY');
+   try{check((await donor.observeRemoval(scope(a),{}))?.ok===true,'ACCOUNT_REMOVAL_UNKNOWN');await admit();const m=await module();check(m.generation===job.generation,'STALE_GENERATION');
+    await core.removeAccountData({accountId:a.id,jobId:job.id,expectedRev:a.rev});await pins(core);return result(job,'COMPLETE');
+   }catch(error){return hold(a,job,errorCode(error));}
+  }
+  const stage=a.flow.stage;check(['REMOVE_TABS','REMOVE_PERSONA'].includes(stage),'ACCOUNT_REMOVAL_SCOPE_DENIED');const read=()=>stage==='REMOVE_TABS'?donor.observeClosedTabs(scope(a),{}):donor.observeRemoval(scope(a),{});
+  const operationId=job.id+'-'+stage,current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);
+  try{
+   if(!possible&&!observed){if(reconcile)return result(job,'READY');await admit();
+    await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_'+stage,write:true,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {ok:latest.rev===a.rev&&!core.queue.accountActive(a.id),accountRevision:latest.rev};},call:()=>stage==='REMOVE_TABS'?donor.closeTabs(scope(a),{operationId}):donor.removePersona(scope(a),{operationId}),observe:async()=>{const value=await read();return {matched:value?.ok===true,operationId};}});
+    return removal(await core.read('accounts',a.id),await core.read('jobs',job.id),true);
+   }
+   const value=await read();if(!value?.ok)return hold(a,job,value?.code??'ACCOUNT_REMOVAL_UNKNOWN');
+   if(possible)await core.queue.reconcile(job.id,current.rev,operationId,{matched:true,operationId});
+   a=await core.read('accounts',a.id);await save(a,{holdCode:null,flow:{...a.flow,stage:stage==='REMOVE_TABS'?'REMOVE_PERSONA':'REMOVE_DATA'}},stage==='REMOVE_TABS'?'ACCOUNT_TABS_CLOSED':'ACCOUNT_PERSONA_REMOVED');return result(job,'CONTINUE');
+  }catch(error){return hold(await core.read('accounts',a.id),job,errorCode(error));}
+ }
  return {
-  initialize:async()=>{await pins(core);const m=await module();if(!available(m)||!m.enabled||m.lifecycle)return;let cursor=null;do{const page=await core.list({table:'accounts',cursor});for(const p of page.rows){const a=await core.read('accounts',p.id);if(a.flow&&!a.flow.jobId&&!END.has(a.flow.stage))await ensure(a);}cursor=page.cursor;}while(cursor);},
+  initialize:async()=>{await pins(core);const m=await module();if(!available(m)||!m.enabled||m.lifecycle)return;let cursor=null;do{const page=await core.list({table:'accounts',cursor});for(const p of page.rows){const a=await core.read('accounts',p.id);if(a.admission)core.queue.fenceAccount(a.id);else core.queue.unfenceAccount(a.id);if(a.flow&&!a.flow.jobId&&!END.has(a.flow.stage))await ensure(a);}cursor=page.cursor;}while(cursor);},
   add:({label,requestId})=>serial(requestId,async()=>{await admit();check(UUID.test(requestId??'')&&typeof label==='string'&&label.trim().length>0&&label.trim().length<=128,'ACCOUNT_LABEL_INVALID');label=label.trim();let a=await core.read('accounts',requestId);if(a){check(a.label===label,'REQUEST_CONFLICT');return project('accounts',await ensure(a));}a={id:requestId,accountId:requestId,label,state:'PREPARING',flow:{requestId,jobId:null,purpose:'ENROLL',stage:'CREATE',startedAt:clock(),wasReady:false},bindingVersion:1};a=await save(a,{},'ACCOUNT_ENROLL','COMPLETE',{id:'account-add:'+requestId,signature:JSON.stringify(label)});return project('accounts',await ensure(a));}),
-  command:args=>serial(args.id,()=>command(args)),
+  command:args=>['ARCHIVE','REMOVE','REACTIVATE'].includes(args.kind)?lifecycleCommand(args):serial(args.id,()=>command(args)),
   effect:(job,reconcile=false)=>serial(job.accountId,()=>effect(job,reconcile)),
   async check(id){return serial(id,async()=>{const a=await core.read('accounts',id);check(a,'ACCOUNT_MISSING');if(a.flow?.jobId){const job=await core.read('jobs',a.flow.jobId);if(job&&!['COMPLETE','FAILED'].includes(job.state)){const outcome=await effect(job,true),latest=await core.read('jobs',job.id);if(['READY','CONTINUE','COMPLETE'].includes(outcome.value.state)&&latest.effect?.boundary!=='POSSIBLE'&&latest.state==='HELD')await core.queue.transition(job.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});}}return project('accounts',await core.read('accounts',id));});},
   async status(){const m=await module();return {enabled:m?.enabled===true&&!m.lifecycle,available:available(m)};},
-  async list(args={}){return core.list({table:'accounts',cursor:args.cursor,search:args.search??'',filters:args.state?{state:args.state}:{},limit:50});},
-  async get(id){const a=await core.read('accounts',id);if(!a)return null;return {...project('accounts',a),containerId:a.containerId??null,routeId:a.routeId??null,exitAddresses:a.exitAddresses??[],routeObservedAt:a.routeObservedAt??null,identityObservedAt:a.identityObservedAt??null,confirmedAt:a.confirmedAt??null,stage:a.flow?.stage??null,jobId:a.flow?.jobId??null,work:a.flow?.jobId?project('jobs',await core.read('jobs',a.flow.jobId)):null};}
+  async list(args={}){const page=await core.list({table:'accounts',cursor:args.cursor,search:args.search??'',filters:args.state?{state:args.state}:{},limit:50});return {...page,rows:await Promise.all(page.rows.map(async p=>{const a=await core.read('accounts',p.id);return {...p,generatorCount:(await accountRows('generators',p.id)).length,loginStatus:a.state==='READY'?'Login checked':a.admission==='ARCHIVED'?'Archived':'Login: Unknown',routeStatus:a.state==='READY'?'Route checked':a.admission==='ARCHIVED'?'Archived':'Route: Unknown'};}))};},
+  async related(id,table,cursor=null){check(['jobs','generators'].includes(table),'QUERY_DENIED');return core.list({table,filters:{accountId:id},cursor,limit:50});},
+  async get(id){const a=await core.read('accounts',id);if(!a)return null;const jobs=await accountRows('jobs',id),generators=await accountRows('generators',id);return {...project('accounts',a),admission:a.admission??null,generatorCount:generators.length,unfinishedJobs:jobs.filter(j=>!['COMPLETE','FAILED'].includes(j.state)).map(j=>project('jobs',j)),containerId:a.containerId??null,routeId:a.routeId??null,exitAddresses:a.exitAddresses??[],routeObservedAt:a.routeObservedAt??null,identityObservedAt:a.identityObservedAt??null,confirmedAt:a.confirmedAt??null,stage:a.flow?.stage??null,jobId:a.flow?.jobId??null,work:a.flow?.jobId?project('jobs',await core.read('jobs',a.flow.jobId)):null};}
  };
 }

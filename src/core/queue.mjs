@@ -1,11 +1,13 @@
 // Finite queue primitives. Modules own their steps; Core owns admission/effects.
 export function createQueue({transact,root,writeRows,append,req,check,clock}) {
- const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
+ const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set(),accountFences=new Set(),accountEpochs=new Map();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
  const tables=['accounts','jobs','generators','modules','versions','events','blobs','chunks','commands'];
  const tx=work=>transact(tables,'readwrite',async s=>work(s,await root(s)));
  const read=(s,r,table,id)=>req(s(table).get([r.dataset,id]));
  const valid=v=>typeof v==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,199}$/.test(v);
  const maintenance=(job,module)=>module?.enabled===true&&!module.lifecycle&&((module.id==='pcms-journal'&&module.hostClass==='journal'&&['EXPORT','CLEANUP'].includes(job.kind))||(module.id==='pcms-backup'&&module.hostClass==='backup'&&['CAPTURE','EXPORT','RESTORE','CLEANUP'].includes(job.kind)));
+ const lifecycleJob=(job,a)=>job.moduleId==='pcms-accounts'&&job.id===a?.flow?.jobId&&((a.admission==='REMOVING'&&job.kind==='REMOVE')||(a.admission==='REACTIVATING'&&job.kind==='REACTIVATE'));
+ const accountAllowed=(job,a)=>!job.accountId||lifecycleJob(job,a)||!!a&&!accountFences.has(job.accountId)&&!a.admission&&!['ARCHIVED','REMOVING','REMOVED'].includes(a.state)&&(job.moduleId==='pcms-accounts'||a.state==='READY');
  const change=(table,row,value)=>({table,id:row.id,value,expectedRev:row.rev,refs:row.refs??[]});
  const event=(job,step,result,code)=>({jobId:job.id,targetId:job.targetId??job.id,moduleId:job.moduleId,step,result,...code?{code}:{}});
  const save=async(s,r,job,patch,step,result,extra=[])=>{
@@ -13,6 +15,9 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
  };
  const serial=fn=>{const turn=arbiter.then(fn,fn);arbiter=turn.catch(()=>{});return turn;};
  const api={
+  fenceAccount:id=>{accountFences.add(id);accountEpochs.set(id,(accountEpochs.get(id)??0)+1);},
+  unfenceAccount:id=>accountFences.delete(id),
+  accountActive:id=>[...active.values()].some(a=>a.accountId===id),
   fence:moduleId=>fenced.add(moduleId),
   unfence:moduleId=>fenced.delete(moduleId),
   boot:async()=>{
@@ -65,6 +70,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   }),
   claim:async(jobId,expectedRev)=>tx(async(s,r)=>{
     const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');check(job.step!=='WAIT_CREATOR','DEPENDENCY_HAS_NO_WRITER');
+    check(accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null),'ACCOUNT_ADMISSION_HELD');
     const generator=await read(s,r,'generators',job.targetId);check(generator,'TARGET_MISSING');check(!generator.writerHold||generator.writerHold.jobId===jobId,'WRITER_HELD');
     const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
     const lease={bootId,generation:module.generation,jobId};
@@ -79,7 +85,8 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   reconciliationCheckpoint:(jobId,expectedRev,checkpoint)=>tx(async(s,r)=>{const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');return save(s,r,job,{checkpoint,state:'HELD'},'RECONCILE_CHECKPOINT','UNKNOWN');}),
   next:async()=>tx(async(s,r)=>{
     const jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))),modules=await req(s('modules').index('dataset').getAll(IDBKeyRange.only(r.dataset))),byId=new Map(modules.map(m=>[m.id,m]));
-    const ready=jobs.filter(j=>['WAITING','READY'].includes(j.state)&&j.dueAt<=clock()&&byId.get(j.moduleId)?.enabled===true&&!byId.get(j.moduleId).lifecycle&&!fenced.has(j.moduleId)&&(!r.paused||maintenance(j,byId.get(j.moduleId))));
+    const accounts=await req(s('accounts').index('dataset').getAll(IDBKeyRange.only(r.dataset))),accountMap=new Map(accounts.map(a=>[a.id,a]));
+    const ready=jobs.filter(j=>accountAllowed(j,accountMap.get(j.accountId))&&['WAITING','READY'].includes(j.state)&&j.dueAt<=clock()&&byId.get(j.moduleId)?.enabled===true&&!byId.get(j.moduleId).lifecycle&&!fenced.has(j.moduleId)&&(!r.paused||maintenance(j,byId.get(j.moduleId))));
     if(!ready.length)return null;
     const maintain=ready.filter(j=>maintenance(j,byId.get(j.moduleId))),ordinary=ready.filter(j=>!maintenance(j,byId.get(j.moduleId)));
     // One reserved maintenance turn at least every fourth ready turn.
@@ -97,8 +104,9 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     check(valid(operationId)&&valid(kind)&&typeof preflight==='function'&&typeof call==='function'&&typeof observe==='function','INVALID_EFFECT');
     const evidence=await preflight();check(evidence?.ok===true,'PREFLIGHT_HELD');
     const admitted=await serial(async()=>{
-      const job=await tx(async(s,r)=>{
+      let accountEpoch;const job=await tx(async(s,r)=>{
         const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
+        check(accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null),'ACCOUNT_ADMISSION_HELD');
         if(evidence.accountRevision!=null){const account=await read(s,r,'accounts',job.accountId);check(account?.rev===evidence.accountRevision,'STALE_ACCOUNT');}
         const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
         check(job.state!=='COMPLETE'&&job.state!=='FAILED','JOB_FINISHED');check(job.dueAt<=clock(),'NOT_DUE');
@@ -109,10 +117,11 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
         if(sourceWrite){const generator=await read(s,r,'generators',job.targetId);check(generator?.writerHold?.jobId===jobId,'WRITER_HELD');}
         check([...active.values()].filter(a=>!a.maintenance).length<2||maintenance(job,module),'WORK_SLOTS_FULL');
         check(![...active.values()].some(a=>a.targetId===job.targetId||job.accountId&&a.accountId===job.accountId),'TARGET_ACTIVE');
+        accountEpoch=accountEpochs.get(job.accountId)??0;
         // Every individual Git object/ref call comes through this boundary.
         return save(s,r,job,{state:'RUNNING',needsCheck:false,effect:{operationId,kind,inputHash,boundary:'POSSIBLE',bootId,epoch:r.admissionEpoch??0}},'EFFECT_INTENT','POSSIBLE');
       });
-      if(blocked&&write||fenced.has(job.moduleId)){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,'PAUSED');}
+      if(blocked&&write||fenced.has(job.moduleId)||(accountEpochs.get(job.accountId)??0)!==accountEpoch||job.accountId&&accountFences.has(job.accountId)&&!(job.moduleId==='pcms-accounts'&&['REMOVE','REACTIVATE'].includes(job.kind))){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,job.accountId&&accountFences.has(job.accountId)?'ACCOUNT_ADMISSION_HELD':'PAUSED');}
       const marker={targetId:job.targetId,accountId:job.accountId,maintenance:!write};active.set(operationId,marker);
       let sent;try{sent=Promise.resolve(call({operationId}));}catch(error){sent=Promise.reject(error);}
       return {job,sent};
@@ -159,11 +168,11 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     return result;
   }),
   acknowledgeWake:(cut=null)=>tx(async(s,r)=>{r.lastWake=clock();r.wakeSequence=cut??r.sequence+1;await append(s,r,{step:'QUEUE_WAKE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
-  deadline:()=>transact(['jobs','modules'],'readonly',async s=>{
+  deadline:()=>transact(['jobs','modules','accounts'],'readonly',async s=>{
     const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));let next=null;
     // A wake runs one finite turn. Its acknowledgement cannot consume other
     // due jobs; real WAITING work keeps its deadline until handled or held.
-    for(const job of jobs)if(['WAITING','READY'].includes(job.state)){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&!module.lifecycle&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
+    for(const job of jobs)if(['WAITING','READY'].includes(job.state)){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&!module.lifecycle&&accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null)&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
     return next;
   })
  };
