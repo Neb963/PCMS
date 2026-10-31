@@ -41,7 +41,8 @@ test('source manifests include binary files, exact UTF-8 names and complete dele
  const source=await core.source([{path:'src/Zażółć.bin',bytes},{path:'main.pjs',bytes:new TextEncoder().encode('one\r\n')},{path:'index.html',bytes:new Uint8Array([0,255,1])}]);
  assert.deepEqual((await core.verifySource(source.manifestId)).map(x=>x.path),['index.html','main.pjs','src/Zażółć.bin']);
  assert.deepEqual(await core.bytes(source.files.find(x=>x.path.endsWith('.bin')).blobId),bytes);
- await core.mutate([change('one',{slug:'one',sourceManifest:source.manifestId},0,source.refs)],event);
+ await core.mutate([change('one',{slug:'one',sourceManifest:source.manifestId},0,[source.manifestId])],event);
+ await core.releasePin(source.pinId);
  const unused=await core.putBytes(new Uint8Array([9,8]));await core.pin('capture', [unused]);
  assert.equal((await core.collect()).removed,0);await core.releasePin('capture');assert.equal((await core.collect()).removed,1);
  await assert.rejects(core.bytes(unused),/MISSING_BLOB/);await core.verifySource(source.manifestId);
@@ -57,7 +58,7 @@ test('recording failure aborts local state and failed chunks are detected',async
  assert.equal((await core.get('generators','one')).slug,'one');assert.equal(eventRow.length,1);
  const blob=await core.putBytes(new Uint8Array([42]));const r=await core.status();
  const broken=db.transaction('chunks','readwrite');await req(broken.objectStore('chunks').delete([r.dataset,blob,0]));
- await assert.rejects(core.bytes(blob),/MISSING_CHUNK/);db.close();
+ await assert.rejects(core.bytes(blob),/MISSING_CHUNK/);await assert.rejects(core.mutate([change('bad',{},0,[blob])],event),/MISSING_CHUNK/);db.close();
 });
 test('durable view save is deduplicated and cold reads survive; actual quota abort preserves data',async t=>{
  const {core,name}=await fixture(t);
@@ -77,4 +78,10 @@ test('S: 50 accounts / 1,000 generators through indexed paging, no last-page cei
  assert.deepEqual(await core.counts(),{accounts:50,generators:1000,jobs:0,visibility:null});
  let cursor=null,ids=[];do{const page=await core.list({table:'generators',limit:37,cursor});ids.push(...page.rows.map(x=>x.id));cursor=page.cursor;}while(cursor);
  assert.equal(ids.length,1000);assert.equal(new Set(ids).size,1000);assert.equal(ids.at(-1),'generator-0999');
+});
+
+test('cross-realm byte input is copied into local chunks without rejecting valid typed arrays',async t=>{
+ const {core}=await fixture(t);const {runInNewContext}=await import('node:vm');
+ const bytes=runInNewContext('new Uint8Array([0,255,23])');const blob=await core.putBytes(bytes);
+ assert.deepEqual([...await core.bytes(blob)],[0,255,23]);
 });

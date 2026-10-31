@@ -87,7 +87,13 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
   };
   const checkedRefs=async(s,r,refs=[])=>{
     requireCore(Array.isArray(refs)&&refs.every(hash),'INVALID_REFERENCE');
-    for(const blobId of refs){const blob=await req(s('blobs').get([r.dataset,blobId]));requireCore(blob,'MISSING_BLOB');for(let i=0;i<blob.chunks;i++)requireCore(await req(s('chunks').get([r.dataset,blobId,i])),'MISSING_CHUNK');}
+    const closure=new Set(),pending=[...refs];
+    while(pending.length){const blobId=pending.pop();if(closure.has(blobId))continue;requireCore(hash(blobId),'INVALID_REFERENCE');closure.add(blobId);
+      const blob=await req(s('blobs').get([r.dataset,blobId]));requireCore(blob,'MISSING_BLOB');
+      for(let i=0;i<blob.chunks;i++)requireCore(await req(s('chunks').get([r.dataset,blobId,i])),'MISSING_CHUNK');
+      pending.push(...(blob.refs??[]));
+    }
+    return [...closure];
   };
   const writeRows=async(s,r,changes,event)=>{
     const sequence=await append(s,r,event);
@@ -96,9 +102,9 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       requireCore(TABLES.includes(table)&&id(recordId),'INVALID_RECORD');
       const old=await req(s(table).get([r.dataset,recordId]));
       requireCore((old?.rev??0)===expectedRev,'STALE_REVISION');
-      await checkedRefs(s,r,refs);
+      const closure=await checkedRefs(s,r,refs);
       const rev=(old?.rev??0)+1;
-      const row={...structuredClone(value),key:[r.dataset,recordId],dataset:r.dataset,id:recordId,schema:1,rev,sequence,refs:[...new Set(refs)],deleted:value===null};
+      const row={...structuredClone(value),key:[r.dataset,recordId],dataset:r.dataset,id:recordId,schema:1,rev,sequence,refs:closure,deleted:value===null};
       if(table==='accounts')for(const [field,raw] of [['personaKey',row.personaUid],['principalKey',row.expectedPrincipal],['exitKey',row.observedExit]])if(raw!==undefined)row[field]=raw;
       if(table==='generators'){if(row.slug)row.slugKey=row.slug;if(row.repositoryId&&row.folder)row.folderKey=[row.repositoryId,row.folder];}
       if(table==='jobs'&&row.logicalKey)row.logicalKeyUnique=row.logicalKey;
@@ -161,15 +167,16 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
   return core;
 }
 function attachBlobs(core,transact,root,checkedRefs,append) {
-  core.putBytes=async (bytes,pinId=null)=>{
-    requireCore(bytes instanceof Uint8Array,'INVALID_BYTES');const blobId=await sha256(bytes);
+  core.putBytes=async (bytes,pinId=null,refs=[])=>{
+    requireCore(ArrayBuffer.isView(bytes)&&Object.prototype.toString.call(bytes)==='[object Uint8Array]','INVALID_BYTES');
+    bytes=new Uint8Array(bytes);const blobId=await sha256(bytes);
     return transact(['blobs','chunks','events','pins'],'readwrite',async s=>{
       const r=await root(s),key=[r.dataset,blobId];
       if(pinId){const pinKey=[r.dataset,pinId],old=await req(s('pins').get(pinKey));await req(s('pins').put({key:pinKey,refs:[...new Set([...(old?.refs??[]),blobId])]}));}
-      if(await req(s('blobs').get(key)))return blobId;
+      if(await req(s('blobs').get(key))){if(pinId){await append(s,r,{step:'PIN_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put(r));}return blobId;}
       const chunkSize=1024*1024,chunks=Math.ceil(bytes.length/chunkSize);
       for(let i=0;i<chunks;i++)await req(s('chunks').add({key:[r.dataset,blobId,i],bytes:bytes.slice(i*chunkSize,(i+1)*chunkSize)}));
-      await req(s('blobs').add({key,dataset:r.dataset,blobId,bytes:bytes.length,chunks}));await append(s,r,{step:'STORE_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put(r));return blobId;
+      await req(s('blobs').add({key,dataset:r.dataset,blobId,bytes:bytes.length,chunks,refs}));await append(s,r,{step:'STORE_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put(r));return blobId;
     });
   };
   core.bytes=blobId=>transact(['blobs','chunks'],'readonly',async s=>{
@@ -185,7 +192,7 @@ function attachBlobs(core,transact,root,checkedRefs,append) {
       const blobId=await core.putBytes(file.bytes,pinId);manifest.push({path:file.path,bytes:file.bytes.length,sha256:blobId,blobId});
     }
     manifest.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
-    const manifestId=await core.putBytes(encoder.encode(JSON.stringify(manifest)),pinId);
+    const manifestId=await core.putBytes(encoder.encode(JSON.stringify(manifest)),pinId,manifest.map(f=>f.blobId));
     return {manifestId,pinId,files:manifest,refs:[manifestId,...new Set(manifest.map(f=>f.blobId))]};
   };
   core.verifySource=async manifestId=>{
@@ -194,7 +201,7 @@ function attachBlobs(core,transact,root,checkedRefs,append) {
     let previous='';for(const file of manifest){requireCore(file.path>previous&&file.sha256===file.blobId,'INVALID_MANIFEST');previous=file.path;requireCore((await core.bytes(file.blobId)).length===file.bytes,'SOURCE_LENGTH_MISMATCH');}
     return manifest;
   };
-  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);await checkedRefs(s,r,refs);await req(s('pins').put({key:[r.dataset,captureId],refs}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put(r));});
+  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);const closure=await checkedRefs(s,r,refs);await req(s('pins').put({key:[r.dataset,captureId],refs:closure}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put(r));});
   core.releasePin=captureId=>transact(['pins','events'],'readwrite',async s=>{const r=await root(s);await req(s('pins').delete([r.dataset,captureId]));await append(s,r,{step:'RELEASE_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put(r));});
   core.collect=()=>transact(['versions','pins','blobs','chunks','events'],'readwrite',async s=>{
     const r=await root(s),refs=new Set();
