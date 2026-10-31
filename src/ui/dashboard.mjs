@@ -86,7 +86,7 @@ async function queueStatus(){
 }
 document.getElementById('pause-core').addEventListener('click',async event=>{
  const button=event.currentTarget;button.disabled=true;
- const response=await core(button.dataset.operation);button.disabled=false;
+ const response=await core(button.dataset.operation,{requestId:crypto.randomUUID()});button.disabled=false;
  if(!response.ok){document.getElementById('queue-status').replaceChildren(failure(response.code));return;}
  await queueStatus();if(location.hash.startsWith('#work'))await renderRecords('work');
 });

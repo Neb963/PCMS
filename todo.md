@@ -17,7 +17,7 @@ P02 is COMPLETE in PR #2, merge `c2dec0b2a29071bd831a4ac4fb8353e81ae8eb9a`, tree
 
 ## Evidence / holds
 
-P03 T: 10 queue checks PASS locally (28 focused total); B: NOT TESTED. P02 18 focused and B/S (50/1,000) PASS; source and artifact receipts remain in the merged phase history. Larger byte/Journal load and live Git/provider/native checks remain NOT TESTED at their planned phases. The XPI remains an incomplete development checkpoint.
+P03 T: 12 queue checks PASS locally (30 focused total); B: PASS in run `41219609666` on `9568dde8fde6ccd47b6f65ece30368a8133a52fe`; final command-deduplication changes await current-candidate B. P02 18 focused and B/S (50/1,000) PASS; source and artifact receipts remain in the merged phase history. Larger byte/Journal load and live Git/provider/native checks remain NOT TESTED at their planned phases. The XPI remains an incomplete development checkpoint.
 
 ## Next action
 
@@ -26,3 +26,5 @@ Publish Core/queue/UI checkpoint, then complete installed P03 journey. P04 waits
 The queue uses the existing records/events transaction. Work uses an indexed retained-version order. Due alarms are acknowledged once and do not poll when no module runner exists. Finite module execution is P04; no product/provider workflow is claimed.
 
 Queue/UI checkpoint `f9fcc927f777effe788566a7c82b9b3fde0801ba` is pushed in draft PR #3. Installed harness now drives a real packaged dispatch, independently counts its synthetic effect in a separate fixture boundary, clicks Pause/Resume, closes the dashboard, calls Firefox's actual event-page termination and performs a new-process restart. Required B remains NOT TESTED until its run passes.
+
+Installed evidence: Firefox 155.0 / build 20260817142839, sandbox 6. Native background termination observed running → stopped. Persistent XPI SHA-256 `b97357800e7913021b4c9548fc72939917865b80b3288a9fbda86c5707671762`. Independent fixture effect count remains exactly one through visible Pause/Resume, dashboard close, termination/wake and real process restart. Work opens the exact held job/target as Unknown. Receipts: https://github.com/Neb963/PCMS/actions/runs/41219609666/artifacts/13050000097. Final tests add conflicting-command rejection and Pause after committed intent but before call.

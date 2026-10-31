@@ -26,30 +26,33 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   enqueue:async({requestId,logicalKey,moduleId,targetId,accountId=null,kind,jobSchema=1,input={},refs=[],dueAt=clock(),batchId=null})=>{
    check([requestId,logicalKey,moduleId,targetId,kind].every(valid)&&(!accountId||valid(accountId))&&Number.isSafeInteger(jobSchema)&&jobSchema>0&&Number.isFinite(dueAt),'INVALID_JOB');
    return tx(async(s,r)=>{
-    const prior=await req(s('commands').get([r.dataset,requestId]));if(prior)return read(s,r,'jobs',prior.jobId);
+    const commandKey=[r.dataset,'queue:'+requestId],signature=JSON.stringify([logicalKey,moduleId,targetId,accountId,kind,jobSchema,input,[...refs].sort()]);
+    const prior=await req(s('commands').get(commandKey));if(prior){check(prior.signature===signature,'REQUEST_CONFLICT');return read(s,r,'jobs',prior.jobId);}
     const existing=await req(s('jobs').index('logical').get([r.dataset,logicalKey]));
-    if(existing){await req(s('commands').put({key:[r.dataset,requestId],jobId:existing.id}));await append(s,r,event(existing,'ENQUEUE_JOB','EXISTING'));r.revision++;await req(s('meta').put(r));return existing;}
-    const module=await read(s,r,'modules',moduleId);check(module?.enabled===true,'MODULE_DISABLED');
+    if(existing){check(existing.moduleId===moduleId&&existing.targetId===targetId&&existing.kind===kind&&JSON.stringify(existing.input)===JSON.stringify(input),'JOB_INPUT_CONFLICT');await req(s('commands').put({key:commandKey,jobId:existing.id,signature}));await append(s,r,event(existing,'ENQUEUE_JOB','EXISTING'));r.revision++;await req(s('meta').put(r));return existing;}
+    const module=await read(s,r,'modules',moduleId);check(module?.enabled===true,'MODULE_DISABLED');check(Number.isSafeInteger(module.generation)&&module.generation>0&&jobSchema===(module.jobSchema??1),'JOB_SCHEMA_INCOMPATIBLE');
     const job={id:crypto.randomUUID(),jobId:null,logicalKey,moduleId,targetId,accountId,kind,jobSchema,input:structuredClone(input),state:'WAITING',step:'QUEUED',dueAt,batchId,createdAt:clock(),generation:module.generation,needsCheck:true,effects:[]};job.jobId=job.id;
     // Intake is durable even while paused. It cannot dispatch until Resume.
     await writeRows(s,r,[{table:'jobs',id:job.id,value:job,refs}],event(job,'ENQUEUE_JOB','WAITING'));
-    await req(s('commands').put({key:[r.dataset,requestId],jobId:job.id}));return read(s,r,'jobs',job.id);
+    await req(s('commands').put({key:commandKey,jobId:job.id,signature}));return read(s,r,'jobs',job.id);
    });
   },
-  pause:()=>{
-   gateVersion++;blocked=true; // Close admission synchronously before any storage await.
-   return tx(async(s,r)=>{r.paused=true;r.admissionEpoch=(r.admissionEpoch??0)+1;await append(s,r,{step:'PAUSE_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));const running=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));return {state:running.some(j=>j.state==='RUNNING'&&j.effect?.boundary==='POSSIBLE')?'PAUSING':'PAUSED'};});
+  pause:(requestId=crypto.randomUUID())=>{
+   check(valid(requestId),'INVALID_REQUEST');const gate=++gateVersion;blocked=true; // Close admission synchronously before any storage await.
+   return tx(async(s,r)=>{const key=[r.dataset,'pause:'+requestId];if(await req(s('commands').get(key))){if(gate===gateVersion)blocked=r.paused;return {state:r.paused?'PAUSED':'RUNNING'};}r.paused=true;r.admissionEpoch=(r.admissionEpoch??0)+1;await req(s('commands').put({key}));await append(s,r,{step:'PAUSE_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));const running=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));return {state:running.some(j=>j.state==='RUNNING'&&j.effect?.boundary==='POSSIBLE')?'PAUSING':'PAUSED'};});
   },
-  resume:async()=>{
-   const gate=++gateVersion;
+  resume:async(requestId=crypto.randomUUID())=>{
+   check(valid(requestId),'INVALID_REQUEST');const gate=++gateVersion;
    const result=await tx(async(s,r)=>{
+    const key=[r.dataset,'resume:'+requestId];if(await req(s('commands').get(key)))return {state:r.paused?'PAUSED':'RUNNING',paused:r.paused};
+    await req(s('commands').put({key}));
     // Rechecks belong to the selected module/adapter before every next effect.
     // Resume never changes a held/possible job into a write-ready job.
     r.paused=false;r.admissionEpoch=(r.admissionEpoch??0)+1;
     const jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));
     for(const job of jobs)if(['WAITING','READY'].includes(job.state))await save(s,r,job,{state:'WAITING',needsCheck:true,dueAt:Math.max(clock(),job.dueAt??0),lease:null},'RESUME_JOB','WAITING');
-    await append(s,r,{step:'RESUME_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));return {state:'RUNNING'};
-   });if(gate===gateVersion)blocked=false;return result;
+    await append(s,r,{step:'RESUME_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));return {state:'RUNNING',paused:false};
+   });if(gate===gateVersion)blocked=result.paused;return result;
   },
   status:async()=>transact(['jobs'], 'readonly',async s=>{const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))),running=jobs.filter(j=>j.state==='RUNNING'&&j.effect?.boundary==='POSSIBLE').length;return {state:r.paused?(running?'PAUSING':'PAUSED'):blocked?'BLOCKED':'RUNNING',paused:r.paused,active:running,bootId};}),
   transition:async(jobId,expectedRev,patch)=>tx(async(s,r)=>{

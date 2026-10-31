@@ -15,8 +15,8 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{}}={
       const value=await core();let result;
       switch(message?.operation) {
         case 'queue.status':result=await value.queue.status();break;
-        case 'queue.pause':result=await value.queue.pause();break;
-        case 'queue.resume':result=await value.queue.resume();await schedule(value);break;
+        case 'queue.pause':result=await value.queue.pause(message.requestId);break;
+        case 'queue.resume':result=await value.queue.resume(message.requestId);await schedule(value);break;
         case 'queue.list':{const page=await value.queue.list({cursor:message.cursor,search:message.search??'',state:message.state??''});result={...page,rows:page.rows.map(j=>project('jobs',j))};break;}
         case 'queue.get':result=await value.get('jobs',message.id);break;
         case 'queue.batch':result=await value.queue.batch(message.id);break;

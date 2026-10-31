@@ -21,7 +21,7 @@ def main():
     const {openCore}=await import(browser.runtime.getURL('core/records.mjs'));const c=await openCore();await c.queue.boot();
     await c.mutate([{table:'modules',id:'fixture-module',value:{enabled:true,generation:1}},{table:'generators',id:'fixture-generator',value:{slug:'fixture-generator'}}],{step:'FIXTURE_SETUP',result:'COMPLETE'});
     let job=await c.queue.enqueue({requestId:'fixture-request',logicalKey:'fixture-save',moduleId:'fixture-module',targetId:'fixture-generator',accountId:'fixture-account',kind:'SAVE',batchId:'fixture-batch'});
-    const duplicate=await c.queue.enqueue({requestId:'fixture-request',logicalKey:'fixture-save',moduleId:'fixture-module',targetId:'fixture-generator',kind:'SAVE'});if(duplicate.id!==job.id)throw Error('DUPLICATE');
+    const duplicate=await c.queue.enqueue({requestId:'fixture-request',logicalKey:'fixture-save',moduleId:'fixture-module',targetId:'fixture-generator',accountId:'fixture-account',kind:'SAVE',batchId:'fixture-batch'});if(duplicate.id!==job.id)throw Error('DUPLICATE');
     job=await c.queue.claim(job.id,job.rev);const ready=new Promise(resolve=>{
       window.fixturePending=c.queue.dispatch(job.id,job.rev,{operationId:'fixture-operation',kind:'SAVE',sourceWrite:true,preflight:async()=>({ok:true}),call:async()=>{
        const saved=await browser.storage.local.get('fixture-effects');await browser.storage.local.set({'fixture-effects':(saved['fixture-effects']??0)+1});resolve();await new Promise(()=>{});

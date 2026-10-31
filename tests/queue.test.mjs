@@ -89,3 +89,20 @@ test('one due wake is coalesced and future deadlines reconstruct without keepali
  assert.equal(await core.queue.deadline(),2000);await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),5000);
  setClock(6000);await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),null);
 });
+
+test('command conflicts reject and repeated Pause/Resume IDs do not undo later intent',async t=>{
+ const {core}=await fixture(t);await core.queue.enqueue(input());
+ await assert.rejects(core.queue.enqueue(input('other',{requestId:'request-one'})),/REQUEST_CONFLICT/);
+ await assert.rejects(core.queue.enqueue(input('one',{requestId:'new',input:{version:'changed'}})),/JOB_INPUT_CONFLICT/);
+ await core.queue.pause('p1');await core.queue.resume('r1');await core.queue.pause('p1');assert.equal((await core.queue.status()).state,'RUNNING');
+ await core.queue.pause('p2');await core.queue.resume('r1');assert.equal((await core.queue.status()).state,'PAUSED');
+});
+test('Pause after committed intent cancels before call; changed module generation rejects old lease',async t=>{
+ const {core}=await fixture(t);let job=await core.queue.enqueue(input());job=await core.queue.claim(job.id,job.rev);let calls=0,pause;
+ const proto=IDBObjectStore.prototype,add=proto.add;
+ proto.add=function(row){if(this.name==='events'&&row.step==='EFFECT_INTENT')this.transaction.addEventListener('complete',()=>{pause=core.queue.pause();},{once:true});return add.call(this,row);};
+ try{await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('gap',async()=>calls++)),/PAUSED/);}finally{proto.add=add;}
+ await pause;assert.equal(calls,0);job=await core.read('jobs',job.id);assert.equal(job.effect.boundary,'BEFORE');
+ await core.queue.resume();const module=await core.read('modules','alpha');await core.mutate([{table:'modules',id:'alpha',expectedRev:module.rev,value:{...module,generation:2}}],event);job=await core.read('jobs',job.id);
+ await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('gap',async()=>calls++)),/STALE_GENERATION/);assert.equal(calls,0);
+});
