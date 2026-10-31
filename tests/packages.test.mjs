@@ -45,6 +45,7 @@ test('install is atomic, identical bytes no-op; changed same-version/downgrade r
  assert.equal((await install.install(good.zip)).state,'UNCHANGED');assert.equal((await core.read('modules',initial.id)).rev,initial.rev);
  await assert.rejects(install.install((await fixture({files:{'extra.txt':strToU8('changed')}})).zip),/SAME_VERSION_CHANGED/);
  await assert.rejects(install.install((await fixture({version:'0.9.0'})).zip),/DOWNGRADE_REJECTED/);
+ assert.ok((await core.list({table:'events',search:'DOWNGRADE_REJECTED'})).rows.some(e=>e.step==='IMPORT_MODULE'&&e.result==='FAILED'));
  assert.equal((await install.install((await fixture({version:'1.1.0'})).zip)).state,'STAGED');const staged=await core.read('modules',initial.id);assert.equal(staged.version,'1.0.0');assert.equal(staged.generation,1);assert.equal(staged.staged.manifest.version,'1.1.0');
  for(const f of staged.manifest.files)assert.deepEqual(await core.bytes(staged.payload[f.path]),good.payload[f.path]);
 });

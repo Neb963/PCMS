@@ -1,7 +1,7 @@
 import {validatePackage,compareVersions,PackageError} from './package.mjs';
 import {publicError} from '../core/records.mjs';
 export function createInstaller(core){
- return {async install(bytes,{budget}={}){
+ const run=async(bytes,{budget}={})=>{
   const candidate=await validatePackage(bytes,{budget}),m=candidate.manifest;
   const current=await core.read('modules',m.id);
   if(current){
@@ -21,6 +21,7 @@ export function createInstaller(core){
    catch(error){const latest=await core.read('modules',m.id);if(latest?.packageHash===packageHash){try{await core.releasePin(pinId);}catch{}return {state:'UNCHANGED',id:m.id};}throw error;}
    let cleanupCode=null;try{await core.releasePin(pinId);}catch{cleanupCode='IMPORT_PIN_CLEANUP_PENDING';}
    return {state:current?'STAGED':'INSTALLED',id:m.id,cleanupCode};
-  }catch(error){if(!committed){try{await core.releasePin(pinId);}catch{}try{await core.record({step:'IMPORT_MODULE',result:'FAILED',moduleId:m.id,code:error instanceof PackageError?error.code:publicError(error)});}catch{}}throw error;}
- }};
+  }catch(error){if(!committed){try{await core.releasePin(pinId);}catch{}}throw error;}
+ };
+ return {async install(bytes,options){try{return await run(bytes,options);}catch(error){try{await core.record({step:'IMPORT_MODULE',result:'FAILED',code:error instanceof PackageError?error.code:publicError(error)});}catch{}throw error;}}};
 }
