@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
-import {zipSync,strToU8} from 'fflate';
+import {zipSync,strToU8,Zip,ZipPassThrough} from 'fflate';
 import {sha256,openCore} from '../src/core/records.mjs';
 import {validatePackage,strictJSON,zipInventory,PackageError} from '../src/modules/package.mjs';
 import {createInstaller} from '../src/modules/install.mjs';
@@ -56,4 +56,14 @@ test('quota and incompatible settings/job updates preserve registry, drafts and 
  const proto=IDBObjectStore.prototype,put=proto.put;proto.put=function(row){if(this.name==='modules')throw new DOMException('fixture quota private','QuotaExceededError');return put.call(this,row);};
  try{await assert.rejects(install.install((await fixture({version:'1.2.0'})).zip),{name:'QuotaExceededError'});}finally{proto.put=put;}
  assert.deepEqual(await core.read('modules','fixture-package'),before);assert.equal((await core.read('jobs',job.id)).state,'WAITING');assert.deepEqual(await core.view('module:fixture-package:main'),{draft:'preserve'});
+});
+
+test('ZIP64 directory metadata and streamed data descriptors validate without ZIP32 assumptions',async()=>{
+ const good=await fixture(),{v,e}=central(good.zip),count=v.getUint16(e+10,true),size=v.getUint32(e+12,true),offset=v.getUint32(e+16,true);
+ const wide=new Uint8Array(e+56+20+22);wide.set(good.zip.subarray(0,e));const w=new DataView(wide.buffer),z=e,l=e+56,end=e+76;
+ w.setUint32(z,0x06064b50,true);w.setBigUint64(z+4,44n,true);w.setUint16(z+12,45,true);w.setUint16(z+14,45,true);w.setBigUint64(z+24,BigInt(count),true);w.setBigUint64(z+32,BigInt(count),true);w.setBigUint64(z+40,BigInt(size),true);w.setBigUint64(z+48,BigInt(offset),true);
+ w.setUint32(l,0x07064b50,true);w.setBigUint64(l+8,BigInt(z),true);w.setUint32(l+16,1,true);wide.set(good.zip.subarray(e),end);w.setUint16(end+8,65535,true);w.setUint16(end+10,65535,true);w.setUint32(end+12,0xffffffff,true);w.setUint32(end+16,0xffffffff,true);
+ assert.equal((await validatePackage(wide)).manifest.id,'fixture-package');
+ const chunks=[];const stream=new Zip((error,data)=>{if(error)throw error;chunks.push(data);});for(const [path,data]of Object.entries({'module.json':strToU8(JSON.stringify(good.m)),...good.payload})){const file=new ZipPassThrough(path);stream.add(file);file.push(data,true);}stream.end();
+ const length=chunks.reduce((n,c)=>n+c.length,0),bytes=new Uint8Array(length);let p=0;for(const c of chunks){bytes.set(c,p);p+=c.length;}assert.equal((await validatePackage(bytes)).manifest.id,'fixture-package');
 });

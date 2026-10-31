@@ -22,3 +22,5 @@ P05 T/B: NOT TESTED. No provider/native operation is needed or authorized. ZIP d
 Implement the packaged ZIP/manifest validator and atomic registry installation boundary.
 
 Initial implementation and six focused package tests pass locally: actual ZIP/payload bytes, duplicate JSON/manifest fields, unsafe/case-folded paths, encryption/symlink/truncation/header faults, CRC/hash/listing/import dependency/resource errors, atomic IDB registry installation and quota preservation, compatible update staging. Installed selection and negative-case B remains NOT TESTED. fflate 0.8.2 and Acorn 8.15.0 are pinned, bundled locally by explicit build-copy imports, with licenses.
+
+Checkpoint `5d66cb22722cbaf3ba18bf98ce01658b70e1139b` is pushed in draft PR #5. Focused ZIP64-directory and streaming data-descriptor cases now pass too (seven package checks, 41 focused total). The installed journey selects actual ZIP files, runs the installed sandbox action and checks precise duplicate-key/budget/quota UI errors against independently retained registry, unfinished job and draft. B remains NOT TESTED until CI passes.

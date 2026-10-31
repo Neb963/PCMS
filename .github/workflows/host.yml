@@ -52,12 +52,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Persistent module journey (normal sandbox)
-        run: python3 tests/installed_modules.py build/pcms-dev.xpi
+      - name: Persistent ZIP journey (normal sandbox)
+        run: python3 tests/installed_packages.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-modules-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-packages-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json
