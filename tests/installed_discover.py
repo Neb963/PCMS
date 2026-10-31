@@ -68,6 +68,8 @@ def main():
   except Exception as error:
    receipt['error']=str(error);receipt['slugReads']=fixture.slug_reads
    if sid:
+    try:receipt['page'] = script(sid,"return {text:document.body.innerText,start:document.getElementById('discover-start')?.disabled,feedback:document.getElementById('discover-feedback')?.textContent};")
+    except Exception:pass
     try:top(sid);receipt['state']=inspect(sid)
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise
