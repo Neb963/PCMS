@@ -15,7 +15,7 @@ P01–P05 are merged into `main`. P05 PR #5 merged at `9795a433140a5be8c1c90b1f8
 
 ## Evidence / holds
 
-T/B implementation written; **verification PENDING**. No PASS claimed until current-candidate CI finishes. H/G/P live effects are deferred by the accepted phase plan. P07 owns active-generation update/Disable/Enable and dirty-editor teardown; the P06 preservation fixture may set existing disabled state directly, but is not P07 operational acceptance.
+Initial P06 CI [run 41223284976](https://github.com/Neb963/PCMS/actions/runs/41223284976): T failed at seed.test line 34 due to assuming insertion rather than indexed sort; B failed at installed_seed.py line 69 due to checking asynchronous Other rendering before it appeared. Both test-oracle defects corrected on branch; current-candidate T/B **PENDING**. No PASS claimed until current-candidate CI finishes. H/G/P live effects are deferred by the accepted phase plan. P07 owns active-generation update/Disable/Enable and dirty-editor teardown; the P06 preservation fixture may set existing disabled state directly, but is not P07 operational acceptance.
 
 ## Next action
 
