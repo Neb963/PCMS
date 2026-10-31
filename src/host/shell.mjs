@@ -33,6 +33,8 @@ export function registerShell(api) {
   api.runtime.onInstalled.addListener(() => {});
   api.alarms.onAlarm.addListener(alarm => {if(alarm.name==='pcms-queue')void records.wake().catch(()=>{});});
   api.downloads.onChanged.addListener(() => {});
+  api.webNavigation?.onDOMContentLoaded?.addListener(details=>{void records.website(details).catch(()=>{});});
+  api.permissions?.onAdded?.addListener(()=>{void records.handle({operation:'modules.rebuild'});});
   api.runtime.onConnect.addListener(port => {
     if(port.name==='pcms-core-rpc'){
       if(!trustedShell(api,port.sender)){port.disconnect();return;}

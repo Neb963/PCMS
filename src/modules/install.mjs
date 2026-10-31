@@ -17,7 +17,7 @@ export function createInstaller(core){
    for(const file of m.files){payload[file.path]=await core.putBytes(candidate.files.get(file.path),pinId);refs.push(payload[file.path]);}
    const manifestHash=await core.putBytes(candidate.files.get('module.json'),pinId),packageHash=await core.putBytes(candidate.zip,pinId);refs.push(manifestHash,packageHash);
    const packageRecord={packageHash,manifestHash,manifest:m,payload,refs};
-   const value=current?{...current,staged:packageRecord}:{moduleId:m.id,name:m.name,version:m.version,enabled:true,generation:1,settings:{},settingsSchema:m.settingsSchema,state:'READY',...packageRecord};
+   const value=current?{...current,staged:packageRecord}:{moduleId:m.id,name:m.name,version:m.version,enabled:true,generation:1,jobSchema:m.jobSchema,settings:{},settingsSchema:m.settingsSchema,state:'READY',...packageRecord};
    try{await core.mutate([{table:'modules',id:m.id,value,expectedRev:current?.rev??0,refs:[...new Set([...(current?.refs??[]),...refs])]}],{step:'IMPORT_MODULE',result:current?'STAGED':'COMPLETE',moduleId:m.id});committed=true;}
    catch(error){const latest=await core.read('modules',m.id);if(latest?.packageHash===packageHash){try{await core.releasePin(pinId);}catch{}return {state:'UNCHANGED',id:m.id};}throw error;}
    let cleanupCode=null;try{await core.releasePin(pinId);}catch{cleanupCode='IMPORT_PIN_CLEANUP_PENDING';}

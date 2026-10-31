@@ -15,13 +15,13 @@ export function createLifecycle({core,host,clock=Date.now}) {
  async function hold(m,code){return save(m,{enabled:false,state:'HELD',lifecycle:{...m.lifecycle,code}},'HELD');}
  async function advance(id){
   let m=await core.read('modules',id);if(!m?.lifecycle)return m;
-  const l=m.lifecycle;
+  const l=m.lifecycle;core.queue.fence(id);
   // A dispatched call may still finish. Only independent readback can clear a
   // POSSIBLE boundary, even if its runner/boot has gone away.
+  await host.unregister(m);
   if((await jobs(id)).some(j=>j.effect?.boundary==='POSSIBLE'))return hold(m,'MODULE_EFFECT_UNKNOWN');
   if(l.phase==='STOP'){
    try{
-    await host.unregister(m);
     const receipts=await host.stopModule(m,l);
     m=await core.read('modules',id);
     check(Array.isArray(receipts),'MODULE_STOP_INCOMPLETE');
@@ -46,7 +46,7 @@ export function createLifecycle({core,host,clock=Date.now}) {
    try{
     if(m.lifecycle.desiredEnabled)await host.rebuild({...m,enabled:true,lifecycle:null});
     m=await core.read('modules',id);
-    return save(m,{enabled:m.lifecycle.desiredEnabled,state:m.lifecycle.desiredEnabled?'READY':'DISABLED',lastLifecycle:{id:m.lifecycle.id,kind:m.lifecycle.kind,completedAt:clock()},lifecycle:null},'COMPLETE');
+    const done=await save(m,{enabled:m.lifecycle.desiredEnabled,state:m.lifecycle.desiredEnabled?'READY':'DISABLED',lastLifecycle:{id:m.lifecycle.id,kind:m.lifecycle.kind,completedAt:clock()},lifecycle:null},'COMPLETE');core.queue.unfence(id);return done;
    }catch{return hold(m,'MODULE_REBUILD_FAILED');}
   }
   return m;
@@ -61,6 +61,7 @@ export function createLifecycle({core,host,clock=Date.now}) {
    const candidate=kind==='UPDATE'?m.staged:kind==='ROLLBACK'?m.previous:m;
    if(kind!=='DISABLE')await compatible(m,candidate);
    const instances=await host.instances(m);
+   core.queue.fence(id);
    m=await save(m,{enabled:false,generation:m.generation+1,state:'STOPPING',lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances,startedAt:clock(),code:null}},'FENCED');
    await host.fence(m);
    return advance(id);

@@ -50,10 +50,10 @@ let disposeModule=null;
 let view={journalFilter:'',route:'home',scroll:0,workSearch:'',workState:''},pageCursor=null,nextCursor=null;
 let corePort=null;const requests=new Map();
 function connection(){if(corePort)return corePort;const port=browser.runtime.connect({name:'pcms-core-rpc'});corePort=port;
- port.onMessage.addListener(({rpcId,response})=>{const request=requests.get(rpcId);if(request){requests.delete(rpcId);request(response);}});
- port.onDisconnect.addListener(()=>{if(corePort===port)corePort=null;for(const resolve of requests.values())resolve({ok:false,code:'CORE_UNAVAILABLE'});requests.clear();});return port;}
+ port.onMessage.addListener(({rpcId,response,event})=>{if(event?.type==='stopModulePage')window.dispatchEvent(new CustomEvent('pcms-module-stop',{detail:event}));if(event?.type==='moduleChanged')void updateModuleNavigation();const request=requests.get(rpcId);if(request){requests.delete(rpcId);request(response);}});
+ port.onDisconnect.addListener(()=>{if(corePort===port)corePort=null;if(disposeModule){disposeModule();disposeModule=null;}for(const resolve of requests.values())resolve({ok:false,code:'CORE_UNAVAILABLE'});requests.clear();});return port;}
 const core=(operation,extra={})=>new Promise(resolve=>{const rpcId=crypto.randomUUID();requests.set(rpcId,resolve);try{connection().postMessage({channel:'pcms-core',rpcId,operation,...extra});}catch{requests.delete(rpcId);resolve({ok:false,code:'CORE_UNAVAILABLE'});}});
-const errors={STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
+const errors={MODULE_STOP_INCOMPLETE:'An old page has not stopped safely. Continue review in the affected editor, then check safe stop.',MODULE_EFFECT_UNKNOWN:'An external result is unknown. It must be read back before the module can change.',MODULE_PERMISSION_REQUIRED:'Allow website scripts, then check safe stop.',MODULE_JOB_INCOMPATIBLE:'This version cannot read the saved job. Select a compatible package. Work is kept.',MODULE_SETTINGS_INCOMPATIBLE:'This version cannot read the saved settings. Select a compatible package.',MODULE_EDITOR_MISSING:'The affected editor is no longer open. Work stays held for inspection.',MODULE_START_FAILED:'The selected module could not start. The previous version and work are kept.',STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function failure(code){const n=node('p',errors[code]||'Core records are unavailable. Restart Firefox to check again.');n.setAttribute('role','alert');n.dataset.code=code;return n;}
 async function persist(){
@@ -136,6 +136,9 @@ async function renderOther(area){
 }
 async function renderModuleSettings(area){
  area.append(node('h2','Modules'));renderInstall(area);
+ const permission=await core('modules.permission');
+ if(permission.ok&&!permission.result.granted){const button=node('button','Allow website scripts');button.id='allow-userscripts';button.type='button';const result=node('p');result.setAttribute('role','status');button.addEventListener('click',async()=>{try{const granted=await browser.permissions.request({permissions:['userScripts']});result.textContent=granted?'Website scripts allowed.':'Website scripts are still blocked. You can allow them here later.';if(granted){await core('modules.rebuild');await renderRecords('settings');}}catch{result.textContent='Firefox could not grant website scripts. Check this extension’s permissions.';}});area.append(button,result);}
+
  const status=await core('modules.seed.status');
  if(!status.ok){area.append(failure(status.code));}
  else if(!status.result.initialized){
@@ -150,6 +153,14 @@ async function renderModuleSettings(area){
  }
  const selected=location.hash.split('/')[2];
  for(const module of await moduleRecords())if(!selected||selected===module.id){const section=node('section'),title=node('h3',module.name??module.id);section.append(title,node('p',(module.version??'Unknown version')+' · '+(module.enabled?'Enabled':'Disabled')));if(module.stagedVersion)section.append(node('p','Update '+module.stagedVersion+' staged.'));
+  section.dataset.module=module.id;
+  const outcome=node('p');outcome.setAttribute('role','status');outcome.className='lifecycle-result';
+  if(module.lifecycle)outcome.textContent=(module.lifecycle.kind==='DISABLE'?'Disabling':'Updating')+' — '+(module.lifecycle.code||'Stopping safely');
+  for(const [kind,label] of module.lifecycle?[['CONTINUE','Check safe stop']]:[...module.stagedVersion?[['UPDATE','Update to '+module.stagedVersion]]:[],[module.enabled?'DISABLE':'ENABLE',module.enabled?'Disable':'Enable'],...module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]){
+   const button=node('button',label);button.type='button';button.dataset.lifecycle=kind;button.addEventListener('click',async()=>{button.disabled=true;outcome.textContent='In progress';const response=await core('module.lifecycle',{id:module.id,kind,requestId:crypto.randomUUID()});if(response.ok){await updateModuleNavigation();await renderRecords('settings');}else{outcome.replaceChildren(failure(response.code));button.disabled=false;}});section.append(button);
+  }
+  if(module.lifecycle?.code==='MODULE_STOP_INCOMPLETE'){const open=node('button','Open affected editor');open.type='button';open.addEventListener('click',async()=>{const result=await core('module.editor',{id:module.id});if(!result.ok)outcome.replaceChildren(failure(result.code));});section.append(open);}
+  section.append(outcome);
   if(module.enabled&&module.pages.length){const label=node('label'),check=node('input');check.type='checkbox';check.checked=module.pinned;check.className='module-pin';check.dataset.module=module.id;label.append(check,document.createTextNode(' Show in primary navigation'));check.addEventListener('change',async()=>{const result=await core('module.pin',{id:module.id,pinned:check.checked});if(result.ok)await updateModuleNavigation();else{check.checked=!check.checked;section.append(failure(result.code));}});section.append(label);}
   area.append(section);
  }

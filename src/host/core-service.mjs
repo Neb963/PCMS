@@ -3,11 +3,13 @@ import {seedBundled} from '../modules/seed.mjs';
 import {PackageError} from '../modules/package.mjs';
 import {createModuleHost} from './module-host.mjs';
 import {createLifecycle} from '../modules/lifecycle.mjs';
+import {createWebsiteScripts} from './website-scripts.mjs';
+import {websiteContext} from './bootstrap.mjs';
 import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,seedFailure=null;
+  let pending,modules,lifecycle,scripts,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -18,7 +20,18 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     await value.queue.boot();
     await value.record({step:'CORE_START',result:'COMPLETE'});
     await seed(value);
-    if(globalThis.document&&api){modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value)});lifecycle=createLifecycle({core:value,host:modules.lifecycle});await lifecycle.recover();await modules.start();await modules.turn();}
+    if(globalThis.document&&api){
+      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value)});
+      scripts=createWebsiteScripts({core:value,api,load:modules.load,context:websiteContext});
+      const host=modules.lifecycle;
+      lifecycle=createLifecycle({core:value,host:{...host,
+        instances:async m=>[...await host.instances(m),...scripts.instances(m)],
+        unregister:m=>scripts.unregister(m),
+        stopModule:async(m,l)=>[...await host.stopModule(m,{...l,instances:l.instances.filter(i=>i.type!=='website')}),...await scripts.stop(m,l)],
+        rebuild:async m=>{await host.rebuild(m);await scripts.configure(m);}
+      }});
+      await lifecycle.recover();await scripts.rebuild();await modules.start();await modules.turn();
+    }
     const due=await value.queue.deadline();if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}
     return value;
   })().catch(error=>{pending=null;throw error;});
@@ -28,6 +41,8 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       switch(message?.operation) {
         case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
         case 'modules.permission':result={granted:await api.permissions.contains({permissions:['userScripts']})};break;
+        case 'modules.rebuild':await lifecycle?.recover();await scripts?.rebuild();await modules?.start();result={state:'CHECKED'};break;
+        case 'module.editor':result=await scripts.open(await value.read('modules',message.id));break;
         case 'module.install':{result=await createInstaller(value).install(message.bytes,{budget:message.budget});if(modules)await modules.start();break;}
         case 'modules.seed.status':result={...await value.moduleSeedStatus(),failure:seedFailure};break;
         case 'modules.seed.retry':{result=await seed(value);if(result.state==='FAILED')return {ok:false,code:result.code};if(modules)await modules.start();break;}
@@ -55,5 +70,5 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     } catch(error){return {ok:false,code:error instanceof PackageError?error.code:/^(MODULE_[A-Z_]+|PAGE_[A-Z_]+|DOCUMENT_DENIED|CAPABILITY_DENIED|TARGET_DENIED|ACTION_DENIED)$/.test(error?.message)?error.message:publicError(error)};}
   }
   async function schedule(value){const due=await value.queue.deadline();if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}}
-  return {start:core,handle,closeDocument:id=>modules?.closeDocument(id),wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(modules)await modules.turn();await value.queue.acknowledgeWake(cut);await schedule(value);}};
+  return {start:core,handle,closeDocument:id=>modules?.closeDocument(id),website:async details=>{await core();await scripts?.inject(details);},wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(lifecycle)await lifecycle.recover();if(modules)await modules.turn();await value.queue.acknowledgeWake(cut);await schedule(value);}};
 }

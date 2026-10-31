@@ -66,3 +66,5 @@ export async function hostStatus(api) {
     return result;
   } catch { return {...result, code: 'DONOR_BOOTSTRAP_FAILED'}; }
 }
+
+export async function websiteContext(tab){if(!donor||failure)return null;await donor.initialize();return donor.websiteContext?.(tab)??null;}

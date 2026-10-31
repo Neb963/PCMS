@@ -126,7 +126,6 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   async checkCandidate(m,jobs){const b=await frame({...m,validationJobs:jobs},'validate');remove(b);},
   async instances(m){return [...frames,...pageBindings.values()].filter(b=>b.moduleId===m.id).map(b=>({instance:b.channel,document:bootId,type:'sandbox'}));},
   async fence(m){notify({type:'moduleFenced',moduleId:m.id});},
-  async unregister(){},
   async stopModule(m,l){
    if(running)await running;
    const receipts=[];

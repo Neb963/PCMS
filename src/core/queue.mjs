@@ -1,6 +1,6 @@
 // Finite queue primitives. Modules own their steps; Core owns admission/effects.
 export function createQueue({transact,root,writeRows,append,req,check,clock}) {
- const bootId=crypto.randomUUID(),active=new Map();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
+ const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
  const tables=['jobs','generators','modules','versions','events','blobs','chunks','commands'];
  const tx=work=>transact(tables,'readwrite',async s=>work(s,await root(s)));
  const read=(s,r,table,id)=>req(s(table).get([r.dataset,id]));
@@ -13,6 +13,8 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
  };
  const serial=fn=>{const turn=arbiter.then(fn,fn);arbiter=turn.catch(()=>{});return turn;};
  const api={
+  fence:moduleId=>fenced.add(moduleId),
+  unfence:moduleId=>fenced.delete(moduleId),
   boot:async()=>{
    if(initialized)return;
    await tx(async(s,r)=>{
@@ -109,7 +111,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
         // Every individual Git object/ref call comes through this boundary.
         return save(s,r,job,{state:'RUNNING',needsCheck:false,effect:{operationId,kind,inputHash,boundary:'POSSIBLE',bootId,epoch:r.admissionEpoch??0}},'EFFECT_INTENT','POSSIBLE');
       });
-      if(blocked&&write){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,'PAUSED');}
+      if((blocked||fenced.has(job.moduleId))&&write){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,'PAUSED');}
       const marker={targetId:job.targetId,accountId:job.accountId,maintenance:!write};active.set(operationId,marker);
       let sent;try{sent=Promise.resolve(call({operationId}));}catch(error){sent=Promise.reject(error);}
       return {job,sent};
