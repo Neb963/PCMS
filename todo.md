@@ -24,3 +24,5 @@ Installed run [41241812062](https://github.com/Neb963/PCMS/actions/runs/41241812
 Final race review adds per-account fence epochs: a new Archive cancels a Reactivate call in the intent-to-call gap even though Reactivate legitimately began behind its older lifecycle fence. The regression observes zero adapter calls. This bounded queue change requires its rebuilt T/B candidate; no scope expansion.
 
 The installed other-account Open oracle waits for the distinct new operation ID and its completion, so an earlier Ready record cannot satisfy the assertion. Await the final changed candidate's complete T/B run before merge.
+
+Archive parks only runnable/in-progress known-safe steps. It preserves pre-existing held review/challenge reasons and checkpoints, so Reactivate cannot release a human-review hold. The focused regression keeps the same held job/recovery/checkpoint while its account returns Ready.
