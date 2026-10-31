@@ -119,7 +119,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     });
     try {
       await admitted.sent;
-      const observation=await observe({operationId});check(observation?.matched===true,'OUTCOME_UNKNOWN');
+      const observation=await observe({operationId});check(observation?.matched===true||observation?.resolved===true&&observation.outcome==='FAILED','OUTCOME_UNKNOWN');
       return await api.reconcile(jobId,admitted.job.rev,operationId,observation);
     } catch {
       await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);if(current.effect?.operationId===operationId&&current.effect.boundary==='POSSIBLE')await save(s,r,current,{state:'HELD',recovery:{action:'RECONCILE',code:'OUTCOME_UNKNOWN'}},'EFFECT_OUTCOME','UNKNOWN');});

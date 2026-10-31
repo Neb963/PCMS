@@ -172,4 +172,3 @@ export function repairMullvadRuntime(source){
   return { resolve, refreshStatus, maybeStopIdle, clear, drop, setStatus, getStatus, invalidateConnections,recoveryGeneration,recoveryCurrent,acceptObservedPreparation };`);
  return source;
 }
-

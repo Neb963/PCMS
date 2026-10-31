@@ -17,4 +17,3 @@ export async function restoreNativeReceipt(storage,key,incoming){
   return {preserved:false};
  });
 }
-

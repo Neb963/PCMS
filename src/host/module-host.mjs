@@ -16,7 +16,7 @@ export function sanitizeMarkup(html,document) {
  return parsed.body.innerHTML;
 }
 export function sanitizeStyle(css){return /@import|url\s*\(|expression\s*\(|-moz-binding|\\/i.test(css)?'':css;}
-export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},journalEffect=null}) {
+export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},journalEffect=null,accountEffect=null}) {
  const frames=new Set(),backgrounds=new Map(),pageBindings=new Map(),bootId=crypto.randomUUID();let running=null;const reconciled=new Set();
  const manifestCap=(m,group)=>m.manifest?.capabilities?.find(c=>c.startsWith(group+'.'));
  async function current(binding){return core.read('modules',binding.moduleId);}
@@ -29,9 +29,15 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(binding.mode==='validate')throw Error('VALIDATION_READ_ONLY');
   const active=await current(binding),operation=m.operation,args=m.args??{};
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
+  const accountCall=['accounts.step','accounts.status'].includes(args.name);
   const journalCall=['journal.export','journal.status','journal.cleanup','journal.cleanupStatus'].includes(args.name);
-  const capability=journalCall?(args.name.startsWith('journal.cleanup')?'journal.cleanup':'journal.export'):operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
+  const capability=accountCall?'persona.prepare':journalCall?(args.name.startsWith('journal.cleanup')?'journal.cleanup':'journal.export'):operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
   if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
+  if(accountCall){
+   if(binding.mode!=='background'||!binding.jobId||active.packageClass!=='bundled-accounts'||!accountEffect||(args.name==='accounts.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
+   const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.accountId!==binding.accountId||job.targetId!==binding.targetId||job.rev!==binding.expectedRevision)throw Error('STALE_REVISION');
+   const result=await accountEffect(job,args.name==='accounts.status');binding.expectedRevision=result.jobRevision;return result.value;
+  }
   if(journalCall){
    if(binding.mode!=='background'||!binding.jobId||active.packageClass!=='bundled-journal'||!journalEffect||(['journal.status','journal.cleanupStatus'].includes(args.name)?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
    const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.rev!==binding.expectedRevision)throw Error('STALE_REVISION');
@@ -74,7 +80,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
  window.addEventListener('message',message);
  function request(binding,type,value={}){
   const callId=crypto.randomUUID();return new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>{binding.pending.delete(callId);reject(Error('MODULE_STEP_TIMEOUT'));},30000);
+   const timer=setTimeout(()=>{binding.pending.delete(callId);reject(Error('MODULE_STEP_TIMEOUT'));},binding.moduleId==='pcms-accounts'&&type==='STEP'?90000:30000);
    binding.pending.set(callId,{resolve,reject,timer});binding.window.postMessage({channel:binding.channel,type,callId,...value},'*');
   });
  }

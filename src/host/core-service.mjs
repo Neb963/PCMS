@@ -4,7 +4,9 @@ import {PackageError} from '../modules/package.mjs';
 import {createModuleHost} from './module-host.mjs';
 import {createLifecycle} from '../modules/lifecycle.mjs';
 import {createWebsiteScripts} from './website-scripts.mjs';
-import {websiteContext} from './bootstrap.mjs';
+import {createAccounts} from '../modules/accounts.mjs';
+import {refreshAccountPins} from './account-pins.mjs';
+import {websiteContext,accountAdapter} from './bootstrap.mjs';
 import {createRetention} from '../core/retention.mjs';
 import {createDownloads} from '../core/downloads.mjs';
 import {createJournal} from '../modules/journal.mjs';
@@ -12,7 +14,7 @@ import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -23,10 +25,11 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     await value.queue.boot();
     await value.record({step:'CORE_START',result:'COMPLETE'});
     await seed(value);
+    accounts=createAccounts({core:value,donor:accountAdapter,pins:refreshAccountPins});await accounts.initialize();
     downloads=api?.downloads?createDownloads({core:value,api,profileId:(await value.status()).profileId}):null;
     journal=createJournal({core:value,downloads,retention:api?.downloads?createRetention({core:value,api,profileId:(await value.status()).profileId}):null});await journal.initialize();if(downloads)await journal.changed();await journal.tick();
     if(globalThis.document&&api){
-      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect});
+      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect});
       scripts=createWebsiteScripts({core:value,api,load:modules.load,context:websiteContext});
       const host=modules.lifecycle;
       lifecycle=createLifecycle({core:value,host:{...host,
@@ -44,7 +47,13 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     try {
       const value=await core();let result;
       switch(message?.operation) {
-        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await journal.tick();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await journal.tick();await accounts.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'accounts.status':result=await accounts.status();break;
+        case 'accounts.list':result=await accounts.list(message);break;
+        case 'accounts.get':result=await accounts.get(message.id);break;
+        case 'accounts.add':result=await accounts.add({label:message.label,requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'accounts.command':result=await accounts.command({id:message.id,kind:message.kind,requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'accounts.check':result=await accounts.check(message.id);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'journal.check':await journal.changed();if(modules)await modules.turn();await schedule(value);result=await journal.status();break;
         case 'journal.status':result=await journal.status();break;
         case 'journal.events':result=await journal.events(message);break;
@@ -72,7 +81,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'view.get':result=await value.view('shell-view');break;
         case 'view.save': {
           const v=message.value;
-          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
+          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
           result=await value.saveView('shell-view',v,message.requestId);break;
         }
         default:return {ok:false,code:'OPERATION_DENIED'};

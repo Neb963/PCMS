@@ -21,7 +21,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   a=await core.read('accounts',a.id);if(a.flow.requestId!==job.input.requestId)return a;
   return save(a,{flow:{...a.flow,jobId:job.id}},'ACCOUNT_JOB_LINK');
  }
- const scope=a=>({accountId:a.id,label:a.label,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,preparationId:a.preparationId,tabId:a.tabId,exitAddresses:a.exitAddresses,expectedPrincipal:a.expectedPrincipal});
+ const scope=a=>({accountId:a.id,label:a.label,rejectedRouteId:a.flow?.rejectedRouteId,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,preparationId:a.preparationId,tabId:a.tabId,exitAddresses:a.exitAddresses,expectedPrincipal:a.expectedPrincipal});
  const result=async(job,state,code=null)=>({value:{state,code,accountId:job.accountId},jobRevision:(await core.read('jobs',job.id)).rev});
  async function hold(a,job,code){if(a.holdCode!==code||a.state!=='HELD')await save(a,{state:'HELD',holdCode:code},'ACCOUNT_HOLD','HELD');return result(job,'HELD',code);}
  async function apply(a,job,stage,value){
@@ -67,14 +67,14 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    check(['CREATE','SELECT','CREATE_ROUTE','ASSIGN','VERIFY','OPEN'].includes(stage),'ACCOUNT_STAGE_INVALID');
    if(possible||observed){
     check(!possible||current.effect.operationId===operationId,'ACCOUNT_OPERATION_CHANGED');const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});
-    if(!value?.ok){if(possible&&value?.noDispatch)await core.queue.reconcile(job.id,current.rev,operationId,{resolved:true,outcome:'FAILED',code:value.code,operationId});return hold(a,job,value?.code??'ACCOUNT_OUTCOME_UNKNOWN');}
+    if(!value?.ok){if(possible&&(value?.noDispatch||value?.resolved))await core.queue.reconcile(job.id,current.rev,operationId,{resolved:true,outcome:'FAILED',code:value.code,operationId});return hold(a,job,value?.code??'ACCOUNT_OUTCOME_UNKNOWN');}
     if(possible)await core.queue.reconcile(job.id,current.rev,operationId,{matched:true,operationId});
     a=await core.read('accounts',a.id);return await apply(a,job,stage,value);
    }
    if(reconcile)return result(job,'READY');await admit();
    const prerequisites=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!prerequisites?.ok)return hold(a,job,prerequisites?.code??'DONOR_UNAVAILABLE');
-   await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_'+stage,write:true,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {accountRevision:latest.rev,ok:latest.rev===a.rev&&latest.flow.jobId===job.id&&(await donor.checkBinding(scope(latest),{stage:'PREREQUISITES',readOnly:true})).ok===true};},call:()=>stage==='OPEN'?donor.openProtectedTab(scope(a),{operationId,stage}):donor.preparePersona(scope(a),{operationId,stage}),observe:async()=>{const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return value?.ok?{matched:true,operationId}:value?.noDispatch?{resolved:true,outcome:'FAILED',code:value.code,operationId}:{matched:false,operationId};}});
-   const updated=await core.read('jobs',job.id);if(updated.state==='FAILED'){const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return hold(await core.read('accounts',a.id),job,value?.code??'ACCOUNT_SETUP_FAILED');}
+   let reply;await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_'+stage,write:true,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {accountRevision:latest.rev,ok:latest.rev===a.rev&&latest.flow.jobId===job.id&&(await donor.checkBinding(scope(latest),{stage:'PREREQUISITES',readOnly:true})).ok===true};},call:async()=>{reply=await(stage==='OPEN'?donor.openProtectedTab(scope(a),{operationId,stage}):donor.preparePersona(scope(a),{operationId,stage}));},observe:async()=>{const value=(reply?.noDispatch||reply?.resolved)?reply:await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return value?.ok?{matched:true,operationId}:(value?.noDispatch||value?.resolved)?{resolved:true,outcome:'FAILED',code:value.code,operationId}:{matched:false,operationId};}});
+   const updated=await core.read('jobs',job.id);if(updated.state==='FAILED'){const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return hold(await core.read('accounts',a.id),job,updated.recovery?.code??value?.code??'ACCOUNT_SETUP_FAILED');}
    return effect(updated,true);
   }catch(error){
    const code=error.code??(/^[A-Z][A-Z_]*$/.test(error.message)?error.message:publicError(error));return hold(await core.read('accounts',a.id),job,code);
@@ -84,15 +84,15 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   check(UUID.test(requestId??''),'INVALID_REQUEST');await admit();let a=await core.read('accounts',id);check(a,'ACCOUNT_MISSING');check(a.state!=='ARCHIVED','ACCOUNT_ARCHIVED');
   const prior=await core.command('account-command:'+requestId);if(prior){check(prior.signature===JSON.stringify([id,kind]),'REQUEST_CONFLICT');return project('accounts',await ensure(a));}
   if(a.flow.jobId&&!END.has(a.flow.stage)){
-   const job=await core.read('jobs',a.flow.jobId);if(job?.effect?.boundary==='POSSIBLE')return project('accounts',a);
+   const job=await core.read('jobs',a.flow.jobId);if(job?.effect?.boundary==='POSSIBLE'){const observation=await effect(job,true),latest=await core.read('jobs',job.id);if(['CONTINUE','READY','COMPLETE'].includes(observation.value.state)&&latest.effect?.boundary!=='POSSIBLE'&&latest.state==='HELD')await core.queue.transition(job.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});return project('accounts',await core.read('accounts',id));}
    if(job&&!['FAILED','COMPLETE'].includes(job.state)){check(job.state==='HELD','ACCOUNT_BUSY');await core.queue.transition(job.id,job.rev,{state:'FAILED',recovery:{action:'OPEN_ACCOUNT',code:'SUPERSEDED_BY_RECHECK'}});}
   }
   check(['CONFIRM','LOGIN','OPEN','REPAIR'].includes(kind),'ACCOUNT_COMMAND_DENIED');
   if(kind==='CONFIRM')check(a.personaUid&&a.containerId&&a.routeId&&a.tabId!=null,'ACCOUNT_LOGIN_NOT_OPEN');
   if(kind==='OPEN')check(!!a.expectedPrincipal,'ACCOUNT_NOT_READY');
   if(kind!=='REPAIR')check(END.has(a.flow.stage)||a.holdCode&&a.personaUid,'ACCOUNT_SETUP_INCOMPLETE');
-  const wasReady=!!a.expectedPrincipal,stage=kind==='REPAIR'&&!END.has(a.flow.stage)&&a.flow.stage!=='IDENTITY'?a.flow.stage:'VERIFY',confirmationAt=kind==='CONFIRM'?clock():kind==='REPAIR'?a.flow.confirmationAt??null:null;
-  a=await save(a,{state:'PREPARING',holdCode:null,flow:{requestId,jobId:null,purpose:kind,stage,startedAt:clock(),wasReady,confirmationAt}},'ACCOUNT_COMMAND','COMPLETE',{id:'account-command:'+requestId,signature:JSON.stringify([id,kind])});return project('accounts',await ensure(a));
+  const changeCandidate=kind==='REPAIR'&&!a.expectedPrincipal&&a.flow.stage==='VERIFY'&&['ACCOUNT_BINDING_RESERVED','ROUTE_CONNECTION_FAILED','DNS_LEAK_DETECTED','NOT_A_MULLVAD_EXIT','IPV6_EVIDENCE_UNVERIFIED'].includes(a.holdCode),wasReady=!!a.expectedPrincipal,stage=changeCandidate?'SELECT':a.holdCode==='ACCOUNT_ROUTE_RECHECK_REQUIRED'?'VERIFY':kind==='REPAIR'&&!END.has(a.flow.stage)&&a.flow.stage!=='IDENTITY'?a.flow.stage:'VERIFY',confirmationAt=kind==='CONFIRM'?clock():kind==='REPAIR'?a.flow.confirmationAt??null:null;
+  a=await save(a,{state:'PREPARING',holdCode:null,flow:{requestId,jobId:null,purpose:kind,stage,startedAt:clock(),wasReady,confirmationAt,rejectedRouteId:changeCandidate?a.routeId:null}},'ACCOUNT_COMMAND','COMPLETE',{id:'account-command:'+requestId,signature:JSON.stringify([id,kind])});return project('accounts',await ensure(a));
  }
  return {
   initialize:async()=>{await pins(core);const m=await module();if(!available(m)||!m.enabled||m.lifecycle)return;let cursor=null;do{const page=await core.list({table:'accounts',cursor});for(const p of page.rows){const a=await core.read('accounts',p.id);if(a.flow&&!a.flow.jobId&&!END.has(a.flow.stage))await ensure(a);}cursor=page.cursor;}while(cursor);},

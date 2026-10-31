@@ -46,7 +46,12 @@ export async function bindingObservation(value){
 // Fixed isolated-world session read. Token/email are sent only to the native
 // same-origin read endpoint; no secret leaves the protected page. The fresh
 // authenticated response, not local loggedIn state, establishes identity.
-export async function observePerchanceIdentity(){
+export function accountDocumentWitness(){
+ if(!Object.prototype.hasOwnProperty.call(globalThis,'__PCMS_ACCOUNT_DOCUMENT_1'))Object.defineProperty(globalThis,'__PCMS_ACCOUNT_DOCUMENT_1',{value:crypto.randomUUID()});
+ return globalThis.__PCMS_ACCOUNT_DOCUMENT_1;
+}
+export async function observePerchanceIdentity(expectedDocumentWitness){
+ if(typeof expectedDocumentWitness!=='string'||globalThis.__PCMS_ACCOUNT_DOCUMENT_1!==expectedDocumentWitness)return {ok:false,code:'ACCOUNT_DOCUMENT_CHANGED'};
  const hold=code=>({ok:false,code});
  if(location.origin!=='https://perchance.org')return hold('WRONG_ORIGIN');
  if(globalThis.document?.querySelector('#challenge-running,.cf-turnstile,iframe[src*="challenges.cloudflare.com"]'))return hold('ACCOUNT_CHALLENGE');
@@ -59,8 +64,9 @@ export async function observePerchanceIdentity(){
   if(response.status===429)return hold('ACCOUNT_RATE_LIMITED');if(response.status!==200||!String(response.headers.get('content-type')).includes('json'))return hold('ACCOUNT_IDENTITY_UNKNOWN');const body=await response.json();
   if(body?.status==='session-token-error')return hold('ACCOUNT_LOGIN_REQUIRED');
   if(body?.status!=='success'||!Array.isArray(body.generators)||!body.generatorFolderMap||typeof body.generatorFolderMap!=='object'||Array.isArray(body.generatorFolderMap))return hold('ACCOUNT_IDENTITY_UNKNOWN');
+  if(globalThis.__PCMS_ACCOUNT_DOCUMENT_1!==expectedDocumentWitness)return hold('ACCOUNT_DOCUMENT_CHANGED');
   if(location.origin!=='https://perchance.org'||localStorage.getItem('app-storage')!==raw||localStorage.getItem('sessionTokenLastChangeTime')!==change)return hold('ACCOUNT_PRINCIPAL_CHANGED');
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(principal));
-  return {ok:true,source:'PERCHANCE_AUTHENTICATED_IDENTITY',principalFingerprint:[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join(''),principalLabel:principal,observedAt:Date.now()};
+  return {ok:true,documentWitness:expectedDocumentWitness,source:'PERCHANCE_AUTHENTICATED_IDENTITY',principalFingerprint:[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join(''),principalLabel:principal,observedAt:Date.now()};
  }catch{return hold('ACCOUNT_IDENTITY_UNKNOWN');}
 }

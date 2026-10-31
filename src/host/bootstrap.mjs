@@ -68,3 +68,10 @@ export async function hostStatus(api) {
 }
 
 export async function websiteContext(tab){if(!donor||failure)return null;await donor.initialize();return donor.websiteContext?.(tab)??null;}
+
+// Private, fixed account operations. Never returned through dashboard/ZIP RPC.
+async function accountCall(name,scope,operation){
+ if(!donor||failure)return {ok:false,code:failure??'DONOR_STARTING'};
+ await donor.initialize();return donor.accounts[name](scope,operation);
+}
+export const accountAdapter=Object.freeze({preparePersona:(scope,op)=>accountCall('preparePersona',scope,op),checkBinding:(scope,op)=>accountCall('checkBinding',scope,op),openProtectedTab:(scope,op)=>accountCall('openProtectedTab',scope,op),repairRoute:(scope,op)=>accountCall('repairRoute',scope,op)});
