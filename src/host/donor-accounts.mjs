@@ -303,8 +303,9 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
     if(tab){const proof=await run(tab.id);if(proof.witness!==snapshot.witness||proof.manual||proof.url!==prior.url)return fail('DISCOVER_TAB_NEEDS_INSPECTION');tab=await api.tabs.update(tab.id,{url,active:false});}
     else tab=await personaPlatform.open(scope.containerId,url,false);
     await api.sessions.setTabValue(tab.id,'pcmsDiscoverTab',{accountId:scope.accountId,personaUid:scope.personaUid,operationId,role:'checking'});
+    await saveTab({schema:1,accountId:scope.accountId,operationId,slug,url,tabId:tab.id,witness:null,state:'NAVIGATING'});
     const until=Date.now()+15000;
-    while(Date.now()<until){await admit();const current=await api.tabs.get(tab.id);if(current.cookieStoreId!==scope.containerId||current.url&&current.url!==url)return fail('SLUG_DOCUMENT_CHANGED');if(current.status==='complete'&&current.url===url)break;await new Promise(resolve=>setTimeout(resolve,200));}
+    while(Date.now()<until){await admit();const current=await api.tabs.get(tab.id);if(current.cookieStoreId!==scope.containerId)return fail('SLUG_DOCUMENT_CHANGED');if(current.status==='complete'&&current.url===url)break;await new Promise(resolve=>setTimeout(resolve,200));}
     snapshot=await run(tab.id,{install:true});if(snapshot.url!==url||snapshot.manual)return fail('SLUG_DOCUMENT_CHANGED');
     state={schema:1,accountId:scope.accountId,operationId,slug,url,tabId:tab.id,witness:snapshot.witness,state:'OBSERVING'};await saveTab(state);
    }else{snapshot=await run(tab.id);if(snapshot.witness!==state.witness||snapshot.manual)return fail('DISCOVER_TAB_NEEDS_INSPECTION');}

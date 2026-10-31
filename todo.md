@@ -51,3 +51,5 @@ Installed314f004b proved trusted keyboard Start/Pause/Resume and exact protected
 A concrete Disable/recovery review found that an uncertain read could otherwise strand safe stop after the module was fenced. Core can now read back only that already-dispatched observation while disabled, then finish the same lifecycle stop; it cannot navigate or start the next check. A focused fenced-generation regression covers it. Final rebuilt T/B required.
 
 The affected installed journey now also operates actual Discover Disable/Enable on the stopped Unknown batch, checks no hidden navigation, then reopens its preserved results/hold before process restart. This qualifies the new safe-stop wrapper with the real page disposer and registered package.
+
+Installeddb17f7ef reached a real navigation race: Persona open returned while the new tab still exposed its initial document. The adapter now saves the created tab identity immediately and waits, within the existing bound, for the exact requested URL and complete document. Final exact container/URL/witness/identity checks remain unchanged; no redirect/other document can classify successfully. Rebuilt required T/B remains OPEN.
