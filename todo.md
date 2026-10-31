@@ -21,3 +21,5 @@ P14 code not yet written. Next implement/test the classifier and durable batch p
 G/H/P1–P5 remain NOT TESTED and unauthorized. P44 separately qualifies current native slug rules/messages/frames; fixtures do not establish live availability. No provider/Git target mutations in P14.
 
 Classifier checkpoint: exact accepted literals/layout folding, historical native normalization with retained collisions/rejections, and fixed isolated-world output snapshot are drafted with independent focused cases. Durable batch/adapter/UI/export and required final T/B remain OPEN.
+
+Durable policy checkpoint: batch rows/position/dates now live in the one Core job, with finite sequential read receipts, explicit Unknown/Resume, Pause fences and two-second/backoff deadlines. Core Downloads ZIP export preserves original/rejected/colliding rows with checked JSON/CSV hashes and a real file receipt. Adapter/primary UI/tests and final T/B remain OPEN.
