@@ -84,10 +84,11 @@ test('Work ordering/paging/search retain an exact snapshot and batch item counts
  assert.equal((await core.queue.list({search:'g2'})).rows[0].id,b.id);
  assert.deepEqual(await core.queue.batch('batch'),{completed:1,active:0,waiting:0,held:2});
 });
-test('one due wake is coalesced and future deadlines reconstruct without keepalive polling',async t=>{
- const {core,setClock}=await fixture(t);await core.queue.enqueue(input('past'));await core.queue.enqueue(input('future',{dueAt:5000}));
- assert.equal(await core.queue.deadline(),2000);await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),5000);
- setClock(6000);await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),null);
+test('finite wakes retain unhandled due work and stop after real completion/holds, without idle polling',async t=>{
+ const {core,setClock}=await fixture(t);const past=await core.queue.enqueue(input('past'));const future=await core.queue.enqueue(input('future',{dueAt:5000}));
+ assert.equal(await core.queue.deadline(),2000);await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),2000); // acknowledgement is not execution
+ const first=await core.queue.next();assert.equal(first.id,past.id);await core.queue.transition(first.id,first.rev,{state:'HELD',recovery:{action:'RECHECK',code:'FIXTURE_HOLD'}});await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),5000);
+ setClock(6000);await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),7000);const second=await core.queue.next();assert.equal(second.id,future.id);await core.queue.transition(second.id,second.rev,{state:'COMPLETE'});await core.queue.acknowledgeWake();assert.equal(await core.queue.deadline(),null);
 });
 
 test('command conflicts reject and repeated Pause/Resume IDs do not undo later intent',async t=>{

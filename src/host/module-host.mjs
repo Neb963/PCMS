@@ -29,13 +29,14 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(binding.mode==='validate')throw Error('VALIDATION_READ_ONLY');
   const active=await current(binding),operation=m.operation,args=m.args??{};
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
-  const journalCall=['journal.export','journal.status'].includes(args.name);
-  const capability=journalCall?'journal.export':operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
+  const journalCall=['journal.export','journal.status','journal.cleanup','journal.cleanupStatus'].includes(args.name);
+  const capability=journalCall?(args.name.startsWith('journal.cleanup')?'journal.cleanup':'journal.export'):operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
   if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
   if(journalCall){
-   if(binding.mode!=='background'||!binding.jobId||active.packageClass!=='bundled-journal'||!journalEffect||args.name==='journal.status'&&operation!=='query'||args.name==='journal.export'&&operation!=='action')throw Error('ACTION_DENIED');
+   if(binding.mode!=='background'||!binding.jobId||active.packageClass!=='bundled-journal'||!journalEffect||(['journal.status','journal.cleanupStatus'].includes(args.name)?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
    const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.rev!==binding.expectedRevision)throw Error('STALE_REVISION');
-   const result=await journalEffect(job,args.name==='journal.status');binding.expectedRevision=result.jobRevision;return result.value;
+   if((job.kind==='CLEANUP')!==args.name.startsWith('journal.cleanup'))throw Error('ACTION_DENIED');
+   const result=await journalEffect(job,['journal.status','journal.cleanupStatus'].includes(args.name));binding.expectedRevision=result.jobRevision;return result.value;
   }
   if(operation==='pageReady'||operation==='pageFailed')return core.record({step:'OPEN_MODULE_PAGE',result:operation==='pageReady'?'COMPLETE':'FAILED',moduleId:binding.moduleId});
   if(operation==='saveView')return core.saveView('module:'+binding.moduleId+':'+binding.pageId,args.value,m.requestId);

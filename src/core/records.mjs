@@ -157,6 +157,17 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result}));return result;
     }),
     record:event=>transact(['events'],'readwrite',async s=>{const r=await root(s);const sequence=await append(s,r,event);r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {sequence,revision:r.revision};}),
+    pruneJournal:({beforeTime,exportedThrough})=>transact(['events','pins','jobs'],'readwrite',async s=>{
+      requireCore(Number.isFinite(beforeTime)&&Number.isSafeInteger(exportedThrough)&&exportedThrough>=0,'INVALID_RETENTION');const r=await root(s),pins=[];let pc=await req(s('pins').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(pc){if(pc.value.journalRange)pins.push(pc.value.journalRange);pc=await req(pc.continue()||pc.request);}for(const job of await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))))if(job.moduleId==='pcms-journal'&&job.kind==='EXPORT'&&!['COMPLETE','FAILED'].includes(job.state))pins.push({first:job.input.first,last:job.input.last});let removed=0,last=r.journalPrunedThrough??0;
+      let c=await req(s('events').openCursor(IDBKeyRange.bound([r.dataset,0],[r.dataset,Math.min(exportedThrough,r.sequence)])));
+      while(c){const row=c.value;if(row.time>=beforeTime||pins.some(p=>row.sequence>=p.first&&row.sequence<=p.last))break;last=row.sequence;await req(c.delete());removed++;c=await req(c.continue()||c.request);}
+      if(removed){r.journalPrunedThrough=last;await append(s,r,{step:'PRUNE_JOURNAL',result:'COMPLETE',moduleId:'pcms-journal'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}return {removed,through:last};
+    }),
+    releaseExportPayload:recordId=>transact(['files','versions','events','blobs','chunks'],'readwrite',async s=>{
+      const r=await root(s),file=await req(s('files').get([r.dataset,recordId]));requireCore(file?.state==='COMPLETE','EXPORT_NOT_COMPLETE');if(!file.payloadId)return {state:'UNCHANGED'};
+      const payloadId=file.payloadId;await writeRows(s,r,[{table:'files',id:recordId,expectedRev:file.rev,value:{...file,payloadId:null},refs:file.refs.filter(ref=>ref!==payloadId)}],{step:'RELEASE_EXPORT_PAYLOAD',result:'COMPLETE',moduleId:file.moduleId,operationId:recordId});
+      let c=await req(s('versions').openCursor(IDBKeyRange.bound([r.dataset,'files',recordId,0],[r.dataset,'files',recordId,Number.MAX_SAFE_INTEGER])));while(c){const row=c.value;if(row.payloadId===payloadId||row.refs.includes(payloadId))await req(c.update({...row,payloadId:null,refs:row.refs.filter(ref=>ref!==payloadId)}));c=await req(c.continue()||c.request);}return {state:'RELEASED'};
+    }),
     // Private packaged service access. This object is never returned by RPC.
     read: (table,recordId)=>transact([table],'readonly',async s=>{requireCore(TABLES.includes(table),'READ_DENIED');const r=await root(s);return req(s(table).get([r.dataset,recordId]));}),
     get:async(table,recordId)=>project(table,await core.read(table,recordId)),
@@ -168,6 +179,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       const r=await root(s),cut=cursor?.cut??r.sequence,after=cursor?.after??'';
       const matches=row=>Object.entries(filters).every(([k,v])=>row[k]===v)&&(!search||Object.values(project(table,row)).filter(x=>typeof x==='string'||typeof x==='number').join(' ').toLowerCase().includes(search.toLowerCase()));
       requireCore(!cursor||(cursor.dataset===r.dataset&&cursor.table===table&&cursor.search===search&&JSON.stringify(cursor.filters??{})===JSON.stringify(filters)&&Number.isSafeInteger(cut)&&cut<=r.sequence&&typeof after==='string'),'STALE_CURSOR');
+      requireCore(table!=='events'||!cursor||Number(after)>=(r.journalPrunedThrough??0),'STALE_CURSOR');
       const rows=[];let last=after,more=false;
       if(table==='events') {
         if(Number(after||0)>=cut)return {rows:[],cursor:null,cut};
@@ -215,7 +227,7 @@ function attachBlobs(core,transact,root,checkedRefs,append,clock) {
     bytes=new Uint8Array(bytes);const blobId=await sha256(bytes);
     return transact(['blobs','chunks','events','pins'],'readwrite',async s=>{
       const r=await root(s),key=[r.dataset,blobId];
-      if(pinId){const pinKey=[r.dataset,pinId],old=await req(s('pins').get(pinKey));await req(s('pins').put({key:pinKey,refs:[...new Set([...(old?.refs??[]),blobId])]}));}
+      if(pinId){const pinKey=[r.dataset,pinId],old=await req(s('pins').get(pinKey));await req(s('pins').put({...old,key:pinKey,refs:[...new Set([...(old?.refs??[]),blobId])]}));}
       if(await req(s('blobs').get(key))){if(pinId){await append(s,r,{step:'PIN_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}return blobId;}
       const chunkSize=1024*1024,chunks=Math.ceil(bytes.length/chunkSize);
       for(let i=0;i<chunks;i++)await req(s('chunks').add({key:[r.dataset,blobId,i],bytes:bytes.slice(i*chunkSize,(i+1)*chunkSize)}));
@@ -244,7 +256,8 @@ function attachBlobs(core,transact,root,checkedRefs,append,clock) {
     let previous='';for(const file of manifest){requireCore(file.path>previous&&file.sha256===file.blobId,'INVALID_MANIFEST');previous=file.path;requireCore((await core.bytes(file.blobId)).length===file.bytes,'SOURCE_LENGTH_MISMATCH');}
     return manifest;
   };
-  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);const closure=await checkedRefs(s,r,refs);await req(s('pins').put({key:[r.dataset,captureId],refs:closure}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
+  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);const closure=await checkedRefs(s,r,refs);const key=[r.dataset,captureId],old=await req(s('pins').get(key));await req(s('pins').put({...old,key,refs:closure}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
+  core.pinJournal=(captureId,{first,last})=>transact(['pins','events'],'readwrite',async s=>{requireCore(id(captureId)&&Number.isSafeInteger(first)&&first>0&&Number.isSafeInteger(last)&&last>=first,'INVALID_CAPTURE');const r=await root(s);requireCore(first>(r.journalPrunedThrough??0)&&last<=r.sequence,'JOURNAL_RANGE_INVALID');const key=[r.dataset,captureId],old=await req(s('pins').get(key));await req(s('pins').put({...old,key,refs:old?.refs??[],journalRange:{first,last}}));await append(s,r,{step:'PIN_JOURNAL',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
   core.releasePin=captureId=>transact(['pins','events'],'readwrite',async s=>{const r=await root(s);await req(s('pins').delete([r.dataset,captureId]));await append(s,r,{step:'RELEASE_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
   core.collect=()=>transact(['versions','pins','blobs','chunks','events'],'readwrite',async s=>{
     const r=await root(s),refs=new Set();

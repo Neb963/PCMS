@@ -21,15 +21,16 @@ const pending=`PCMS.defineModule({
 });\n`;
 const journal=`PCMS.defineModule({
  start(){},
- async runStep(job,api){const result=await api.action({name:'journal.export'});return result.state==='COMPLETE'?{kind:'complete',checkpoint:{fileId:result.fileId}}:{kind:'hold',reason:result.code||'DOWNLOAD_PENDING',recovery:{action:'OPEN_JOURNAL'},checkpoint:{fileId:result.fileId}};},
- async reconcile(job,api){const result=await api.query({name:'journal.status'});if(result.state==='NOT_STARTED')return {kind:'checkpoint',checkpoint:job.checkpoint};return result.state==='COMPLETE'?{kind:'complete',checkpoint:{fileId:result.fileId}}:{kind:'hold',reason:result.code||'DOWNLOAD_PENDING',recovery:{action:'OPEN_JOURNAL'},checkpoint:{fileId:result.fileId}};},
+ async runStep(job,api){return this.outcome(await api.action({name:job.kind==='CLEANUP'?'journal.cleanup':'journal.export'}));},
+ async reconcile(job,api){const result=await api.query({name:job.kind==='CLEANUP'?'journal.cleanupStatus':'journal.status'});if(['NOT_STARTED','READY'].includes(result.state))return {kind:'checkpoint',checkpoint:job.checkpoint};return this.outcome(result);},
+ outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{fileId:result.fileId}};if(result.state==='WAITING')return {kind:'wait',dueAt:result.dueAt,checkpoint:{fileId:result.fileId}};return {kind:'hold',reason:result.code||'DOWNLOAD_PENDING',recovery:{action:'RECHECK'},checkpoint:{fileId:result.fileId}};},
  stop(){}
 });\n`;
 const stamp=new Date('1980-01-01T00:00:00.000Z');
 export function bundledPackage(id,name){
  const isJournal=id==='pcms-journal',background=strToU8(isJournal?journal:pending);
- const manifest={format:1,id,name,version:isJournal?'0.2.0':'0.1.0',coreApi:1,jobSchema:1,
-  readsJobSchemas:[1],capabilities:isJournal?['journal.query','journal.export']:[],entries:{background:'background.js'},
+ const manifest={format:1,id,name,version:isJournal?'0.3.0':'0.1.0',coreApi:1,jobSchema:1,
+  readsJobSchemas:[1],capabilities:isJournal?['journal.query','journal.export','journal.cleanup']:[],entries:{background:'background.js'},
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};
  const manifestBytes=strToU8(JSON.stringify(manifest));
  const zip=zipSync({'module.json':[manifestBytes,{mtime:stamp}],

@@ -43,3 +43,6 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 
 - P08: concurrent real Core operations can interleave a test's record writes. Export tests must verify all records in the exact requested sequence range and identify controlled fixture rows separately; assuming contiguous fixture-only sequences would incorrectly reject complete Journal coverage.
 - P08: a result count alone cannot show that a new search is ready. The prior page can have the same count with a different cursor. Disable paging while the active query loads, and test its actual filtered rows and ready state.
+
+- P09: acknowledging a wake is not executing every due job. The installed multi-file cleanup journey exposed that sequence-based wake suppression stranded other WAITING jobs after one finite turn. Keep deadlines for actual runnable work; stop alarms when jobs complete/hold, not merely when a wake was acknowledged.
+- P09: native removeFile can finish physical removal while DownloadItem.exists remains stale. Persist the API acknowledgement, wait for read-only metadata, and expose a hold without another remove. After real Firefox restart these fixture history rows disappeared; missing history stays a hold, even when independent test disk inspection proves the earlier removal. Production metadata cannot claim independent physical disk verification.
