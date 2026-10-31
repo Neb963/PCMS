@@ -11,10 +11,10 @@
 ## Implementation plan
 
 - [x] Inspect repository/checkpoints and select dependency-ready P01.
-- [ ] Vendor the exact pinned donor with MIT attribution and reproducible hashes. Extract the proven Alpha bootstrap repairs as small, checked build transformations. Preserve native protocol, permissions and `persona-route-manager@local`; exclude legacy UI/controllers from the operating host.
-- [ ] Add one packaged MV3 event page. Import fail-closed protection before PCMS initialization; register shell/wake listeners synchronously. Keep admission blocked for missing permission/bridge or bootstrap failure. No provider actions exist in P01.
-- [ ] Add the toolbar handler and one dashboard, with Home · Generators · Accounts · Refresher · Work · Other · Settings. Serialize rapid icon clicks; focus the existing dashboard. Show honest startup diagnostics and unfinished areas without fake operations.
-- [ ] Build a deterministic development XPI with `strict_min_version: 154.0`, separate privileged/sandbox CSP, no popup and source/XPI identity receipt. Add a short clean-profile installation guide.
+- [x] Vendor the exact pinned donor with MIT attribution and reproducible hashes. Extract the proven Alpha bootstrap repairs as small, checked build transformations. Preserve native protocol, permissions and `persona-route-manager@local`; exclude legacy UI/controllers from the operating host.
+- [x] Add one packaged MV3 event page. Import fail-closed protection before PCMS initialization; register shell/wake listeners synchronously. Keep admission blocked for missing permission/bridge or bootstrap failure. No provider actions exist in P01.
+- [x] Add the toolbar handler and one dashboard, with Home · Generators · Accounts · Refresher · Work · Other · Settings. Serialize rapid icon clicks; focus the existing dashboard. Show honest startup diagnostics and unfinished areas without fake operations.
+- [x] Build a deterministic development XPI with `strict_min_version: 154.0`, separate privileged/sandbox CSP, no popup and source/XPI identity receipt. Add a short clean-profile installation guide.
 - [ ] Add focused T checks for bootstrap ordering/failure, duplicate icon clicks, package identity, attribution, permissions and transformations; add fast CI and only the required installed P01 journey.
 - [ ] B: persistently install the built XPI in a dedicated clean profile on a qualifying Firefox build with normal sandbox. Click the real toolbar icon twice; independently count/focus dashboard tabs. Verify blocked cold startup without a bridge. Record browser/build, source commit and XPI SHA-256. Unsupported browser or environmental failure remains an explicit hold.
 - [ ] Push meaningful checkpoints with this file; verify remote commit/tree, PR checks and resulting main after merge when required evidence passes.
@@ -26,8 +26,8 @@
 - H: **NOT TESTED**, deferred to P42 for working bridge/protected contexts. No live provider or native route mutation is in scope.
 - This is an incomplete development checkpoint. Module seed/workflows and durable Core records belong to later phases.
 
-**Remote checkpoint:** None for P01 yet; baseline main is recorded above.
+**Remote checkpoint:** Plan commit `2b12bd8842e2b74e43e7710d5206443534034bb6`, [PR #1](https://github.com/Neb963/PCMS/pull/1). Shell Git push lacked credentials; use the connected GitHub integration.
 
-**Next unresolved action:** Inspect pinned donor and Alpha bootstrap/build sources, then publish this plan before implementation.
+**Next unresolved action:** Publish the host, focused tests and installed journey; inspect CI on the exact remote candidate. Local build succeeds. Installed evidence remains pending.
 
 **Next eligible phase after verified P01:** P02 — Durable records and continuous Core recording. Do not start it in this chat.
