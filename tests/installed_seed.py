@@ -84,7 +84,7 @@ def main():
      value:{...m,enabled:false,settings:{activeHours:17,operatorChoice:'retain'}},expectedRev:m.rev,refs:m.refs}],
      {step:'FIXTURE_SETUP',result:'COMPLETE'});
     await c.mutate([{table:'jobs',id:'seed-fixture-job',value:{jobId:'seed-fixture-job',kind:'CHECK',
-      moduleId:'fixture-package',state:'HELD',jobSchema:1}}],{step:'FIXTURE_SETUP',result:'COMPLETE'});
+      moduleId:'fixture-module',state:'HELD',jobSchema:1}}],{step:'FIXTURE_SETUP',result:'COMPLETE'});
     await c.saveView('module:seed-fixture:main',{draft:'keep exact user draft'},'seed-fixture-draft');c.close();return true;
    """);assert revised is True,revised
    before=inspect(sid);assert before['seed']=={'initialized':True,'moduleCount':8};assert before['job']=='HELD'
