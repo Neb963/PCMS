@@ -52,12 +52,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Targeted account lifecycle and native/site fixtures (normal sandbox)
-        run: python3 tests/installed_account_lifecycle.py build/pcms-dev.xpi
+      - name: Targeted Git catalog and independent HTTPS fixture (normal sandbox)
+        run: python3 tests/installed_git_catalog.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-account-lifecycle-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-git-catalog-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json

@@ -4,6 +4,7 @@ import {PackageError} from '../modules/package.mjs';
 import {createModuleHost} from './module-host.mjs';
 import {createLifecycle} from '../modules/lifecycle.mjs';
 import {createWebsiteScripts} from './website-scripts.mjs';
+import {createGitCatalog} from '../core/git-catalog.mjs';
 import {createAccounts} from '../modules/accounts.mjs';
 import {refreshAccountPins} from './account-pins.mjs';
 import {websiteContext,accountAdapter,hostStatus} from './bootstrap.mjs';
@@ -14,7 +15,7 @@ import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,accounts,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -25,6 +26,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     await value.queue.boot();
     await value.record({step:'CORE_START',result:'COMPLETE'});
     await seed(value);
+    git=createGitCatalog({core:value});await git.initialize();
     accounts=createAccounts({core:value,donor:accountAdapter,pins:refreshAccountPins});await accounts.initialize();
     downloads=api?.downloads?createDownloads({core:value,api,profileId:(await value.status()).profileId}):null;
     journal=createJournal({core:value,downloads,retention:api?.downloads?createRetention({core:value,api,profileId:(await value.status()).profileId}):null});await journal.initialize();if(downloads)await journal.changed();await journal.tick();
@@ -48,6 +50,12 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       const value=await core();let result;
       switch(message?.operation) {
         case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await journal.tick();await accounts.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'git.status':result=await git.status();break;
+        case 'git.configure':result=await git.configure({repository:message.repository,credential:message.credential});void git.tick().finally(()=>schedule(value)).catch(()=>{});await schedule(value);break;
+        case 'git.reconnect':result=await git.reconnect();void git.tick().finally(()=>schedule(value)).catch(()=>{});await schedule(value);break;
+        case 'git.check':result=await git.tick(true);await schedule(value);break;
+        case 'catalog.list':result=await git.list(message);break;
+        case 'catalog.get':result=await git.get(message.id);break;
         case 'host.status':result=await hostStatus(api);break;
         case 'accounts.status':result=await accounts.status();break;
         case 'accounts.list':result=await accounts.list(message);break;
@@ -83,7 +91,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'view.get':result=await value.view('shell-view');break;
         case 'view.save': {
           const v=message.value;
-          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
+          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
           result=await value.saveView('shell-view',v,message.requestId);break;
         }
         default:return {ok:false,code:'OPERATION_DENIED'};
@@ -91,6 +99,6 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       return {ok:true,result};
     } catch(error){return {ok:false,code:error instanceof PackageError?error.code:/^(MODULE_[A-Z_]+|PAGE_[A-Z_]+|DOCUMENT_DENIED|CAPABILITY_DENIED|TARGET_DENIED|ACTION_DENIED)$/.test(error?.message)?error.message:publicError(error)};}
   }
-  async function schedule(value){const times=[await value.queue.deadline(),await journal?.deadline()].filter(Number.isFinite),due=times.length?Math.max(Date.now()+1000,Math.min(...times)):null;if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}}
-  return {start:core,handle,closeDocument:id=>modules?.closeDocument(id),website:async details=>{await core();await scripts?.inject(details);},downloadsChanged:async()=>{const value=await core();await journal.changed();if(lifecycle)await lifecycle.recover();if(modules)await modules.turn();await schedule(value);},wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(lifecycle)await lifecycle.recover();await journal.changed();await journal.tick();if(modules)await modules.turn();await value.queue.acknowledgeWake(cut);await schedule(value);}};
+  async function schedule(value){const times=[await value.queue.deadline(),await journal?.deadline(),await git?.deadline()].filter(Number.isFinite),due=times.length?Math.max(Date.now()+1000,Math.min(...times)):null;if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}}
+  return {start:core,handle,closeDocument:id=>modules?.closeDocument(id),website:async details=>{await core();await scripts?.inject(details);},downloadsChanged:async()=>{const value=await core();await journal.changed();if(lifecycle)await lifecycle.recover();if(modules)await modules.turn();await schedule(value);},wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(lifecycle)await lifecycle.recover();await journal.changed();await journal.tick();if(modules)await modules.turn();await git.tick();await value.queue.acknowledgeWake(cut);await schedule(value);}};
 }
