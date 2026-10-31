@@ -130,8 +130,10 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   reconcile:async(jobId,expectedRev,operationId,observation)=>tx(async(s,r)=>{
     const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
     check(job.effect?.operationId===operationId&&job.effect.boundary==='POSSIBLE','WRONG_OPERATION');
-    check(observation?.matched===true&&observation.operationId===operationId,'OUTCOME_UNKNOWN');
-    return save(s,r,job,{state:'WAITING',recovery:null,effect:{...job.effect,boundary:'OBSERVED'},effects:[...(job.effects??[]),{operationId,kind:job.effect.kind,boundary:'OBSERVED'}],needsCheck:true,lease:null},'EFFECT_READBACK','OBSERVED');
+    const failed=observation?.resolved===true&&observation.outcome==='FAILED';
+    check((observation?.matched===true||failed)&&observation.operationId===operationId,'OUTCOME_UNKNOWN');
+    if(failed)check(typeof observation.code==='string'&&/^[A-Z][A-Z0-9_]*$/.test(observation.code),'INVALID_OBSERVATION');
+    return save(s,r,job,{state:failed?'FAILED':'WAITING',recovery:failed?{action:'INSPECT_EXPORT',code:observation.code}:null,effect:{...job.effect,boundary:'OBSERVED',...failed?{outcome:'FAILED'}:{}},effects:[...(job.effects??[]),{operationId,kind:job.effect.kind,boundary:'OBSERVED',...failed?{outcome:'FAILED'}:{}}],needsCheck:true,lease:null},'EFFECT_READBACK',failed?'FAILED':'OBSERVED');
   }),
   list:({cursor=null,limit=50,search='',state=''}={})=>transact(['versions'],'readonly',async s=>{
     const r=await root(s),cut=cursor?.cut??r.sequence,after=cursor?.after??[-1,''];

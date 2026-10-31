@@ -40,3 +40,6 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - P07 permission grant: source inspection of the tested Firefox 155 `browser-addons.js` (`#createUserScriptsPermissionItems`) showed that Allow remains disabled until the native userScripts confirmation checkbox is checked. Waiting longer does not satisfy this condition. Inspect the actual native UI/source before inferring a timing issue. The test must operate the checkbox and Allow; never inject granted permission state.
 
 - P07: removing a sandbox iframe is not the same as revoking its host-held page binding. A token tied to the dashboard document can otherwise outlive the module page, leaving update waiting for an impossible STOP reply. Explicit page disposal must revoke that exact binding; document disconnect remains a separate cleanup boundary.
+
+- P08: concurrent real Core operations can interleave a test's record writes. Export tests must verify all records in the exact requested sequence range and identify controlled fixture rows separately; assuming contiguous fixture-only sequences would incorrectly reject complete Journal coverage.
+- P08: a result count alone cannot show that a new search is ready. The prior page can have the same count with a different cursor. Disable paging while the active query loads, and test its actual filtered rows and ready state.

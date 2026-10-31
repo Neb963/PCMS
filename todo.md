@@ -1,26 +1,28 @@
 # Current work
 
-**P07 — Safe module update, disable and cold recovery: COMPLETE; merge/postmerge verification pending.**
+**P08 — Searchable Journal and completed exports: COMPLETE; merge/postmerge verification pending.**
 
-P01–P06 remain merged. P07 is on `p07-module-lifecycle`, [PR #7](https://github.com/Neb963/PCMS/pull/7). Latest verified code: `d451bf8052ba5710ff18689fe67db623f05e58aa`, tree `9da0371a44f23e6717f934381616d3b82cfdc4bf`. Current user task requires continuous sequential execution after each phase, without interphase confirmation.
+P01–P07 are merged. P07 main `90cb5c1610fbf761fea055b604226af2dbe16991` passed postmerge [41227136530](https://github.com/Neb963/PCMS/actions/runs/41227136530).
 
-## Implemented
+P08 branch `p08-journal-exports`, [PR #8](https://github.com/Neb963/PCMS/pull/8). Verified source `7e1b8e51307162ff268e5f9b0aca1756afcc38ae`, tree `41c88a6bb5f62b534ac648c0ec1fd23bf8349474`. Final diff/syntax/whitespace review passed.
 
-- Durable per-module stage/fence/STOP/SWITCH/REBUILD lifecycle, candidate start/schema validation, compatible explicit rollback and cold continuation. Requests are durably deduplicated. Incompatible jobs/settings remain intact.
-- Generation gates reject stale requests and new read/write admission. POSSIBLE effects require same-operation readback. Each exact page stop receipt is saved before proceeding; an unresolved page retains its contextual editor action. No forced reload or Direct fallback.
-- Donor URL/world helpers select exact protected documents. Common disposers stop only registered resources, resume partial cleanup once, and preserve editor source/chat. Normal iframe disposal explicitly revokes its Core binding.
-- Settings has operating Update/Disable/Enable/rollback, actual optional userScripts permission request, visible held state and contextual recovery. Navigation, drafts, package provenance and unfinished jobs survive changes/restart. Import refreshes rows without clearing the selected file.
+## Implemented and verified
+
+- Shared packaged Core Downloads owns durable profile-specific receipts and content-addressed export bytes. It validates relative paths, observes exact extension/path/time/size identity, distinguishes known browser failure from lost durable ID, and never replays an Unknown request. Journal enablement does not own this service.
+- Bundled Journal 0.2.0 runs finite steps in the existing sandbox/queue. ZIPs include exact sequence coverage, count/hash/gap metadata and a completion marker. Local result/watermark application is atomic and idempotent; manual ranges do not advance automatic progress. Terminal failure preserves prior success and records.
+- Enabled Journal reconstructs one coalesced 30-minute deadline and operates during global Pause with the dashboard closed. Disable stops its new work/search/export; Core recording continues. Known in-flight results reconcile. Finite RUNNING jobs become preserved read-only rechecks across lifecycle fencing.
+- Settings → Journal has operating search, exact filters, stable paging/details, range export, interval/destination, last-result/status recovery and persisted drafts. The pager cannot consume a cursor from an unfinished different query. Old inert development ZIPs require explicit compatible updates, rather than silent reseeding.
 
 ## Evidence
 
-[Run 41226896469](https://github.com/Neb963/PCMS/actions/runs/41226896469) at `d451bf8`: focused T and targeted installed B PASS, Firefox 155.0 build `20260817142839`, normal OS sandbox 6. It exercised actual native permission deny/checkbox/grant, real ZIP selection/stage/update, the production dirty website disposer, exact editor focus/source/chat preservation, saved draft/job, Disable, genuine process restart and Enable. No provider or route mutations.
+[Run 41229143241](https://github.com/Neb963/PCMS/actions/runs/41229143241): focused T and installed **B/DSK PASS**, Firefox 155.0/build `20260817142839`, normal OS sandbox 6. Tested XPI SHA-256 `a0c14d043e22543c0f9f9a07a4cf8c35ee16b69511ce52a07bd3c4042206356b`.
 
-Final [run 41227006676](https://github.com/Neb963/PCMS/actions/runs/41227006676), source `d10ad088f925ffb0e10385dbe5ce460cec26ced1`, passed 60 T and targeted B. Tested XPI SHA-256 `04b590cee3979b4666793d28fee3a6ef1916c12aeae4a7f21fd9e2a9586ddede`. It also verified an actually valid Core page token before/after explicit close, no job from the revoked RPC, and exact unfinished job/draft bytes after cold restart/Enable. Final diff/syntax/whitespace review passed.
+The actual Settings/sandbox/Core/Downloads journey independently reopened production disk ZIPs with Python CRC/digest/full-range checks and all 65 controlled fixture targets. It passed later-page search/filter/details, saved settings, global Pause, dashboard closure, native event-page termination/alarm wake, module Disable/Enable, a genuine process restart, incremental ranges with no missed-export burst, injected IDB receipt loss after a real download with exactly one file, and a real unwritable destination with prior files/watermark/unrelated sentinel preserved. No provider or route effect.
 
-Local installed Firefox is unavailable because normal sandbox content processes fail `uid_map: EPERM`. Sandbox protection was not weakened. Existing CI supplies the required B environment. Diagnostic/source details: [P07 Firefox boundary](docs/diagnostics/P07-Firefox-boundary.md). Earlier failing runs are preserved on PR #7; they exposed native permission controls, startup rendering, stale rows and orphan page bindings and were not marked PASS.
+Earlier failed runs remain on PR #8: the first assumed concurrent fixture events occupied consecutive sequences; the next used a stale pager during an unfinished search. The test now preserves every actual record and waits for the real filtered result; product paging is fenced during load. Neither failed run was reported PASS.
 
-## Next action and holds
+## Next and holds
 
-Merge PR #7 with the verified head, compare postmerge tree and relevant checks. Then write the P08-specific implementation plan here and continue. P08, P10 and P12 depend on completed P07 interfaces/evidence; none has started.
+Merge PR #8 with the verified head, compare its remote main tree and postmerge checks. Then write the P09-specific retention plan here and continue sequentially. Do not stop for interphase confirmation.
 
-Actual retained native AI-editor teardown remains NOT TESTED until authorized P46. Later G/H/P1–P5 still require named disposable targets/effects. This is a development XPI, not a complete product or production acceptance.
+Retention/deletion remains P09; large-volume stress remains P40/P41. Actual AI teardown and all G/H/P1–P5 remain NOT TESTED until authorized later acceptance with named disposable targets/effects. This is a development checkpoint, not complete product readiness. Local normal-sandbox Firefox is unavailable (`uid_map: EPERM`); existing CI supplies required B/DSK without weakened security.

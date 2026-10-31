@@ -41,7 +41,7 @@ export function createLifecycle({core,host,clock=Date.now}) {
    const enabled=m.lifecycle.kind!=='DISABLE',unfinished=await jobs(id),changes=[];
    for(const job of unfinished){
     check(job.effect?.boundary!=='POSSIBLE','MODULE_EFFECT_UNKNOWN');
-    changes.push({table:'jobs',id:job.id,expectedRev:job.rev,refs:job.refs,value:{...job,generation:m.generation,lease:null,needsCheck:true,packageProvenance:job.packageProvenance??m.packageHash}});
+    changes.push({table:'jobs',id:job.id,expectedRev:job.rev,refs:job.refs,value:{...job,...job.state==='RUNNING'?{state:'HELD',recovery:{action:'RECHECK',code:'MODULE_LIFECYCLE_RECHECK'}}:{},generation:m.generation,lease:null,needsCheck:true,packageProvenance:job.packageProvenance??m.packageHash}});
    }
    const previous=candidate?{packageHash:m.packageHash,manifestHash:m.manifestHash,manifest:m.manifest,payload:m.payload,refs:m.refs}:m.previous;
    const value={...m,...candidate,previous,staged:candidate?null:m.staged,version:candidate?.manifest.version??m.version,settingsSchema:candidate?.manifest.settingsSchema??m.settingsSchema,jobSchema:candidate?.manifest.jobSchema??m.jobSchema,enabled:false,state:'REBUILDING',instances:[],lifecycle:{...m.lifecycle,phase:'REBUILD',desiredEnabled:enabled,code:null},refs:m.refs};

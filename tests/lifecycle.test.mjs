@@ -72,3 +72,6 @@ test('volatile lifecycle fence rejects ordinary read-effect admission as well as
  await assert.rejects(s.core.queue.dispatch(selected.id,selected.rev,{operationId:'read-one',kind:'OBSERVE',write:false,preflight:async()=>{s.core.queue.fence(selected.moduleId);return {ok:true};},call:async()=>{calls++;},observe:async()=>({matched:true,operationId:'read-one'})}),/STALE_GENERATION/);assert.equal(calls,0);
  await assert.rejects(s.core.queue.enqueue({requestId:'after-fence',logicalKey:'after-fence',moduleId:selected.moduleId,targetId:'target',kind:'CHECK'}),/MODULE_DISABLED/);
 });
+test('Disable drains a known finite RUNNING step into preserved read-only recheck, never leaves it stranded RUNNING',async t=>{
+ const s=await setup(t),j=await s.core.read('jobs',s.job.id);await s.core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,value:{...j,state:'RUNNING'}}],{step:'FIXTURE_SETUP',result:'COMPLETE'});await s.life().request('fixture-module','DISABLE','disable');const held=await s.core.read('jobs',j.id);assert.equal(held.state,'HELD');assert.equal(held.recovery.action,'RECHECK');assert.deepEqual(held.input,{original:'keep'});await s.life().request('fixture-module','ENABLE','enable');assert.equal((await s.core.queue.reconciliation())[0].id,j.id);
+});

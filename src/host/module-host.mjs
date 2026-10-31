@@ -16,7 +16,7 @@ export function sanitizeMarkup(html,document) {
  return parsed.body.innerHTML;
 }
 export function sanitizeStyle(css){return /@import|url\s*\(|expression\s*\(|-moz-binding|\\/i.test(css)?'':css;}
-export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{}}) {
+export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},journalEffect=null}) {
  const frames=new Set(),backgrounds=new Map(),pageBindings=new Map(),bootId=crypto.randomUUID();let running=null;const reconciled=new Set();
  const manifestCap=(m,group)=>m.manifest?.capabilities?.find(c=>c.startsWith(group+'.'));
  async function current(binding){return core.read('modules',binding.moduleId);}
@@ -29,8 +29,14 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(binding.mode==='validate')throw Error('VALIDATION_READ_ONLY');
   const active=await current(binding),operation=m.operation,args=m.args??{};
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
-  const capability=operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
+  const journalCall=['journal.export','journal.status'].includes(args.name);
+  const capability=journalCall?'journal.export':operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
   if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
+  if(journalCall){
+   if(binding.mode!=='background'||!binding.jobId||active.packageClass!=='bundled-journal'||!journalEffect||args.name==='journal.status'&&operation!=='query'||args.name==='journal.export'&&operation!=='action')throw Error('ACTION_DENIED');
+   const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.rev!==binding.expectedRevision)throw Error('STALE_REVISION');
+   const result=await journalEffect(job,args.name==='journal.status');binding.expectedRevision=result.jobRevision;return result.value;
+  }
   if(operation==='pageReady'||operation==='pageFailed')return core.record({step:'OPEN_MODULE_PAGE',result:operation==='pageReady'?'COMPLETE':'FAILED',moduleId:binding.moduleId});
   if(operation==='saveView')return core.saveView('module:'+binding.moduleId+':'+binding.pageId,args.value,m.requestId);
   if(operation==='getView')return core.view('module:'+binding.moduleId+':'+binding.pageId);
@@ -91,14 +97,15 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   running=(async()=>{
    await start();const reconcileJobs=await core.queue.reconciliation();const recovery=reconcileJobs.find(j=>!reconciled.has(j.id));const job=recovery??await core.queue.next();if(!job)return;if(recovery)reconciled.add(job.id);
    const runner=backgrounds.get(job.moduleId);if(!runner){if(recovery)return;await core.queue.transition(job.id,job.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'RUNNER_UNAVAILABLE'}});return;}
-   runner.targetId=job.targetId;runner.accountId=job.accountId;runner.reconciling=!!recovery;
+   runner.targetId=job.targetId;runner.accountId=job.accountId;runner.reconciling=!!recovery;runner.jobId=job.id;runner.expectedRevision=job.rev;
    try{const result=validateStep(await request(runner,'STEP',{job,reconcile:!!recovery}));
     const latestModule=await current(runner);if(!bindingAllows(runner,{source:runner.window,channel:runner.channel,current:latestModule,operation:'ui.view'}))throw Error('STALE_GENERATION');
     const patch={checkpoint:result.checkpoint??null,state:result.kind==='complete'?'COMPLETE':result.kind==='hold'?'HELD':'WAITING',step:result.kind==='complete'?'COMPLETE':'CHECKPOINT'};
     if(result.kind==='wait')patch.dueAt=result.dueAt;if(result.kind==='hold')patch.recovery={action:result.recovery?.action??'OPEN_MODULES',code:result.reason};
-    if(job.effect?.boundary==='POSSIBLE')await core.queue.reconciliationCheckpoint(job.id,job.rev,result.checkpoint??null);else await core.queue.transition(job.id,job.rev,patch);
-   }catch{const latest=await core.read('jobs',job.id);if(latest?.effect?.boundary!=='POSSIBLE')await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
-   finally{runner.targetId=null;runner.accountId=null;runner.reconciling=false;await onDue();}
+    const latest=await core.read('jobs',job.id);if(latest.rev!==runner.expectedRevision||latest.state==='FAILED')return;
+    if(latest.effect?.boundary==='POSSIBLE')await core.queue.reconciliationCheckpoint(job.id,latest.rev,result.checkpoint??null);else await core.queue.transition(job.id,latest.rev,patch);
+   }catch(error){const latest=await core.read('jobs',job.id),m=await core.read('modules',job.moduleId);if(error.message!=='STALE_REVISION'&&m?.enabled&&!m.lifecycle&&latest?.generation===runner.generation&&latest?.effect?.boundary!=='POSSIBLE'&&latest?.state!=='FAILED')await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
+   finally{runner.targetId=null;runner.accountId=null;runner.reconciling=false;runner.jobId=null;await onDue();}
   })().finally(()=>{running=null;});return running;
  }
  async function openPage(moduleId,pageId,container){const module=await core.read('modules',moduleId);return frame(module,'page',pageId,container);}

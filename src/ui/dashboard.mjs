@@ -22,7 +22,7 @@ function route() {
   const primary=location.hash.slice(1).split('/')[0];
   const key=primary==='module'?'module':primary in titles?primary:'home';
   document.getElementById('heading').textContent = titles[key]??'Module';
-  document.getElementById('page-note').textContent = notes[key]??'';
+  document.getElementById('page-note').textContent = key==='settings'&&location.hash.includes('/')?'':notes[key]??'';
   void renderRecords(key);
   for (const link of document.querySelectorAll('nav a')) {
     const selected=key==='module'?(link.dataset.pinnedModule===location.hash.split('/')[1]||link.hash==='#other'&&![...document.querySelectorAll('[data-pinned-module]')].some(a=>a.dataset.pinnedModule===location.hash.split('/')[1])):link.hash==='#'+key;
@@ -45,7 +45,7 @@ const timeout=setTimeout(()=>{if(!received)show({code:'STATUS_UNAVAILABLE',admis
 port.onMessage.addListener(status=>{received=true;clearTimeout(timeout);show(status);port.disconnect();});
 port.onDisconnect.addListener(()=>{clearTimeout(timeout);if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});});
 
-let disposeModule=null;
+let disposeModule=null,refreshJournal=null;
 let view={journalFilter:'',route:'home',scroll:0,workSearch:'',workState:''},pageCursor=null,nextCursor=null;
 let corePort=null;const requests=new Map();
 function connection(){if(corePort)return corePort;const port=browser.runtime.connect({name:'pcms-core-rpc'});corePort=port;
@@ -62,7 +62,7 @@ async function persist(){
 }
 async function renderRecords(key){
  void queueStatus();
- const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
+ refreshJournal=null;const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
  if(key==='module'){await renderModule(area);return;}
  if(key==='other'){await renderOther(area);return;}
  if(key==='home'){
@@ -74,16 +74,9 @@ async function renderRecords(key){
  }else if(key==='work'){await renderWork(area);
  }else if(key==='settings'){
    if(location.hash.split('/')[1]==='modules'){await renderModuleSettings(area);return;}
-   const modulesLink=node('a','Modules');modulesLink.href='#settings/modules';area.append(modulesLink);
-   const title=node('h2','Journal'),label=node('label','Filter recorded work'),input=node('input');input.id='journal-filter';input.value=view.journalFilter;label.htmlFor=input.id;
-   const save=node('button','Save view');save.id='save-view';save.type='button';
-   const progress=node('p');progress.id='view-result';progress.setAttribute('role','status');
-   const list=node('ol');list.id='journal-events';const next=node('button','Next');next.id='next-events';next.type='button';
-   const load=async()=>{const response=await core('events',{cursor:pageCursor,search:view.journalFilter});list.replaceChildren();if(!response.ok){list.append(failure(response.code));next.hidden=true;return;}nextCursor=response.result.cursor;next.hidden=!nextCursor;for(const event of response.result.rows){const text=[event.sequence,event.step,event.result,event.code,event.targetId].filter(Boolean).join(' · ');list.append(node('li',text));}};
-   input.addEventListener('input',()=>{view.journalFilter=input.value;pageCursor=null;void load();});
-   save.addEventListener('click',async()=>{save.disabled=true;progress.textContent='Saving…';const response=await persist();progress.replaceChildren(response.ok?node('span','Saved'):failure(response.code));save.disabled=false;if(response.ok)await load();});
-   next.addEventListener('click',()=>{pageCursor=nextCursor;void load();});
-   area.append(title,label,input,save,progress,list,next);await load();
+   if(location.hash.split('/')[1]==='journal'){await renderJournal(area);return;}
+   for(const [name,path] of [['Modules','modules'],['Journal','journal']]){const link=node('a',name);link.href='#settings/'+path;area.append(link,document.createTextNode(' '));}
+
  }
 }
 const initial=await core('view.get');
@@ -179,7 +172,7 @@ async function renderModule(area){
 }
 
 // Refresh only the visible dashboard status; no background keepalive.
-setInterval(()=>{if(document.visibilityState==='visible')void queueStatus();},2000);
+setInterval(()=>{if(document.visibilityState==='visible'){void queueStatus();if(refreshJournal)void refreshJournal();}},2000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void queueStatus();});
 
 const importMessages={IMPORT_BUDGET_EXCEEDED:'This ZIP needs more import space. Increase the import budget or select a smaller package.',INVALID_IMPORT_BUDGET:'Enter a positive import budget.',DUPLICATE_JSON_KEY:'module.json has a repeated field.',INVALID_JSON:'module.json is not valid JSON.',INVALID_MANIFEST_FIELDS:'The module manifest has missing or unknown fields.',INCOMPATIBLE_CORE_API:'This module needs a different Core API.',UNKNOWN_CAPABILITY:'This module requests an unsupported capability.',INVALID_RELEASE_VERSION:'Use a release version in major.minor.patch format.',INCOMPATIBLE_SCHEMA:'The module job or settings schema is incompatible.',INCOMPATIBLE_SETTINGS_SCHEMA:'This update cannot read the current settings.',INCOMPATIBLE_JOB_SCHEMA:'This update cannot read an unfinished job. Existing work is kept.',SAME_VERSION_CHANGED:'These bytes differ from the installed release. Use a higher version.',DOWNGRADE_REJECTED:'This is an older release. The active package is kept.',UNSAFE_PATH:'The ZIP contains an unsafe file path.',PATH_COLLISION:'The ZIP contains duplicate or conflicting paths.',ENCRYPTED_ZIP:'Encrypted module ZIPs are not supported.',NON_REGULAR_ZIP_ENTRY:'The ZIP contains a link or special file.',PAYLOAD_LIST_MISMATCH:'The ZIP files do not match the manifest.',PAYLOAD_HASH_MISMATCH:'A file does not match its manifest hash.',PAYLOAD_SIZE_MISMATCH:'A file does not match its declared size.',ZIP_CRC_MISMATCH:'A ZIP file failed its CRC check.',UNSUPPORTED_EXECUTABLE_DEPENDENCY:'Bundle module code locally without imports.',INVALID_EXECUTABLE:'A module script is invalid or uses an unsupported import.'};
@@ -201,3 +194,33 @@ function renderInstall(area,onInstalled=async()=>{}){
  });
  form.append(label,file,budgetLabel,budget,install,status);area.append(form);
 }
+
+async function renderJournal(area){
+ const response=await core('journal.status');if(!response.ok){area.append(failure(response.code));return;}const state=response.result;
+ area.append(node('h2','Journal'));
+ if(!state.available){const link=node('a','Open Modules');link.href='#settings/modules/pcms-journal';area.append(node('p','Update the Journal module to use this feature. Existing records are kept.'),link);return;}
+ if(!state.enabled){const enable=node('button','Enable Journal');enable.id='enable-journal';enable.addEventListener('click',async()=>{enable.disabled=true;const result=await core('module.lifecycle',{id:'pcms-journal',kind:'ENABLE',requestId:crypto.randomUUID()});if(result.ok&&location.hash==='#settings/journal')await renderRecords('settings');else if(!result.ok){area.append(failure(result.code));enable.disabled=false;}});area.append(node('p','Journal is disabled. Core still records work. The last export can become stale.'),enable);if(state.settings.lastComplete)area.append(node('p','Last successful export: '+new Date(state.settings.lastComplete.completedAt).toLocaleString()));return;}
+ const field=(label,id,value,type='text')=>{const l=node('label',label),input=node('input');input.id=id;input.type=type;input.value=value;l.htmlFor=id;area.append(l,input);return input;};
+ const interval=field('Automatic export interval (minutes)','journal-interval',view.journalDraftInterval??state.settings.intervalMinutes,'number'),folder=field('Relative Downloads folder','journal-folder',view.journalDraftFolder??state.settings.folder),save=node('button','Save Journal settings'),settingResult=node('p');save.id='save-journal-settings';settingResult.setAttribute('role','status');
+ save.addEventListener('click',async()=>{save.disabled=true;const r=await core('journal.settings',{value:{intervalMinutes:Number(interval.value),folder:folder.value}});settingResult.textContent=r.ok?'Saved. Next export: '+new Date(r.result.nextDue).toLocaleString():journalError(r.code);save.disabled=false;});area.append(save,settingResult);
+ interval.addEventListener('input',()=>{view.journalDraftInterval=interval.value;void persist();});folder.addEventListener('input',()=>{view.journalDraftFolder=folder.value;void persist();});
+ const first=field('First sequence (blank for all retained records)','journal-first',view.journalFirst??'','number'),last=field('Last sequence (blank for current records)','journal-last',view.journalLast??'','number'),exportNow=node('button','Export now'),check=node('button','Check download status'),progress=node('p');exportNow.id='export-journal';check.id='check-journal-download';progress.id='journal-export-status';progress.setAttribute('role','status');area.append(exportNow,check,progress);
+ const update=async()=>{if(!area.isConnected)return;const r=await core('journal.status');if(!r.ok){progress.textContent=journalError(r.code);return;}const v=r.result,pending=v.jobs.length>0;exportNow.disabled=pending;
+  const outcome=v.settings.lastExport;progress.textContent=pending?'Export needs observation · '+v.jobs.map(j=>j.recovery?.code??j.state).join(' · '):outcome?outcome.state==='COMPLETE'?'Export complete · '+outcome.first+'–'+outcome.last+' · '+outcome.count+' records'+(outcome.coverageComplete?'':' · Journal coverage is incomplete'):'Export failed · '+journalError(outcome.code)+(v.settings.lastComplete?' Last successful export: '+new Date(v.settings.lastComplete.completedAt).toLocaleString():''):'No completed export yet.';
+  check.hidden=!pending;
+ };
+ first.addEventListener('input',()=>{view.journalFirst=first.value;void persist();});last.addEventListener('input',()=>{view.journalLast=last.value;void persist();});
+ refreshJournal=update;
+ exportNow.addEventListener('click',async()=>{exportNow.disabled=true;progress.textContent='Preparing export…';const r=await core('journal.export',{requestId:crypto.randomUUID(),first:first.value===''?undefined:Number(first.value),last:last.value===''?undefined:Number(last.value)});if(!r.ok){progress.textContent=journalError(r.code);exportNow.disabled=false;}else await update();});
+ check.addEventListener('click',async()=>{check.disabled=true;const r=await core('journal.check');check.disabled=false;if(!r.ok)progress.textContent=journalError(r.code);else await update();});
+ area.append(node('h3','Recorded work'));const search=field('Search recorded work','journal-filter',view.journalFilter??''),moduleFilter=field('Module ID','journal-module',view.journalModule??''),targetFilter=field('Target ID','journal-target',view.journalTarget??'');
+ const severity=node('select');severity.id='journal-severity';severity.setAttribute('aria-label','Severity');for(const value of ['','info','warning','error']){const option=node('option',value||'All severities');option.value=value;severity.append(option);}severity.value=view.journalSeverity??'';area.append(severity);
+ const list=node('ol'),next=node('button','Next records');list.id='journal-events';next.id='next-events';let cursor=view.journalCursor??null,nextCursor=null,queryVersion=0;
+ const load=async()=>{next.disabled=true;list.setAttribute('aria-busy','true');const version=++queryVersion,filters={};for(const [key,value] of [['moduleId',moduleFilter.value],['targetId',targetFilter.value],['severity',severity.value]])if(value)filters[key]=value;
+  const r=await core('journal.events',{search:search.value,filters,cursor});if(version!==queryVersion||!area.isConnected)return;list.setAttribute('aria-busy','false');list.replaceChildren();if(!r.ok){list.append(node('li',journalError(r.code)));next.hidden=true;return;}nextCursor=r.result.cursor;next.hidden=!nextCursor;next.disabled=false;
+  for(const event of r.result.rows){const li=node('li'),details=node('details'),summary=node('summary',[event.sequence,event.step,event.result,event.targetId].filter(Boolean).join(' · '));details.append(summary,node('pre',JSON.stringify(event,null,2)));li.append(details);list.append(li);}if(!r.result.rows.length)list.append(node('li','No matching records.'));
+ };
+ const changed=()=>{view.journalFilter=search.value;view.journalModule=moduleFilter.value;view.journalTarget=targetFilter.value;view.journalSeverity=severity.value;cursor=null;view.journalCursor=null;void persist();void load();};
+ for(const input of [search,moduleFilter,targetFilter])input.addEventListener('input',changed);severity.addEventListener('change',changed);next.addEventListener('click',()=>{cursor=nextCursor;view.journalCursor=cursor;void persist();void load();});area.append(list,next);await load();await update();
+}
+function journalError(code){return ({JOURNAL_DISABLED:'Enable Journal in Modules.',JOURNAL_UPDATE_REQUIRED:'Update Journal in Modules. Existing records are kept.',JOURNAL_RANGE_INVALID:'Enter an existing sequence range, with first no greater than last.',JOURNAL_INTERVAL_INVALID:'Enter a positive whole number of minutes.',EXPORT_DESTINATION_INVALID:'Use a relative folder inside PCMS, without dots or unsafe path characters.',DOWNLOAD_LOOKUP_FAILED:'Firefox download status is unavailable. Check again; the export will not be repeated.',DOWNLOAD_START_FAILED:'Firefox could not start the download. Check the selected Downloads destination; earlier files and records are kept.',DOWNLOAD_ACCESS_DENIED:'Firefox could not write this destination. Choose a writable relative folder. Earlier files are kept.',DOWNLOAD_NO_SPACE:'Firefox reported that the destination has no space. Earlier files and records are kept.',DOWNLOAD_INTERRUPTED:'Firefox interrupted the download. Earlier files and records are kept.',DOWNLOAD_START_UNKNOWN:'The download result is unknown. Check its status before another export.',DOWNLOAD_NOT_FOUND:'The recorded download is not in browser history. The result remains unknown.',DOWNLOAD_AMBIGUOUS:'Several downloads match. No file was adopted or repeated.',DOWNLOAD_BYTES_UNVERIFIED:'Firefox did not confirm all expected bytes.'})[code]??errors[code]??code??'Export status is unknown.';}
