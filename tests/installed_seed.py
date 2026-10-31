@@ -66,7 +66,7 @@ def main():
    for module in BUILTINS:
     assert module.split('pcms-')[1].capitalize() in script(sid,"return document.getElementById('records').textContent"),module
    assert script(sid,"return document.querySelectorAll('#records .module-pin').length")==0
-   assert 'No matching modules' in (click(sid,'nav a[href="#other"]') or script(sid,"return document.getElementById('records').textContent"))
+   click(sid,'nav a[href="#other"]');wait(lambda:'No matching modules' in script(sid,"return document.getElementById('records').textContent"))
    first=inspect(sid);assert first['marker']=={'schema':1,'state':'SEEDED','count':7},first
    assert first['seed']=={'initialized':True,'moduleCount':7},first
    assert list(sorted(first['rows']))==sorted(BUILTINS),first
