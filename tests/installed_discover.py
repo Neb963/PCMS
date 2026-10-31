@@ -14,6 +14,7 @@ ORIGINAL=' Free_Name \nfree name\n!!\nreserved-name\nframed-name\nchanged-name\n
 class SlugProvider(Provider):
  def do_GET(self):
   if self.headers.get('Host','').split(':')[0]!='perchance.org' or self.path=='/':return super().do_GET()
+  if self.path=='/favicon.ico':return self.send(b'',kind='image/x-icon',status=404)
   f=self.server.fixture;path=self.path
   with f.lock:f.slug_reads.append({'path':path,'routeId':self.route,'at':time.time()})
   if path in ['/free-name','/last-name']:body=AVAILABLE.replace('create one?','<a href="/must-not-follow">create one?</a>')
@@ -43,7 +44,7 @@ def main():
    assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid)
    settings(sid);wait(lambda:script(sid,"return !!document.getElementById('allow-userscripts')"));click(sid,'#allow-userscripts');permission_choice(sid,True);wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"))
    owner=add(sid,'Discover fixture account');settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'discover@fixture.test');click(sid,'#account-confirm');a=settle(sid,owner,'READY');login_tab=a['tabId']
-   settings(sid);click(sid,'section[data-module="pcms-journal"] button[data-lifecycle="DISABLE"]');wait(lambda:script(sid,"return !!document.querySelector('section[data-module=\"pcms-journal\"] button[data-lifecycle=\"ENABLE\"]')"));click(sid,'#pause-core')
+   settings(sid);wait(lambda:script(sid,"return !!document.querySelector('section[data-module=\"pcms-journal\"] button[data-lifecycle=\"DISABLE\"]')"));click(sid,'section[data-module="pcms-journal"] button[data-lifecycle="DISABLE"]');wait(lambda:script(sid,"return !!document.querySelector('section[data-module=\"pcms-journal\"] button[data-lifecycle=\"ENABLE\"]')"));click(sid,'#pause-core')
    discover(sid);set_input(sid,'#discover-input',ORIGINAL);choose(sid,'#discover-account',owner);click(sid,'#discover-import');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('IMPORTED')"));assert len(script(sid,"return [...document.querySelectorAll('#discover-rows li')].map(e=>e.textContent)"))==7
    click(sid,'#discover-start');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('RUNNING')"));time.sleep(1);assert fixture.slug_reads==[]
    click(sid,'#discover-pause');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('PAUSED')"));click(sid,'#discover-resume');top(sid);click(sid,'#pause-core');frame(sid)

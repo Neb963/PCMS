@@ -316,6 +316,12 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
     if(matches.length!==1){frames.push({accessible:false});continue;}
     try{const observed=await run(tab.id,{},matches[0].frameId);frames.push({accessible:true,complete:observed.complete,content:observed.bodyContent,challenge:observed.challenge});}catch{frames.push({accessible:false});}
    }
+   // Fresh authenticated identity belongs to this protected container/document;
+   // a previously Ready row cannot authorize a silently changed page session.
+   const identityRows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:accountDocumentWitness,args:[]});
+   const identityWitness=identityRows?.[0]?.result;
+   const identity=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:observePerchanceIdentity,args:[identityWitness]});
+   if(identity?.length!==1||identity[0].frameId!==0||identity[0].result?.ok!==true||identity[0].result.principalFingerprint!==scope.expectedPrincipal)return fail('ACCOUNT_PRINCIPAL_UNVERIFIED');
    const after=await run(tab.id),final=await protectedProfile(scope),current=await api.tabs.get(tab.id);
    if(final.code)return fail(final.code);
    if(after.witness!==snapshot.witness||after.url!==url||after.manual||current.cookieStoreId!==scope.containerId||current.url!==url)return fail('SLUG_DOCUMENT_CHANGED');

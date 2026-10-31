@@ -34,7 +34,7 @@ test('fresh install publishes all seven atomically with persistent marker and ha
  assert.deepEqual((await modules(c)).map(x=>x.id).sort(),[...bundledIds].sort());
  for(const p of a.packages){const m=await c.read('modules',p.id);
   assert.equal(m.packageHash,p.packageHash);assert.equal(m.manifestHash,p.manifestHash);
-  assert.equal(m.enabled,true);assert.equal(m.generation,1);assert.equal(m.version,p.id==='pcms-journal'?'0.3.0':p.id==='pcms-accounts'?'0.3.0':id==='pcms-discover'?'0.2.0':'0.1.0');
+  assert.equal(m.enabled,true);assert.equal(m.generation,1);assert.equal(m.version,p.id==='pcms-journal'?'0.3.0':p.id==='pcms-accounts'?'0.3.0':p.id==='pcms-discover'?'0.2.0':'0.1.0');
   assert.deepEqual(m.manifest.pages,p.id==='pcms-discover'?[{id:'check-slugs',title:'Check slugs',html:'page.html',script:'page.js'}]:[]);assert.deepEqual(await c.bytes(m.packageHash),p.zip);
   assert.equal(m.payload['background.js'],p.manifest.files[0].sha256);
  }

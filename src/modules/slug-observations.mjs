@@ -20,7 +20,7 @@ export function importSlugs(text){
 export function classifySlug(page){
  const unknown=code=>({result:'Unknown',basis:code});
  if(!page||page.transportError)return unknown('SLUG_TRANSPORT_ERROR');
- if(page.challenge)return unknown('SLUG_CHALLENGE');
+ if(page.challenge||(page.requiredFrames??[]).some(frame=>frame.challenge))return unknown('SLUG_CHALLENGE');
  if(page.complete!==true)return unknown('SLUG_DOCUMENT_LOADING');
  const text=layoutText(page.text),available=text===AVAILABLE,reserved=text===RESERVED;
  const content=page.rootOutput===true||(page.requiredFrames??[]).some(frame=>frame.accessible===true&&frame.complete===true&&frame.content===true&&!frame.challenge);
@@ -50,7 +50,7 @@ export function captureSlugDocument({install=false,dispose=false}={}){
  };
  const actual=element=>{
   if(!element)return false;
-  const text=visible(element);if(text&&!/^(?:loading[.!… ]*|please wait[.!… ]*|error[.!… ]*)$/i.test(text))return true;
+  const text=visible(element);if(/sorry, (?:we cannot find a generator with that name|this is a reserved name)/i.test(text))return false;if(text&&!/^(?:loading[.!… ]*|please wait[.!… ]*|error[.!… ]*)$/i.test(text))return true;
   return [...element.querySelectorAll('img')].some(img=>img.complete&&img.naturalWidth>0&&img.naturalHeight>0&&img.getClientRects().length>0);
  };
  const challenge=!!document.querySelector('#challenge-running,#challenge-form,.cf-turnstile,iframe[src*="challenges.cloudflare.com"]')||/^(?:just a moment|attention required)/i.test(document.title);
