@@ -122,6 +122,12 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   }
   return rpc(binding,{...message,channel:binding.channel});
  }
+ function closePage(token,sender){
+  const b=pageBindings.get(token);if(!b)return {state:'CLOSED'};
+  const senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.coreDocument,sender.url]);
+  if(b.senderKey!==senderKey)throw Error('DOCUMENT_DENIED');
+  b.stopping?.resolve({instance:token,document:bootId,generation:b.generation,disposedResources:0,unresolvedEffectIds:[]});pageBindings.delete(token);return {state:'CLOSED'};
+ }
  const lifecycle={
   async checkCandidate(m,jobs){const b=await frame({...m,validationJobs:jobs},'validate');remove(b);},
   async instances(m){return [...frames,...pageBindings.values()].filter(b=>b.moduleId===m.id).map(b=>({instance:b.channel,document:bootId,type:'sandbox'}));},
@@ -141,5 +147,5 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   },
   async rebuild(m){await lifecycle.checkCandidate(m,[]);}
  };
- return {start,turn,openPage,stop,preparePage,pageRPC,lifecycle,load,closeDocument:id=>{for(const [token,b] of pageBindings)if(JSON.parse(b.senderKey)[3]===id){b.stopping?.resolve({instance:token,document:bootId,generation:b.generation,disposedResources:0,unresolvedEffectIds:[]});pageBindings.delete(token);}},close(){window.removeEventListener('message',message);for(const b of frames){b.iframe.remove();for(const p of b.pending.values()){clearTimeout(p.timer);p.reject(Error('MODULE_STOPPED'));}}frames.clear();backgrounds.clear();}};
+ return {start,turn,openPage,stop,preparePage,pageRPC,closePage,lifecycle,load,closeDocument:id=>{for(const [token,b] of pageBindings)if(JSON.parse(b.senderKey)[3]===id){b.stopping?.resolve({instance:token,document:bootId,generation:b.generation,disposedResources:0,unresolvedEffectIds:[]});pageBindings.delete(token);}},close(){window.removeEventListener('message',message);for(const b of frames){b.iframe.remove();for(const p of b.pending.values()){clearTimeout(p.timer);p.reject(Error('MODULE_STOPPED'));}}frames.clear();backgrounds.clear();}};
 }

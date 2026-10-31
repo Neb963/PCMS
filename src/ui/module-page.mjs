@@ -22,5 +22,5 @@ export async function openModulePage({core,moduleId,pageId,container,onError}) {
  window.addEventListener('pcms-module-stop',stop);
  iframe.onload=()=>iframe.contentWindow.postMessage({type:'INIT',channel,document:descriptor.document,mode:'page',script:descriptor.script,html:descriptor.html,css:descriptor.css},'*');container.append(iframe);
  const timeout=setTimeout(()=>{if(!ready&&!disposed)onError('MODULE_START_TIMEOUT');},10000);
- const dispose=()=>{disposed=true;clearTimeout(timeout);window.removeEventListener('message',listener);window.removeEventListener('pcms-module-stop',stop);iframe.remove();};return dispose;
+ const dispose=()=>{if(disposed)return;disposed=true;clearTimeout(timeout);window.removeEventListener('message',listener);window.removeEventListener('pcms-module-stop',stop);iframe.remove();void core('module.close',{token:descriptor.token});};return dispose;
 }

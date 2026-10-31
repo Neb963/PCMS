@@ -38,3 +38,5 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - P07 installed run `41225264911`: Firefox's permission panel contains hidden notification templates. A broad CSS selector found a nonvisible `moz-button`. Installed tests must select the visible notification and its actual shadow button before asserting the permission result.
 
 - P07 permission grant: source inspection of the tested Firefox 155 `browser-addons.js` (`#createUserScriptsPermissionItems`) showed that Allow remains disabled until the native userScripts confirmation checkbox is checked. Waiting longer does not satisfy this condition. Inspect the actual native UI/source before inferring a timing issue. The test must operate the checkbox and Allow; never inject granted permission state.
+
+- P07: removing a sandbox iframe is not the same as revoking its host-held page binding. A token tied to the dashboard document can otherwise outlive the module page, leaving update waiting for an impossible STOP reply. Explicit page disposal must revoke that exact binding; document disconnect remains a separate cleanup boundary.
