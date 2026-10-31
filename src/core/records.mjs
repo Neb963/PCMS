@@ -148,7 +148,13 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       r.moduleSeed={schema:1,state:'SEEDED',count:ids.length};
       await req(s('meta').put(r));return {state:'SEEDED',...receipt};
     }),
-    mutate:(changes,event)=>transact([...TABLES,'events','versions','blobs','chunks'],'readwrite',async s=>writeRows(s,await root(s),changes,event)),
+    command:name=>transact(['commands'],'readonly',async s=>{requireCore(id(name),'INVALID_REQUEST');const r=await root(s);return req(s('commands').get([r.dataset,name]));}),
+    mutate:(changes,event,command=null)=>transact([...TABLES,'events','versions','blobs','chunks','commands'],'readwrite',async s=>{
+      const r=await root(s);
+      if(command){requireCore(id(command.id)&&typeof command.signature==='string','INVALID_REQUEST');const previous=await req(s('commands').get([r.dataset,command.id]));if(previous){requireCore(previous.signature===command.signature,'REQUEST_CONFLICT');return previous.result;}}
+      const result=await writeRows(s,r,changes,event);
+      if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result}));return result;
+    }),
     record:event=>transact(['events'],'readwrite',async s=>{const r=await root(s);const sequence=await append(s,r,event);r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {sequence,revision:r.revision};}),
     // Private packaged service access. This object is never returned by RPC.
     read: (table,recordId)=>transact([table],'readonly',async s=>{requireCore(TABLES.includes(table),'READ_DENIED');const r=await root(s);return req(s(table).get([r.dataset,recordId]));}),

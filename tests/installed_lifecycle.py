@@ -34,7 +34,7 @@ def permission_choice(sid,allow):
  # The panel also contains hidden notification templates. Select the visible
  # native button, then its real shadow button, not the moz-button wrapper.
  element=wait(lambda:script(sid,"""const selector=arguments[0];for(const host of document.querySelectorAll(selector)){const r=host.getBoundingClientRect();if(r.width>0&&r.height>0)return host.shadowRoot?.querySelector('button')??host;}return null;""",['#notification-popup .popup-notification-'+('primary' if allow else 'secondary')+'-button']))
- call('POST',f'/session/{sid}/element/'+element['element-6066-11e4-a52e-4f735466cecf']+'/click',{})
+ script(sid,'arguments[0].click();return true;',[element])
  context(sid,'content')
 
 def main():

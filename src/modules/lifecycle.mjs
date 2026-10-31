@@ -4,7 +4,7 @@ import {requireCore as check} from '../core/records.mjs';
 export function createLifecycle({core,host,clock=Date.now}) {
  const turns=new Map();
  const serial=(id,fn)=>{const prior=turns.get(id)??Promise.resolve();const next=prior.catch(()=>{}).then(fn);turns.set(id,next);return next.finally(()=>{if(turns.get(id)===next)turns.delete(id);});};
- const save=async(m,patch,result)=>{await core.mutate([{table:'modules',id:m.id,value:{...m,...patch},expectedRev:m.rev,refs:m.refs}],{step:'MODULE_LIFECYCLE',result,moduleId:m.id});return core.read('modules',m.id);};
+ const save=async(m,patch,result,command=null)=>{await core.mutate([{table:'modules',id:m.id,value:{...m,...patch},expectedRev:m.rev,refs:m.refs}],{step:'MODULE_LIFECYCLE',result,moduleId:m.id},command);return core.read('modules',m.id);};
  const jobs=async id=>{const out=[];let cursor=null;do{const page=await core.list({table:'jobs',cursor});for(const p of page.rows)if(p.moduleId===id&&p.state!=='COMPLETE'){const j=await core.read('jobs',p.id);if(j.state!=='COMPLETE')out.push(j);}cursor=page.cursor;}while(cursor);return out;};
  async function compatible(m,candidate){
   check(candidate?.manifest,'MODULE_PACKAGE_MISSING');
@@ -55,10 +55,12 @@ export function createLifecycle({core,host,clock=Date.now}) {
   request:(id,kind,requestId)=>serial(id,async()=>{
    check(['UPDATE','DISABLE','ENABLE','ROLLBACK','CONTINUE'].includes(kind)&&typeof requestId==='string','MODULE_INVALID_ACTION');
    let m=await core.read('modules',id);check(m,'MODULE_MISSING');
+   const command={id:'module:'+requestId,signature:JSON.stringify([id,kind])},prior=await core.command(command.id);
+   if(prior){check(prior.signature===command.signature,'REQUEST_CONFLICT');return m.lifecycle?.id===requestId?advance(id):m;}
    if(m.lifecycle){
     if(kind==='ROLLBACK'&&m.lifecycle.phase==='REBUILD'){
      await compatible(m,m.previous);
-     m=await save(m,{generation:m.generation+1,lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances:await host.instances(m),startedAt:clock(),code:null}},'FENCED');
+     m=await save(m,{generation:m.generation+1,lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances:await host.instances(m),startedAt:clock(),code:null}},'FENCED',command);
     }
     return advance(id);
    }
@@ -68,7 +70,7 @@ export function createLifecycle({core,host,clock=Date.now}) {
    if(kind!=='DISABLE')await compatible(m,candidate);
    const instances=await host.instances(m);
    core.queue.fence(id);
-   try{m=await save(m,{enabled:false,generation:m.generation+1,state:'STOPPING',lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances,startedAt:clock(),code:null}},'FENCED');}
+   try{m=await save(m,{enabled:false,generation:m.generation+1,state:'STOPPING',lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances,startedAt:clock(),code:null}},'FENCED',command);}
    catch(error){if(!(await core.read('modules',id))?.lifecycle)core.queue.unfence(id);throw error;}
    await host.fence(m);
    return advance(id);

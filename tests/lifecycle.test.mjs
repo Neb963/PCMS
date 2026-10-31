@@ -50,3 +50,14 @@ test('failed fence transaction releases only the volatile fence and preserves du
  s.host.rebuild=async()=>{throw Error('fixture');};await s.life().request('fixture-module','UPDATE','update');assert.equal((await s.core.read('modules','fixture-module')).version,'1.1.0');s.host.rebuild=async()=>{};
  const rolled=await s.life().request('fixture-module','ROLLBACK','explicit-rollback');assert.equal(rolled.version,'1.0.0');assert.equal(rolled.enabled,true);assert.equal(rolled.generation,3);assert.deepEqual((await s.core.read('jobs',s.job.id)).input,{original:'keep'});
 });
+test('a replayed old Disable command cannot disable a later re-enabled module; reused request identity cannot change target/action',async t=>{
+ const s=await setup(t),life=s.life();await life.request('fixture-module','DISABLE','disable-once');await life.request('fixture-module','ENABLE','enable-once');const current=await s.core.read('modules','fixture-module');assert.equal(current.enabled,true);
+ await life.request('fixture-module','DISABLE','disable-once');assert.equal((await s.core.read('modules',current.id)).rev,current.rev);await assert.rejects(life.request(current.id,'UPDATE','disable-once'),/REQUEST_CONFLICT/);
+});
+test('switch transaction failure rolls back migrated jobs and pointer; cold continuation uses the same fenced generation',async t=>{
+ const s=await setup(t);await s.install('1.1.0');const put=IDBObjectStore.prototype.put;let fail=true;
+ IDBObjectStore.prototype.put=function(row){if(fail&&this.name==='modules'&&row.lifecycle?.phase==='REBUILD'){fail=false;throw new DOMException('fixture quota','QuotaExceededError');}return put.call(this,row);};
+ try{await assert.rejects(s.life().request('fixture-module','UPDATE','update'),{name:'QuotaExceededError'});}finally{IDBObjectStore.prototype.put=put;}
+ const partial=await s.core.read('modules','fixture-module');assert.equal(partial.version,'1.0.0');assert.equal(partial.lifecycle.phase,'SWITCH');assert.equal(partial.generation,2);assert.equal((await s.core.read('jobs',s.job.id)).generation,1);
+ await s.life().recover();const done=await s.core.read('modules',partial.id);assert.equal(done.version,'1.1.0');assert.equal(done.generation,2);assert.equal((await s.core.read('jobs',s.job.id)).generation,2);
+});
