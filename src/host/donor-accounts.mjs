@@ -239,8 +239,8 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   }
   return fail('ACCOUNT_OUTCOME_UNKNOWN');
  }
- // Local removal uses donor services only. Container deletion includes its
- // site storage/session and tabs; there is no provider or native route call.
+ // Local removal uses donor services only. Explicit tab closure precedes
+ // container/session deletion; no provider or native route call is made.
  async function removalState(scope){
   await initialize();const state=await getState(),p=pcmsBoundProfile(state,scope.accountId);
   if(p===false)return {code:'ACCOUNT_PERSONA_AMBIGUOUS'};

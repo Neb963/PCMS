@@ -1,6 +1,6 @@
 // Finite queue primitives. Modules own their steps; Core owns admission/effects.
 export function createQueue({transact,root,writeRows,append,req,check,clock}) {
- const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set(),accountFences=new Set();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
+ const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set(),accountFences=new Set(),accountEpochs=new Map();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
  const tables=['accounts','jobs','generators','modules','versions','events','blobs','chunks','commands'];
  const tx=work=>transact(tables,'readwrite',async s=>work(s,await root(s)));
  const read=(s,r,table,id)=>req(s(table).get([r.dataset,id]));
@@ -15,7 +15,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
  };
  const serial=fn=>{const turn=arbiter.then(fn,fn);arbiter=turn.catch(()=>{});return turn;};
  const api={
-  fenceAccount:id=>accountFences.add(id),
+  fenceAccount:id=>{accountFences.add(id);accountEpochs.set(id,(accountEpochs.get(id)??0)+1);},
   unfenceAccount:id=>accountFences.delete(id),
   accountActive:id=>[...active.values()].some(a=>a.accountId===id),
   fence:moduleId=>fenced.add(moduleId),
@@ -104,7 +104,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     check(valid(operationId)&&valid(kind)&&typeof preflight==='function'&&typeof call==='function'&&typeof observe==='function','INVALID_EFFECT');
     const evidence=await preflight();check(evidence?.ok===true,'PREFLIGHT_HELD');
     const admitted=await serial(async()=>{
-      const job=await tx(async(s,r)=>{
+      let accountEpoch;const job=await tx(async(s,r)=>{
         const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
         check(accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null),'ACCOUNT_ADMISSION_HELD');
         if(evidence.accountRevision!=null){const account=await read(s,r,'accounts',job.accountId);check(account?.rev===evidence.accountRevision,'STALE_ACCOUNT');}
@@ -117,10 +117,11 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
         if(sourceWrite){const generator=await read(s,r,'generators',job.targetId);check(generator?.writerHold?.jobId===jobId,'WRITER_HELD');}
         check([...active.values()].filter(a=>!a.maintenance).length<2||maintenance(job,module),'WORK_SLOTS_FULL');
         check(![...active.values()].some(a=>a.targetId===job.targetId||job.accountId&&a.accountId===job.accountId),'TARGET_ACTIVE');
+        accountEpoch=accountEpochs.get(job.accountId)??0;
         // Every individual Git object/ref call comes through this boundary.
         return save(s,r,job,{state:'RUNNING',needsCheck:false,effect:{operationId,kind,inputHash,boundary:'POSSIBLE',bootId,epoch:r.admissionEpoch??0}},'EFFECT_INTENT','POSSIBLE');
       });
-      if(blocked&&write||fenced.has(job.moduleId)||job.accountId&&accountFences.has(job.accountId)&&!(job.moduleId==='pcms-accounts'&&['REMOVE','REACTIVATE'].includes(job.kind))){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,job.accountId&&accountFences.has(job.accountId)?'ACCOUNT_ADMISSION_HELD':'PAUSED');}
+      if(blocked&&write||fenced.has(job.moduleId)||(accountEpochs.get(job.accountId)??0)!==accountEpoch||job.accountId&&accountFences.has(job.accountId)&&!(job.moduleId==='pcms-accounts'&&['REMOVE','REACTIVATE'].includes(job.kind))){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,job.accountId&&accountFences.has(job.accountId)?'ACCOUNT_ADMISSION_HELD':'PAUSED');}
       const marker={targetId:job.targetId,accountId:job.accountId,maintenance:!write};active.set(operationId,marker);
       let sent;try{sent=Promise.resolve(call({operationId}));}catch(error){sent=Promise.reject(error);}
       return {job,sent};
