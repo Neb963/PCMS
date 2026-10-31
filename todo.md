@@ -1,6 +1,6 @@
 # Current work
 
-**P12 — GitHub connection and incremental catalog: planned from verified main.**
+**P12 — GitHub connection and incremental catalog: reader/parser/persistence checkpoint.**
 
 P01–P11 are merged. P11 [PR #11](https://github.com/Neb963/PCMS/pull/11), main `295d9c9e236df68843d4ac9a8fae3b7719795dfb`, exact reviewed tree `d30949db28db0f1c52cd11672080f7f9fdb355f3`; postmerge [41243001968](https://github.com/Neb963/PCMS/actions/runs/41243001968) T/B PASS. P11 source `21c3eb696fd646dcc8ad38b30bbec2a456af471f`,110T/B [41242824226](https://github.com/Neb963/PCMS/actions/runs/41242824226), XPI `2ef97ea1c34ec7ff9498e3579aa2778bc3a8243fabf01acd8705f230718319ea`. Firefox155.0/build20260817142839, normal sandbox6.
 
@@ -15,6 +15,6 @@ P01–P11 are merged. P11 [PR #11](https://github.com/Neb963/PCMS/pull/11), main
 
 ## Next
 
-Implement parser/credential-isolated reader and durable finite catalog with focused T/S, checkpoint, then complete Connections/Generators UI and the installed HTTPS fixture journey. Reuse unchanged donor/account/Journal evidence; do not repeat broad historical suites.
+The strict marker parser, fixed-scope credential-isolated reader, durable finite traversal/cache/backoff and complete catalog updates are implemented. Seven focused T/S tests pass, including1,101 folders in8.6s, later pages, unchanged-ref-only reads, one changed marker, interruption/reopen, missing/malformed/DONE-unverified declarations, auth/rate/missing-main preservation, immutable blob/tree integrity and owner/source-preserving moves. The truncated test explicitly checks recursive fallback requests. UI/host integration and required B remain OPEN. Next wire actual Connections/Generators and the installed HTTPS journey. Reuse unchanged donor/account/Journal evidence; do not repeat broad historical suites.
 
 G/H/P1–P5 remain NOT TESTED and unauthorized. P43 verifies actual disposable Git permissions/history before live writes; this read-only fixture phase cannot establish them. No real token or external target operation is available or authorized.
