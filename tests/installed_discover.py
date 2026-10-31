@@ -4,7 +4,7 @@ No external service/socket forwarding or provider/Git mutation.
 """
 import account_fixture
 from account_fixture import Fixture,Provider
-from installed_accounts import account_session,add,settle,login,page as account_page
+from installed_accounts import account_session,add,settle,login,account,page as account_page
 from installed_lifecycle import permission_choice
 from installed_journal import set_input
 from installed_packages import *
@@ -63,7 +63,7 @@ def main():
    prior=stop(sid,profile);sid=None;sid,_=account_session(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);discover(sid)
    assert script(sid,"return document.getElementById('discover-input').value")==ORIGINAL;assert script(sid,"return document.getElementById('discover-account').value")==owner;assert script(sid,"return document.getElementById('discover-selected').textContent").startswith('Selected input 1');assert script(sid,"return document.getElementById('discover-state').textContent").startswith('UNKNOWN');time.sleep(1);assert fixture.slug_reads==before
    activate(sid,'#discover-resume');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('PAUSED')&&document.getElementById('discover-state').textContent.includes('fresh route check')"),30);top(sid);pending=next(j for j in inspect(sid)['jobs'] if j['id']==job_id);assert pending['discover']['rows'][6]['state']=='PENDING' and pending['discover']['rows'][6]['checkedAt'] is None;assert fixture.slug_reads==before
-   account_page(sid,owner);wait(lambda:script(sid,"const b=document.getElementById('account-open');return b&&!b.disabled&&!b.hidden"));click(sid,'#account-open');settle(sid,owner,'READY');dashboard(sid);discover(sid);activate(sid,'#discover-resume');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('COMPLETE')"),30);assert len([r for r in fixture.slug_reads if r['path']=='/free-name'])==1 and len([r for r in fixture.slug_reads if r['path']=='/changed-name'])==1 and len([r for r in fixture.slug_reads if r['path']=='/last-name'])==1
+   account_page(sid,owner);wait(lambda:script(sid,"const b=document.getElementById('account-open');return b&&!b.disabled&&!b.hidden"));previous_job=account(sid,owner)['flow']['jobId'];click(sid,'#account-open');wait(lambda:account(sid,owner)['flow']['jobId']!=previous_job);settle(sid,owner,'READY');dashboard(sid);discover(sid);activate(sid,'#discover-resume');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('COMPLETE')"),30);assert len([r for r in fixture.slug_reads if r['path']=='/free-name'])==1 and len([r for r in fixture.slug_reads if r['path']=='/changed-name'])==1 and len([r for r in fixture.slug_reads if r['path']=='/last-name'])==1
    activate(sid,'#discover-export');wait(lambda:'COMPLETE' in script(sid,"return document.getElementById('discover-export-state').textContent"),30);activate(sid,'#discover-check');top(sid);state=inspect(sid);assert state['journalEnabled'] is False
    export=next(j for j in state['jobs'] if j['kind']=='DISCOVER_EXPORT');file=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),f=await c.read('files',arguments[0]);c.close();return f;",[export['id']]);assert file['state']=='COMPLETE';path=pathlib.Path(file['absolutePath']);raw=path.read_bytes();assert len(raw)==file['bytes'] and hashlib.sha256(raw).hexdigest()==file['sha256']
    with zipfile.ZipFile(path) as z:
