@@ -1,34 +1,38 @@
 # Current work
 
-**Active phase:** P01 — Protected packaged host. No other phase is in scope.
+**Active phase:** P01 — Protected packaged host. Implementation exists; required installed verification is still open. P02 has not started.
 
-## Repository baseline
+## Baseline and plan
 
-- Inspected GitHub on 31 October 2026: `main` is `c3a066a60813e6b83e63978b79181593a6a76234`; only `main` exists; no PRs or Actions runs. Local checkout matches. No unfinished phase exists.
-- Read accepted v42, design revision 2, AGENTS, phase contracts and CI guidance. Authority files stay unchanged.
-- Reuse Alpha `c5b23b77f50db7ffe50e2ef705a8bf0b5879e36e` and its pinned donor `9995f6eadfa54be6cc0001f4e04f2a2d9b9401bf`. Read only relevant bootstrap/build sources. Do not rerun the historical audit or 41-test baseline.
+GitHub main was `c3a066a60813e6b83e63978b79181593a6a76234`, with no other branch, PR or Actions run. The phase-specific plan was published before code in `2b12bd8842e2b74e43e7710d5206443534034bb6`. Work is in [PR #1](https://github.com/Neb963/PCMS/pull/1), branch `p01-protected-host`. Accepted v42, design revision 2 and phase contracts stay unchanged.
 
-## Implementation plan
+- [x] Vendor the exact pinned donor extension/LICENSE with blob hashes and MIT attribution. Preserve Gecko ID, native protocol and permissions. Apply small checked build transformations; exclude legacy UI/command dispatch and workflow startup.
+- [x] Add the donor-first MV3 module entry and synchronous shell/wake listeners. Keep P01 admission blocked; no account or provider operation exists.
+- [x] Add one dashboard, serialized icon open/focus, the seven ordered navigation entries and bounded startup diagnostics. Unfinished features have no fake operations.
+- [x] Add deterministic XPI/source identity, separate privileged/sandbox CSP, the 154.0 minimum, clean-profile installation guide and focused CI.
+- [x] T: 8 focused tests pass, including cold status, profile preservation, bootstrap failures, rapid icon clicks and package/import integrity.
+- [ ] B: finish the persistently installed Firefox journey below.
+- [ ] Verify remote candidate/tree, checks, lightweight PR merge and resulting main.
 
-- [x] Inspect repository/checkpoints and select dependency-ready P01.
-- [x] Vendor the exact pinned donor with MIT attribution and reproducible hashes. Extract the proven Alpha bootstrap repairs as small, checked build transformations. Preserve native protocol, permissions and `persona-route-manager@local`; exclude legacy UI/controllers from the operating host.
-- [x] Add one packaged MV3 event page. Import fail-closed protection before PCMS initialization; register shell/wake listeners synchronously. Keep admission blocked for missing permission/bridge or bootstrap failure. No provider actions exist in P01.
-- [x] Add the toolbar handler and one dashboard, with Home · Generators · Accounts · Refresher · Work · Other · Settings. Serialize rapid icon clicks; focus the existing dashboard. Show honest startup diagnostics and unfinished areas without fake operations.
-- [x] Build a deterministic development XPI with `strict_min_version: 154.0`, separate privileged/sandbox CSP, no popup and source/XPI identity receipt. Add a short clean-profile installation guide.
-- [x] Add focused T checks for bootstrap ordering/failure, duplicate icon clicks, package identity, attribution, permissions and transformations; add fast CI and only the required installed P01 journey.
-- [ ] B: persistently install the built XPI in a dedicated clean profile on a qualifying Firefox build with normal sandbox. Click the real toolbar icon twice; independently count/focus dashboard tabs. Verify blocked cold startup without a bridge. Record browser/build, source commit and XPI SHA-256. Unsupported browser or environmental failure remains an explicit hold.
-- [ ] Push meaningful checkpoints with this file; verify remote commit/tree, PR checks and resulting main after merge when required evidence passes.
+## Evidence and recovery
 
-## Evidence and holds
+T passes locally and on GitHub through `f2eb993257e0edb9c7ca7b1737303f782512ff5a`. Required B remains **NOT PASSED**; do not replace it with source checks.
 
-- T: **PASS**, all 7 focused tests locally and on GitHub at `8a14f0530285a59312a31a84d1ef80034c342570`. Vendor bytes, complete import graph, syntax and deterministic XPI checks pass.
-- B: **NOT TESTED**. Initial CI run `41214431538` failed before Firefox launch: the Mozilla checksum parser assumed every manifest row had exactly two whitespace fields. Match the exact archive path and first digest field; retain the SHA-512 comparison. Parser repair succeeded. Run `41214513710` installed the XPI persistently on Firefox 155.0b1 with normal sandbox preferences, then failed in the harness at the retired CustomizableUI module URL before the icon click. Use Firefox’s current `moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs` path; keep actual WebDriver toolbar clicks. Code review also found a cold-click status race; wait for the finite donor attachment result and clear a recovered toolbar error.
-- Connected Firefox information request returned MCP internal error before any browser operation. Use a clean local/CI Firefox environment if available; do not modify an existing user profile.
-- H: **NOT TESTED**, deferred to P42 for working bridge/protected contexts. No live provider or native route mutation is in scope.
-- This is an incomplete development checkpoint. Module seed/workflows and durable Core records belong to later phases.
+| Observed failure | Recovery / evidence |
+|---|---|
+| Mozilla checksum parser unpacked every row as two fields; Firefox did not launch. | Exact-path/digest matching retained SHA-512 verification. Run `41214513710` downloaded and persistently installed Firefox 155.0b1. |
+| Old CustomizableUI resource URL failed in the harness. | Use the current `moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs` import. |
+| Toolbar wrapper received trusted events but did not invoke the action. | Run `41215127877` showed registered shell listeners and wrapper events. Target the actual `.webextension-browser-action` child; run `41215249127` opened the dashboard. |
+| Clean profile showed `CLEAN_PROFILE_REQUIRED`, rather than missing bridge. | Run `41215468856` recorded the exact status. The guard incorrectly rejected Firefox’s default containers. Remove that test for prior donor authority; preserve rejection of existing donor/local/sync data. Donor recovery still quarantines unmapped containers. Do not delete containers or clear data to pass. |
 
-**Remote checkpoint:** Plan commit `2b12bd8842e2b74e43e7710d5206443534034bb6`, [PR #1](https://github.com/Neb963/PCMS/pull/1). Shell Git push lacked credentials; use the connected GitHub integration.
+The generated module-entry package omits the unsupported MV3 `persistent` field. The cold status request waits for donor attachment instead of returning stale Starting. No historical research/test program was repeated. Connected Firefox MCP returned an internal error; CI uses a disposable home/profile with no installed bridge.
 
-**Next unresolved action:** Publish the checksum parser repair and inspect the required installed P01 journey. Remote code `8a14f0530285a59312a31a84d1ef80034c342570` / tree `870296786c32ea302381a87b729856b05bf3e4b4` matched the local staged tree. Installed evidence remains pending. Run `41214667752` reached a real toolbar click but observed no dashboard. Run `41214834006` showed the custom background page running without registered shell behavior and a manifest warning for MV3 `persistent`. Restore the proven Alpha module-entry packaging (`background.scripts` + `type: module`), which supplies a nonpersistent document; omit unsupported `persistent` and the redundant custom HTML. The generated module entry removed the manifest warning but run `41214966615` still observed no dashboard. Run `41215127877` confirmed registered donor/shell listeners and trusted mouse events on the outer toolbar item. Firefox’s actual action button is its `.webextension-browser-action` child. Click that real button with WebDriver; the wrapper click did not invoke the action. This was a harness targeting fault, not evidence that the host failed to load. Run `41215249127` then opened the dashboard through the actual button but its startup status did not match the missing-bridge oracle. Capture the exact expected/observed startup code before any recovery change. Keep the single-dashboard and blocked-start assertions unchanged.
+**Required B oracle:** Firefox version satisfies 154.0; persistent add-on is active and not temporary; normal sandbox preferences/environment; real toolbar button twice opens/focuses one dashboard; actual Settings navigation works; real process restart keeps the XPI and blocked missing-bridge startup; simulated existing donor bytes are rejected and preserved. Record browser/build, source and XPI SHA-256.
 
-**Next eligible phase after verified P01:** P02 — Durable records and continuous Core recording. Do not start it in this chat.
+**Remote checkpoint:** [PR #1](https://github.com/Neb963/PCMS/pull/1). Git shell push has no credentials; use the connected GitHub integration. Earlier published code trees matched local staged trees.
+
+**Next unresolved action:** Publish the default-container correction and rerun the same required installed journey. Record actual failures; merge only after P01 evidence passes.
+
+**Deferred:** H at P42 is **NOT TESTED** for the real native bridge, protected contexts and route capacity. No live Perchance/Git-provider or native route mutations occurred. This is an incomplete development XPI; module seed/workflows and durable Core records belong to later phases.
+
+**Next eligible after verified P01:** P02 — Durable records and continuous Core recording. Stop after P01 in this chat.

@@ -30,7 +30,7 @@ test('shell listeners register before asynchronous status work; exact sender onl
   for(const url of ['https://perchance.org/','moz-extension://fixture/ui/index.html.evil','moz-extension://other/ui/index.html'])assert.equal(trustedShell(api,{...sender,url}),false);
   let disconnected=false;api.runtime.onConnect.listeners[0]({name:'pcms-host-status',sender:{...sender,id:'other'},disconnect(){disconnected=true;}});assert.ok(disconnected);
 });
-test('profile guard preserves existing donor/local/sync/container data and retries a storage fault',async()=>{
+test('profile guard preserves donor/local/sync data, permits default containers and retries a storage fault',async()=>{
   for(const fixture of [{state:{}},{other:'value'},{}]){
     let writes=0;
     const sync=Object.keys(fixture).length?{}:{personaRecoveryMetaV1:{}};
@@ -40,7 +40,7 @@ test('profile guard preserves existing donor/local/sync/container data and retri
   let saved={},writes=0,failed=true,containers=[];
   const api={storage:{local:{get:async()=>{if(failed){failed=false;throw Error('quota');}return saved;},set:async(row)=>{saved=row;writes++;}},sync:{get:async()=>({})}},contextualIdentities:{query:async()=>containers}};
   const check=createProfileCheck(api);await assert.rejects(check());await Promise.all([check(),check()]);assert.equal(writes,1);assert.equal(saved[PROFILE_KEY].schema,1);
-  containers=[{cookieStoreId:'firefox-container-1'}];saved={};await assert.rejects(createProfileCheck(api)());
+  containers=[{cookieStoreId:'firefox-container-1'}];saved={};await createProfileCheck(api)();assert.equal(saved[PROFILE_KEY].schema,1);
 });
 test('status never admits work: missing/incompatible bridge, missing permission and bootstrap fault',async()=>{
   let native={installed:false},permission=false,broken=false;

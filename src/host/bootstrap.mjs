@@ -24,11 +24,9 @@ export function createProfileCheck(api) {
         failure = 'CLEAN_PROFILE_REQUIRED';
         throw new Error('CLEAN_PROFILE_REQUIRED');
       }
-      const containers = await api.contextualIdentities.query({});
-      if (containers.length) {
-        failure = 'CLEAN_PROFILE_REQUIRED';
-        throw new Error('CLEAN_PROFILE_REQUIRED');
-      }
+      // Firefox supplies default containers in a clean profile. Their
+      // existence is not prior donor authority. Donor recovery remains
+      // responsible for quarantining unmapped containers before startup.
       await api.storage.local.set({[PROFILE_KEY]: {schema: 1}});
     })().catch(error => { pending = null; throw error; });
     return pending;
