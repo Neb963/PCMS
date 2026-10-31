@@ -70,7 +70,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   });
  }
  async function frame(module,mode,pageId='background',container=document.body){
-  if(!module.enabled||!module.manifest||module.manifest.coreApi!==1||!Array.isArray(module.manifest.capabilities)||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
+  if(!module||!/^[a-f0-9]{64}$/.test(module.packageHash)||!Number.isSafeInteger(module.generation)||!module.enabled||!module.manifest||module.manifest.coreApi!==1||!Array.isArray(module.manifest.capabilities)||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
   const page=mode==='page'?module.manifest.pages.find(p=>p.id===pageId):null;if(mode==='page'&&!page)throw Error('PAGE_MISSING');
   const script=await load(module,mode==='background'?module.manifest.entries.background:page.script);
   const html=page?sanitizeMarkup(await load(module,page.html),document):'',css=page?.style?sanitizeStyle(await load(module,page.style)):'';
@@ -102,7 +102,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
  async function openPage(moduleId,pageId,container){const module=await core.read('modules',moduleId);return frame(module,'page',pageId,container);}
  async function stop(binding){const receipt=await request(binding,'STOP',{generation:binding.generation});frames.delete(binding);binding.iframe.remove();if(backgrounds.get(binding.moduleId)===binding)backgrounds.delete(binding.moduleId);return receipt;}
  async function preparePage(moduleId,pageId,sender){
-  const module=await core.read('modules',moduleId);if(!module?.enabled||!module.manifest)throw Error('MODULE_DISABLED');
+  const module=await core.read('modules',moduleId);if(!module?.enabled||!module.manifest)throw Error('MODULE_DISABLED');if(!/^[a-f0-9]{64}$/.test(module.packageHash)||!Number.isSafeInteger(module.generation)||module.manifest.coreApi!==1||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
   const page=module.manifest.pages.find(p=>p.id===pageId);if(!page)throw Error('PAGE_MISSING');
   const token=crypto.randomUUID(),senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.coreDocument,sender.url]);
   const binding={moduleId,hash:module.packageHash,generation:module.generation,bootId,mode:'page',pageId,channel:token,window:null,capabilities:new Set([...module.manifest.capabilities,'ui.view']),targetId:null,senderKey};

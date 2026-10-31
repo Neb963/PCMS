@@ -71,7 +71,7 @@ export async function build(output=path.join(ROOT,'build')) {
   manifest.options_ui={page:'ui/index.html',open_in_tab:true};
   manifest.sandbox={pages:['host/module-runner.html']};
   manifest.content_security_policy={
-    extension_pages:"script-src 'self'; object-src 'none'; base-uri 'none'",
+    extension_pages:"script-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'self'",
     sandbox:"sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; worker-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'"
   };
   await writeFile(path.join(stage,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');

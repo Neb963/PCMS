@@ -43,7 +43,7 @@ def main():
    assert script(sid,"return !!document.querySelector('script:not([src])')") is False
    assert script(sid,"return document.querySelector('img')?.getAttribute('src')") is None
    click(sid,'#isolation');wait(lambda:'network' in script(sid,"return document.getElementById('result').textContent"));isolated=json.loads(script(sid,"return document.getElementById('result').textContent"));assert isolated=={'browser':'undefined','denied':True,'network':True},isolated
-   type_text(sid,'#draft','preserved draft');click(sid,'#save');wait(lambda:script(sid,"return document.getElementById('result').textContent")=='Saved')
+   type_text(sid,'#draft','preserved draft');type_text(sid,'#draft','\ue004');assert script(sid,"return document.activeElement.id")=='save';type_text(sid,'#save','\ue007');wait(lambda:script(sid,"return document.getElementById('result').textContent")=='Saved')
    click(sid,'#start');wait(lambda:script(sid,"return document.body.dataset.job"));job=script(sid,"return document.body.dataset.job");top(sid)
    wait(lambda:asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs'));const c=await openCore();const j=await c.read('jobs',arguments[0]);c.close();return j?.state==='WAITING'&&j?.checkpoint?.count===1;",[job]),20)
    receipt['checks'].append('actual-module-control/opaque-sandbox/no-browser-or-network/credential-denied/sanitized-markup/draft-ack')
@@ -55,7 +55,7 @@ def main():
    reopened=time.time()*1000;toolbar(sid);dashboard(sid);status(sid,'BRIDGE_MISSING')
    observed=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs'));const c=await openCore();const j=await c.read('jobs',arguments[0]);c.close();return {state:j.state,checkpoint:j.checkpoint,time:j.updatedAt};",[job]);assert observed['state']=='COMPLETE' and observed['checkpoint']=={'value':'expected!!','count':2,'denied':True} and observed['time']<reopened,observed
    receipt['checks'].append('closed-dashboard/native-event-page-termination/alarm-wake/finite-background-completion/independent-expected-checkpoint')
-   click(sid,'nav a[href="#other"]');click(sid,'#records a[href="#module/fixture-module/main"]');wait(lambda:script(sid,"return !!document.querySelector('iframe.module-frame')"));frame(sid);wait(lambda:script(sid,"return document.getElementById('draft')?.value")=='preserved draft');top(sid)
+   click(sid,'nav a[href="#other"]');wait(lambda:script(sid,"return !!document.querySelector('#records a[href=\"#module/fixture-module/main\"]')"));click(sid,'#records a[href="#module/fixture-module/main"]');wait(lambda:script(sid,"return !!document.querySelector('iframe.module-frame')"));frame(sid);wait(lambda:script(sid,"return document.getElementById('draft')?.value")=='preserved draft');top(sid)
    click(sid,'#records a[href="#module/fixture-module/broken"]');wait(lambda:'Open Modules' in script(sid,"return document.getElementById('records').textContent"));click(sid,'#records a[href="#settings/modules/fixture-module"]');wait(lambda:script(sid,"return !!document.querySelector('.module-pin')"));click(sid,'.module-pin')
    wait(lambda:script(sid,"return !!document.querySelector('nav [data-pinned-module]')"));nav=script(sid,"return [...document.querySelectorAll('nav a')].map(a=>a.textContent)");assert nav[-2:]==['Fixture','Settings'],nav
    click(sid,'nav [data-pinned-module]');wait(lambda:script(sid,"return !!document.querySelector('iframe.module-frame')"));frame(sid);wait(lambda:script(sid,"return document.getElementById('draft')?.value")=='preserved draft');top(sid)
