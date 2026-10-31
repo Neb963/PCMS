@@ -52,12 +52,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Targeted scoped Git writes and actual Git HTTPS fixture (normal sandbox)
-        run: python3 tests/installed_git_writer.py build/pcms-dev.xpi
+      - name: Targeted Discover protected rendered batch and Downloads (normal sandbox)
+        run: python3 tests/installed_discover.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-git-writer-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-discover-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json
