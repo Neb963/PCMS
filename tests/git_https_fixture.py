@@ -7,9 +7,10 @@ TOKEN='disposable-fixture-github-token'
 def oid(kind,data):return hashlib.sha1((kind+' '+str(len(data))+'\0').encode()+data).hexdigest()
 def declaration(version='v1',status='NOT_READY'):return f'Format: PCMS-1\nVersion: {version}\nAction: DEVELOP\nStatus: {status}\n'
 class GitFixture:
- def __init__(self,root):
+ def __init__(self,root,folders=None):
   self.root=root;self.objects={};self.head=None;self.log=root/'git-requests.jsonl';self.state=root/'git-model.json';self.nonce=uuid.uuid4().hex;self.proc=None
-  self.folders={f'folder-{i:04d}':declaration() for i in range(61)};self.folders.update({'done-one':declaration('done-version','DONE'),'invalid-one':declaration().replace('Version: v1','Version: v1 ')})
+  self.folders=folders if folders is not None else {f'folder-{i:04d}':declaration() for i in range(61)}
+  if folders is None:self.folders.update({'done-one':declaration('done-version','DONE'),'invalid-one':declaration().replace('Version: v1','Version: v1 ')})
   def blob(text):
    data=text.encode();sha=oid('blob',data);self.objects['blobs/'+sha]={'sha':sha,'size':len(data),'encoding':'base64','content':base64.b64encode(data).decode()};return {'mode':'100644','type':'blob','sha':sha,'size':len(data)}
   def tree(entries):
@@ -31,7 +32,7 @@ class GitFixture:
   try:probe.bind(('127.0.0.1',port))
   except PermissionError:prefix=['sudo','-n']
   finally:probe.close()
-  self.proc=subprocess.Popen([*prefix,sys.executable,str(pathlib.Path(__file__).resolve()),'server',str(self.root),self.nonce,str(port)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);ready=select.select([self.proc.stdout],[],[],10)[0]
+  self.proc=subprocess.Popen([*prefix,sys.executable,str(getattr(self,'server_script',pathlib.Path(__file__).resolve())),'server',str(self.root),self.nonce,str(port)],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True);ready=select.select([self.proc.stdout],[],[],10)[0]
   if not ready or self.proc.stdout.readline().strip()!='GIT_READY':raise RuntimeError('GIT_FIXTURE_START_FAILED')
  def close(self):
   if self.proc and self.proc.poll() is None:
