@@ -67,3 +67,8 @@ test('each page receipt survives an interrupted stop and recovery identifies the
  const held=await s.life().request('fixture-module','UPDATE','update');assert.equal(held.lifecycle.attentionInstance,'second');assert.equal(held.lifecycle.receipts.length,1);assert.equal(held.lifecycle.receipts[0].instance,'first');assert.equal(held.version,'1.0.0');
  s.host.stopModule=async(m,l,record)=>{const receipt={...second,generation:l.oldGeneration,disposedResources:2,unresolvedEffectIds:[]};await record(receipt);return [...l.receipts,receipt];};await s.life().recover();const done=await s.core.read('modules','fixture-module');assert.equal(done.version,'1.1.0');assert.equal(done.generation,2);
 });
+test('volatile lifecycle fence rejects ordinary read-effect admission as well as writes and new jobs',async t=>{
+ const s=await setup(t),j=await s.core.read('jobs',s.job.id);await s.core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,value:{...j,dueAt:0}}],{step:'FIXTURE_SETUP',result:'COMPLETE'});const selected=await s.core.queue.next();let calls=0;
+ await assert.rejects(s.core.queue.dispatch(selected.id,selected.rev,{operationId:'read-one',kind:'OBSERVE',write:false,preflight:async()=>{s.core.queue.fence(selected.moduleId);return {ok:true};},call:async()=>{calls++;},observe:async()=>({matched:true,operationId:'read-one'})}),/STALE_GENERATION/);assert.equal(calls,0);
+ await assert.rejects(s.core.queue.enqueue({requestId:'after-fence',logicalKey:'after-fence',moduleId:selected.moduleId,targetId:'target',kind:'CHECK'}),/MODULE_DISABLED/);
+});

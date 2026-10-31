@@ -81,7 +81,10 @@ def main():
    assert script(sid,"return document.getElementById('chat').textContent")=='retained fixture AI context'
    assert script(sid,"return !!document.getElementById('owned-module-node')")
    element=call('POST',f'/session/{sid}/element',{'using':'css selector','value':'#dirty'});call('POST',f'/session/{sid}/element/'+element['element-6066-11e4-a52e-4f735466cecf']+'/clear',{});type_text(sid,'#dirty','no')
-   toolbar(sid);dashboard(sid);settings(sid);manage(sid,'CONTINUE');wait(lambda:module(sid).get('version')=='1.1.0' and module(sid).get('enabled'))
+   toolbar(sid);dashboard(sid)
+   observed=asyncjs(sid,"""const result=await browser.userScripts.execute({target:{tabId:arguments[0]},world:'USER_SCRIPT',worldId:arguments[1],js:[{code:"({instance:globalThis.__pcmsLifecycle?.instance??null,dirty:document.getElementById('dirty')?.value??null,owned:!!document.getElementById('owned-module-node')})"}]});return result;""",[setup['tab'],setup['worldId']]);receipt['beforeContinue']=observed;print(json.dumps({'beforeContinue':observed}),flush=True)
+   assert observed[0]['result']['dirty']=='no',observed
+   settings(sid);manage(sid,'CONTINUE');wait(lambda:module(sid).get('version')=='1.1.0' and module(sid).get('enabled'))
    call('POST',f'/session/{sid}/window',{'handle':editor_handle});assert script(sid,"return !document.getElementById('owned-module-node')");assert script(sid,"return document.getElementById('editor').value")==expected_source
    toolbar(sid);dashboard(sid);open_fixture(sid);wait(lambda:script(sid,"return document.getElementById('draft').value")=='saved draft Ω');top(sid)
    retained=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),j=await c.read('jobs',arguments[0]);c.close();return {input:j.input,generation:j.generation,state:j.state};",[setup['job']]);assert retained=={'input':{'exact':'retained'},'generation':2,'state':'WAITING'},retained
@@ -94,6 +97,8 @@ def main():
   except Exception as error:
    receipt['error']=str(error)
    if sid:
+    try:receipt['moduleState']=module(sid)
+    except Exception:pass
     try:receipt['visibleState']=script(sid,"return {url:location.href,text:document.body.textContent.slice(-4000)}")
     except Exception:pass
    if sid:

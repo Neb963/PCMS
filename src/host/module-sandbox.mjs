@@ -1,5 +1,5 @@
 // This script runs only in the opaque manifest sandbox. It has no extension API.
-let channel=null,mode=null,module=null,sequence=0,documentId=null,stopped=false,stopResult=null;const pending=new Map(),disposers=[];
+let channel=null,mode=null,module=null,sequence=0,documentId=null,stopped=false,stopping=false,moduleStopped=false,disposedCount=0,stopResult=null;const pending=new Map(),disposers=[];
 const send=message=>parent.postMessage({channel,...message},'*');
 function rpc(operation,args={}) {
  if(stopped)return Promise.reject(Error('MODULE_STOPPED'));
@@ -7,7 +7,7 @@ function rpc(operation,args={}) {
  return new Promise((resolve,reject)=>{pending.set(requestId,{resolve,reject});send({type:'RPC',requestId,operation,args});});
 }
 const api=Object.freeze({
- own(dispose){if(stopped||typeof dispose!=='function')throw Error('INVALID_DISPOSER');disposers.push(dispose);},
+ own(dispose){if(stopped||stopping||typeof dispose!=='function')throw Error('INVALID_DISPOSER');disposers.push(dispose);},
  defineModule(value){if(mode!=='background'||module)throw Error('MODULE_DEFINITION_INVALID');if(!['start','runStep','reconcile','stop'].every(k=>typeof value?.[k]==='function'))throw Error('MODULE_DEFINITION_INVALID');module=value;},
  query:args=>rpc('query',args),action:args=>rpc('action',args),saveView:value=>rpc('saveView',{value}),getView:()=>rpc('getView')
 });
@@ -34,6 +34,6 @@ addEventListener('message',async event=>{
   catch{send({type:'STEP_FAILED',callId:m.callId,code:'MODULE_STEP_FAILED'});}return;
  }
  if(m.type==='STOP'){
-  try{if(!stopResult){if(module)await module.stop(api);for(const dispose of disposers)await dispose();stopped=true;stopResult={generation:m.generation,document:documentId,instance:channel,disposedResources:disposers.length,unresolvedEffectIds:[]};for(const waiter of pending.values())waiter.reject(Error('MODULE_STOPPED'));pending.clear();}send({type:'STOPPED',callId:m.callId,receipt:stopResult});}catch{send({type:'STOP_FAILED',callId:m.callId});}
+  try{if(!stopResult){stopping=true;if(module&&!moduleStopped){await module.stop(api);moduleStopped=true;}while(disposers.length){await disposers[0]();disposers.shift();disposedCount++;}stopped=true;stopResult={generation:m.generation,document:documentId,instance:channel,disposedResources:disposedCount,unresolvedEffectIds:[]};for(const waiter of pending.values())waiter.reject(Error('MODULE_STOPPED'));pending.clear();}send({type:'STOPPED',callId:m.callId,receipt:stopResult});}catch{send({type:'STOP_FAILED',callId:m.callId});}
  }
 });

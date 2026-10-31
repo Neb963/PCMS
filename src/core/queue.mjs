@@ -32,7 +32,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const prior=await req(s('commands').get(commandKey));if(prior){check(prior.signature===signature,'REQUEST_CONFLICT');return read(s,r,'jobs',prior.jobId);}
     const existing=await req(s('jobs').index('logical').get([r.dataset,logicalKey]));
     if(existing){check(existing.moduleId===moduleId&&existing.targetId===targetId&&existing.kind===kind&&JSON.stringify(existing.input)===JSON.stringify(input),'JOB_INPUT_CONFLICT');await req(s('commands').put({key:commandKey,jobId:existing.id,signature}));await append(s,r,event(existing,'ENQUEUE_JOB','EXISTING'));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return existing;}
-    const module=await read(s,r,'modules',moduleId);check(module?.enabled===true&&!module.lifecycle,'MODULE_DISABLED');check(Number.isSafeInteger(module.generation)&&module.generation>0&&jobSchema===(module.jobSchema??1),'JOB_SCHEMA_INCOMPATIBLE');
+    const module=await read(s,r,'modules',moduleId);check(module?.enabled===true&&!module.lifecycle&&!fenced.has(moduleId),'MODULE_DISABLED');check(Number.isSafeInteger(module.generation)&&module.generation>0&&jobSchema===(module.jobSchema??1),'JOB_SCHEMA_INCOMPATIBLE');
     const job={id:crypto.randomUUID(),jobId:null,logicalKey,moduleId,targetId,accountId,kind,jobSchema,input:structuredClone(input),state:'WAITING',step:'QUEUED',dueAt,batchId,createdAt:clock(),generation:module.generation,needsCheck:true,effects:[]};job.jobId=job.id;
     // Intake is durable even while paused. It cannot dispatch until Resume.
     await writeRows(s,r,[{table:'jobs',id:job.id,value:job,refs}],event(job,'ENQUEUE_JOB','WAITING'));
@@ -66,7 +66,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   claim:async(jobId,expectedRev)=>tx(async(s,r)=>{
     const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');check(job.step!=='WAIT_CREATOR','DEPENDENCY_HAS_NO_WRITER');
     const generator=await read(s,r,'generators',job.targetId);check(generator,'TARGET_MISSING');check(!generator.writerHold||generator.writerHold.jobId===jobId,'WRITER_HELD');
-    const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&module.generation===job.generation,'STALE_GENERATION');
+    const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
     const lease={bootId,generation:module.generation,jobId};
     return save(s,r,job,{lease},'CLAIM_WRITER','COMPLETE',[change('generators',generator,{...generator,writerHold:{jobId,reason:job.kind}})]);
   }),
@@ -79,7 +79,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   reconciliationCheckpoint:(jobId,expectedRev,checkpoint)=>tx(async(s,r)=>{const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');return save(s,r,job,{checkpoint,state:'HELD'},'RECONCILE_CHECKPOINT','UNKNOWN');}),
   next:async()=>tx(async(s,r)=>{
     const jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))),modules=await req(s('modules').index('dataset').getAll(IDBKeyRange.only(r.dataset))),byId=new Map(modules.map(m=>[m.id,m]));
-    const ready=jobs.filter(j=>['WAITING','READY'].includes(j.state)&&j.dueAt<=clock()&&byId.get(j.moduleId)?.enabled===true&&!byId.get(j.moduleId).lifecycle&&(!r.paused||maintenance(j,byId.get(j.moduleId))));
+    const ready=jobs.filter(j=>['WAITING','READY'].includes(j.state)&&j.dueAt<=clock()&&byId.get(j.moduleId)?.enabled===true&&!byId.get(j.moduleId).lifecycle&&!fenced.has(j.moduleId)&&(!r.paused||maintenance(j,byId.get(j.moduleId))));
     if(!ready.length)return null;
     const maintain=ready.filter(j=>maintenance(j,byId.get(j.moduleId))),ordinary=ready.filter(j=>!maintenance(j,byId.get(j.moduleId)));
     // One reserved maintenance turn at least every fourth ready turn.
@@ -99,7 +99,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const admitted=await serial(async()=>{
       const job=await tx(async(s,r)=>{
         const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
-        const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&module.generation===job.generation,'STALE_GENERATION');
+        const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
         check(job.state!=='COMPLETE'&&job.state!=='FAILED','JOB_FINISHED');check(job.dueAt<=clock(),'NOT_DUE');
         check(job.effect?.boundary!=='POSSIBLE','RECONCILE_REQUIRED');
         check(!job.effects?.some(e=>e.operationId===operationId),'EFFECT_ALREADY_OBSERVED');
@@ -111,7 +111,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
         // Every individual Git object/ref call comes through this boundary.
         return save(s,r,job,{state:'RUNNING',needsCheck:false,effect:{operationId,kind,inputHash,boundary:'POSSIBLE',bootId,epoch:r.admissionEpoch??0}},'EFFECT_INTENT','POSSIBLE');
       });
-      if((blocked||fenced.has(job.moduleId))&&write){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,'PAUSED');}
+      if(blocked&&write||fenced.has(job.moduleId)){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,'PAUSED');}
       const marker={targetId:job.targetId,accountId:job.accountId,maintenance:!write};active.set(operationId,marker);
       let sent;try{sent=Promise.resolve(call({operationId}));}catch(error){sent=Promise.reject(error);}
       return {job,sent};

@@ -25,3 +25,7 @@ test('missing exact website receipt holds; vanished document yields local teardo
  const api={webNavigation:{getAllFrames:async()=>exists?[{documentId:'doc'}]:[{documentId:'different'}]},userScripts:{execute:async()=>[{documentId:'doc',result:null}]}};
  const service=createWebsiteScripts({core,api,load:async()=>'',context:async()=>null});await assert.rejects(service.stop({id:'fixture'},{oldGeneration:7,instances:[i]}),/MODULE_STOP_INCOMPLETE/);exists=false;assert.equal((await service.stop({id:'fixture'},{oldGeneration:7,instances:[i]}))[0].generation,7);
 });
+test('partial disposal retries only the unfinished resource and never disposes a completed resource twice',async()=>{
+ const world={first:0,second:0,dirty:true};vm.createContext(world);await vm.runInContext(wrapper('PCMS.own(()=>{first++;});PCMS.own(()=>{if(dirty)throw Error("DIRTY");second++;});',{instance:'one',document:'doc',generation:1}),world);
+ await assert.rejects(world.__pcmsLifecycle.stop('one'),/DIRTY/);assert.equal(world.first,1);assert.equal(world.second,0);world.dirty=false;const receipt=await world.__pcmsLifecycle.stop('one');assert.equal(receipt.disposedResources,2);assert.equal(world.first,1);assert.equal(world.second,1);
+});
