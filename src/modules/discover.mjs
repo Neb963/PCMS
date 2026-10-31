@@ -89,7 +89,7 @@ export function createDiscover({core,donor,downloads,gitWriter=null,catalog=null
   }
  }
  async function preparationEffect(job,reconcile){
-  const proof=job.discoverPreparation;check(job.moduleId===id&&job.kind==='GIT_PREPARE'&&proof?.schema===1&&proof.slug===job.input.slug&&proof.repositoryId===job.input.repositoryId&&job.targetId===await targetFor(proof.slug),'DISCOVER_PREPARATION_SCOPE');
+  const proof=job.discoverPreparation;check(job.moduleId===id&&job.kind==='GIT_PREPARE'&&proof?.schema===1&&proof.slug===job.input.slug&&proof.repositoryId===job.input.repositoryId&&proof.repository===job.input.repository&&job.targetId===await targetFor(proof.slug),'DISCOVER_PREPARATION_SCOPE');
   try{
    const parent=await core.read('jobs',proof.batchId),row=parent?.discover?.rows[proof.index];
    check(reconcile||parent&&!parent.ownerMissing&&row?.result==='Available'&&row.slug===proof.slug&&row.checkedAt===proof.checkedAt&&row.preparation?.jobId===job.id,'DISCOVER_OBSERVATION_CHANGED');
@@ -99,7 +99,7 @@ export function createDiscover({core,donor,downloads,gitWriter=null,catalog=null
     const latest=await core.read('jobs',job.id);await save(latest,{discoverPreparation:{...latest.discoverPreparation,catalogRequestedAt:clock()}},'OBSERVE_DISCOVER_FOLDER');if(catalog)await catalog.tick(true);
    }
    return {...result,jobRevision:(await core.read('jobs',job.id)).rev};
-  }catch(error){const code=error.code??(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:publicError(error));return output(job,'HELD',code);}
+  }catch(error){if(['STALE_REVISION','GIT_JOB_SCOPE_DENIED'].includes(error.code))throw error;const code=error.code??(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:publicError(error)),latest=await core.read('jobs',job.id);if(latest.git?.locked&&latest.effect?.boundary!=='POSSIBLE')await core.queue.releaseGit(job.id);return output(job,'HELD',code);}
  }
  async function checkPreparations(batchId){
   await admit();await prepareRows(batchId);const parent=await batch(batchId);
