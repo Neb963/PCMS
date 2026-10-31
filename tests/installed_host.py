@@ -138,6 +138,20 @@ def main():
             assert stored=={'state':{'fixture':'preserve-existing-donor-data'}},stored
             receipt['checks'].append('existing-donor-data-refused-and-preserved')
             receipt['result']='PASS'
+        except Exception:
+            if sid:
+                try:
+                    context(sid,'chrome')
+                    diagnostic=script(sid,"""const {ExtensionParent}=ChromeUtils.importESModule('resource://gre/modules/ExtensionParent.sys.mjs');
+                      const ext=ExtensionParent.GlobalManager.getExtension(arguments[0]);
+                      return {backgroundState:ext?.backgroundState,errors:ext?.errors,
+                        background:ext?.manifest?.background,
+                        console:Services.console.getMessageArray().map(m=>m.message).filter(m=>/moz-extension|PCMS|PersonaMonkey|SyntaxError|background|module/i.test(m)).slice(-25),
+                        tabs:[...gBrowser.tabs].map(t=>t.linkedBrowser.currentURI.spec)};""",[ID])
+                    (OUT/'failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
+                    print('P01_FAILURE_DIAGNOSTIC '+json.dumps(diagnostic),flush=True)
+                except Exception as error: print('DIAGNOSTIC_UNAVAILABLE '+str(error),flush=True)
+            raise
         finally:
             if sid:
                 try:stop(sid,profile)

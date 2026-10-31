@@ -29,6 +29,6 @@
 
 **Remote checkpoint:** Plan commit `2b12bd8842e2b74e43e7710d5206443534034bb6`, [PR #1](https://github.com/Neb963/PCMS/pull/1). Shell Git push lacked credentials; use the connected GitHub integration.
 
-**Next unresolved action:** Publish the checksum parser repair and inspect the required installed P01 journey. Remote code `8a14f0530285a59312a31a84d1ef80034c342570` / tree `870296786c32ea302381a87b729856b05bf3e4b4` matched the local staged tree. Installed evidence remains pending.
+**Next unresolved action:** Publish the checksum parser repair and inspect the required installed P01 journey. Remote code `8a14f0530285a59312a31a84d1ef80034c342570` / tree `870296786c32ea302381a87b729856b05bf3e4b4` matched the local staged tree. Installed evidence remains pending. Run `41214667752` reached a real toolbar click but observed no dashboard. Capture extension background state and console errors to diagnose the packaged startup; do not replace the toolbar oracle with direct navigation.
 
 **Next eligible phase after verified P01:** P02 — Durable records and continuous Core recording. Do not start it in this chat.
