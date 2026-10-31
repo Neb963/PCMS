@@ -1,28 +1,20 @@
 # Current work
 
-**P08 — Searchable Journal and completed exports: COMPLETE; merge/postmerge verification pending.**
+**P09 — Owned-file retention and cleanup recovery: implementation plan.**
 
-P01–P07 are merged. P07 main `90cb5c1610fbf761fea055b604226af2dbe16991` passed postmerge [41227136530](https://github.com/Neb963/PCMS/actions/runs/41227136530).
+P01–P08 are merged. P08 [PR #8](https://github.com/Neb963/PCMS/pull/8) merged at `bdaefb9eb77ceef5fdf7ee575ae714d76429c642`, exact reviewed tree `8a5d530c8b8eb47854326c6654d5d8ec8e751d7c`. Postmerge [41229353436](https://github.com/Neb963/PCMS/actions/runs/41229353436) passed T/B/DSK. Reuse unchanged export/package evidence.
 
-P08 branch `p08-journal-exports`, [PR #8](https://github.com/Neb963/PCMS/pull/8). Verified source `7e1b8e51307162ff268e5f9b0aca1756afcc38ae`, tree `41c88a6bb5f62b534ac648c0ec1fd23bf8349474`. Final diff/syntax/whitespace review passed.
+## Plan from actual code
 
-## Implemented and verified
+- Extend the existing Core Downloads/receipt boundary with receipt-owned deletion for expired automatic files. Require current profile, exact DownloadItem identity/path/extension/size and a newer complete corresponding export. Never select files by glob; preserve manual/unrelated/imported files and earlier files on failed export.
+- Use finite per-file CLEANUP jobs in the one queue. Persist each possible remove before dispatch, retain acknowledged/unknown removal state, and reconcile the same operation. A stale `exists` flag or missing history is a tracked hold, never permission for another remove. Browser history can remain; no history erasure is needed for disk retention.
+- Add the configurable 90-day local/disk Journal retention setting. Prune only an exported, old, unpinned event prefix atomically with its record; preserve unexported records even beyond retention. Keep monotonic sequence identity and distinguish intentionally expired prefix from missing coverage. Release redundant completed-export payload storage without discarding source/job history or pinned captures.
+- Journal schedules cleanup only after a completed new export and only while enabled. Core file primitives remain independent so enabled Backup can later reuse them with Journal disabled. Global Pause still permits enabled maintenance. Expose actual cleanup pending/attention and last-good/error state in Settings.
+- T: exact age/configuration boundaries, profile/receipt authority, manual/imported/moved/replaced/history-loss exclusions, delayed metadata, interruption/no replay, exported-prefix pruning and pins. Use independent expected values.
+- Required B/DSK: real expired owned automatic files, old manual/unrelated sentinels, failed new export, cleared browser history and delayed removal; inspect actual disk bytes/removal independently. Advance controlled fixture dates rather than waiting 90 days. Use the existing targeted installed CI job; no broader historical suite.
 
-- Shared packaged Core Downloads owns durable profile-specific receipts and content-addressed export bytes. It validates relative paths, observes exact extension/path/time/size identity, distinguishes known browser failure from lost durable ID, and never replays an Unknown request. Journal enablement does not own this service.
-- Bundled Journal 0.2.0 runs finite steps in the existing sandbox/queue. ZIPs include exact sequence coverage, count/hash/gap metadata and a completion marker. Local result/watermark application is atomic and idempotent; manual ranges do not advance automatic progress. Terminal failure preserves prior success and records.
-- Enabled Journal reconstructs one coalesced 30-minute deadline and operates during global Pause with the dashboard closed. Disable stops its new work/search/export; Core recording continues. Known in-flight results reconcile. Finite RUNNING jobs become preserved read-only rechecks across lifecycle fencing.
-- Settings → Journal has operating search, exact filters, stable paging/details, range export, interval/destination, last-result/status recovery and persisted drafts. The pager cannot consume a cursor from an unfinished different query. Old inert development ZIPs require explicit compatible updates, rather than silent reseeding.
+## Boundary facts and holds
 
-## Evidence
+The tested Firefox 155 implementation's removeFile awaits native removal but does not itself refresh DownloadItem.exists; search serializes stored target metadata. Keep a durable API acknowledgement distinct from later metadata and independent disk evidence. Do not force removal/history erasure from stale metadata. This extends the new product boundary; do not repeat basic Downloads feasibility.
 
-[Run 41229143241](https://github.com/Neb963/PCMS/actions/runs/41229143241): focused T and installed **B/DSK PASS**, Firefox 155.0/build `20260817142839`, normal OS sandbox 6. Tested XPI SHA-256 `a0c14d043e22543c0f9f9a07a4cf8c35ee16b69511ce52a07bd3c4042206356b`.
-
-The actual Settings/sandbox/Core/Downloads journey independently reopened production disk ZIPs with Python CRC/digest/full-range checks and all 65 controlled fixture targets. It passed later-page search/filter/details, saved settings, global Pause, dashboard closure, native event-page termination/alarm wake, module Disable/Enable, a genuine process restart, incremental ranges with no missed-export burst, injected IDB receipt loss after a real download with exactly one file, and a real unwritable destination with prior files/watermark/unrelated sentinel preserved. No provider or route effect.
-
-Earlier failed runs remain on PR #8: the first assumed concurrent fixture events occupied consecutive sequences; the next used a stale pager during an unfinished search. The test now preserves every actual record and waits for the real filtered result; product paging is fenced during load. Neither failed run was reported PASS.
-
-## Next and holds
-
-Merge PR #8 with the verified head, compare its remote main tree and postmerge checks. Then write the P09-specific retention plan here and continue sequentially. Do not stop for interphase confirmation.
-
-Retention/deletion remains P09; large-volume stress remains P40/P41. Actual AI teardown and all G/H/P1–P5 remain NOT TESTED until authorized later acceptance with named disposable targets/effects. This is a development checkpoint, not complete product readiness. Local normal-sandbox Firefox is unavailable (`uid_map: EPERM`); existing CI supplies required B/DSK without weakened security.
+P09 code and required T/B/DSK are NOT TESTED. Backup-specific prior-complete behavior is P31/P34. No live provider/route/Git effects are authorized. After P09, continue with the next eligible phase (normally P10); do not stop for interphase confirmation.
