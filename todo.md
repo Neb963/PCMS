@@ -19,3 +19,5 @@ P01–P13 are merged. P13 [PR #13](https://github.com/Neb963/PCMS/pull/13), main
 P14 code not yet written. Next implement/test the classifier and durable batch policy, then private protected observation and actual UI/export journey. The local execution environment remains unavailable; use verified GitHub file/tree/commit checkpoints and CI. No unavailable local command is claimed run.
 
 G/H/P1–P5 remain NOT TESTED and unauthorized. P44 separately qualifies current native slug rules/messages/frames; fixtures do not establish live availability. No provider/Git target mutations in P14.
+
+Classifier checkpoint: exact accepted literals/layout folding, historical native normalization with retained collisions/rejections, and fixed isolated-world output snapshot are drafted with independent focused cases. Durable batch/adapter/UI/export and required final T/B remain OPEN.
