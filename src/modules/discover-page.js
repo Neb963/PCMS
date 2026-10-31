@@ -12,7 +12,7 @@ async function refresh(){
  for(const li of [...el('rows').children])if(!wanted.has(li.dataset.index))li.remove();
  el('first').hidden=state.offset===0;el('next').hidden=state.offset+50>=result.rows.length;
  el('export-state').textContent=result.exportJobs.map(j=>[j.file?.state||j.state,j.code,j.file?.filename,j.file?.state==='COMPLETE'?'Completed byte count verified':''].filter(Boolean).join(' · ')).join('\n');
- selection();buttons();
+ el('check').textContent=result.unknown?'Check interrupted observation':'Check export result';selection();buttons();
 }
 function selection(){const row=current?.rows.find(r=>r.index===state.row);el('selected').textContent=row?'Selected input '+(row.index+1)+': '+row.raw+' · '+(row.result||row.state):'';}
 const listen=(id,event,fn)=>el(id).addEventListener(event,fn);

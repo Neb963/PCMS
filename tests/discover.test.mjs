@@ -43,3 +43,8 @@ test('result ZIP reopens exact original/rejected/collision rows and UTF8 CSV/JSO
  const f=await fixture(t),original=' first_name \nfirst name\n"\n☃';const id=await f.imported(original),archive=await discoverArchive(await f.c.read('jobs',id)),files=unzipSync(archive.bytes),decode=b=>new TextDecoder().decode(b),json=JSON.parse(decode(files['results.json'])),manifest=JSON.parse(decode(files['manifest.json']));
  assert.equal(json.original,original);assert.equal(json.rows.length,4);assert.equal(json.rows[1].duplicateOf,0);assert.equal(json.rows[2].state,'REJECTED');assert.equal(json.rows[3].raw,'☃');assert.equal(manifest.jsonSha256,await sha256(files['results.json']));assert.equal(manifest.csvSha256,await sha256(files['results.csv']));assert.ok(decode(files['results.csv']).includes('""""'));
 });
+
+test('explicit readback settles a paused interrupted observation without admitting a new navigation',async t=>{
+ const f=await fixture(t),id=await f.imported('first-name\nnext-name');await f.s.command({id,kind:'START',accountId:'account-one'});
+ f.hook(async()=>{throw Error('lost before result');});await f.turn();assert.equal((await f.c.read('jobs',id)).effect.boundary,'POSSIBLE');await f.s.command({id,kind:'PAUSE'});await f.c.queue.pause('pause-recovery');f.hook(null);f.page({complete:true,text:'unattributed partial result'});await f.s.changed();const j=await f.c.read('jobs',id);assert.equal(j.effect.boundary,'OBSERVED');assert.equal(j.discover.mode,'PAUSED');assert.equal(j.discover.rows[0].result,'Unknown');assert.equal(j.discover.rows[1].state,'PENDING');assert.equal(f.calls.length,2);assert.equal(f.calls[1].readOnly,true);assert.equal(await f.turn(),null);
+});

@@ -15,7 +15,7 @@ export function createDiscover({core,donor,downloads,clock=Date.now}){
  const output=async(job,state,code=null,dueAt=null)=>({jobRevision:(await core.read('jobs',job.id)).rev,value:{state,code,dueAt}});
  async function currentAccount(job){const a=await core.read('accounts',job.accountId);check(a?.state==='READY'&&!a.admission&&a.expectedPrincipal&&a.personaUid&&a.containerId&&a.routeId,'DISCOVER_READY_ACCOUNT_REQUIRED');return a;}
  async function observation(job,reconcile){
-  if(job.discover.mode!=='RUNNING'||fences.has(job.id))return output(job,'HELD',job.discover.code??'DISCOVER_PAUSED');
+  if((job.discover.mode!=='RUNNING'||fences.has(job.id))&&job.effect?.boundary!=='POSSIBLE')return output(job,'HELD',job.discover.code??'DISCOVER_PAUSED');
   const index=job.discover.rows.findIndex(row=>row.state==='PENDING');
   if(index<0){await save(job,{discover:{...job.discover,mode:'COMPLETE',code:null,completedAt:clock()}});return output(job,'COMPLETE');}
   const operationId=job.id+'-slug-'+index,key='discover-observation:'+operationId;
@@ -23,7 +23,7 @@ export function createDiscover({core,donor,downloads,clock=Date.now}){
   const observe=async()=>({matched:!!(await core.view(key)),operationId});
   const read=async onlyRead=>{
    const a=await currentAccount(job),tab=await core.view('discover-observer');
-   const guard=async()=>{const m=await admit(),j=await batch(job.id),q=await core.queue.status(),fresh=await currentAccount(job);check(m.generation===job.generation&&j.discover.mode==='RUNNING'&&!fences.has(job.id)&&q.state==='RUNNING'&&fresh.rev===a.rev,'DISCOVER_ADMISSION_HELD');};
+   const guard=async()=>{const m=await admit(),j=await batch(job.id),q=await core.queue.status(),fresh=await currentAccount(job);check(m.generation===job.generation&&fresh.rev===a.rev&&(onlyRead||j.discover.mode==='RUNNING'&&!fences.has(job.id)&&q.state==='RUNNING'),'DISCOVER_ADMISSION_HELD');};
    await guard();
    const observed=await donor.observeSlug(scope(a),{slug:job.discover.rows[index].slug,operationId,tab,readOnly:onlyRead,fresh:job.discover.freshTab===true,
     admit:guard,saveTab:value=>core.saveView('discover-observer',value,crypto.randomUUID())});
@@ -45,7 +45,7 @@ export function createDiscover({core,donor,downloads,clock=Date.now}){
    check(receipt.operationId===operationId&&receipt.slug===latest.discover.rows[index].slug,'SLUG_OBSERVATION_SCOPE');
    const rows=latest.discover.rows.map((row,i)=>i===index?{...row,state:'CHECKED',result:receipt.result,basis:receipt.basis,checkedAt:receipt.checkedAt}:row);
    const unknown=receipt.result==='Unknown',failures=unknown?(latest.discover.failures??0)+1:0,nextDue=clock()+(unknown?Math.min(300000,10000*2**Math.min(failures-1,5)):2000);
-   const mode=fences.has(job.id)?'PAUSED':unknown?'UNKNOWN':rows.some(row=>row.state==='PENDING')?'RUNNING':'COMPLETE';
+   const mode=fences.has(job.id)||latest.discover.mode==='PAUSED'?'PAUSED':unknown?'UNKNOWN':rows.some(row=>row.state==='PENDING')?'RUNNING':'COMPLETE';
    await save(latest,{discover:{...latest.discover,rows,mode,code:unknown?receipt.basis:mode==='PAUSED'?'DISCOVER_PAUSED':null,failures,nextDue,freshTab:false,...mode==='COMPLETE'?{completedAt:clock()}:{}},dueAt:nextDue});
    return output(job,mode==='RUNNING'?'WAITING':mode==='COMPLETE'?'COMPLETE':'HELD',unknown?receipt.basis:mode==='PAUSED'?'DISCOVER_PAUSED':null,nextDue);
   }catch(error){
@@ -84,6 +84,6 @@ export function createDiscover({core,donor,downloads,clock=Date.now}){
    job=await save(job,{accountId,discover:{...job.discover,mode:'RUNNING',code:null,freshTab:true},state:'WAITING',dueAt:Math.max(clock(),job.discover.nextDue),recovery:null});return {id:job.id};});},
   export:args=>run(async()=>{const m=await admit();await batch(args.id);const old=(await jobs()).find(j=>j.kind==='DISCOVER_EXPORT'&&j.input.batchId===args.id&&!['COMPLETE','FAILED'].includes(j.state));if(old)return {id:old.id};const job=await core.queue.enqueue({requestId:args.requestId,logicalKey:'discover:export:'+args.requestId,moduleId:id,targetId:'discover-export:'+args.id,kind:'DISCOVER_EXPORT',jobSchema:m.manifest.jobSchema,input:{batchId:args.id}});return {id:job.id};}),
   effect:(job,reconcile=false)=>run(async()=>{check(job.moduleId===id&&['DISCOVER_BATCH','DISCOVER_EXPORT'].includes(job.kind),'DISCOVER_SCOPE_DENIED');check((await admit()).generation===job.generation,'STALE_GENERATION');return job.kind==='DISCOVER_BATCH'?observation(job,reconcile):exportEffect(job,reconcile);}),
-  changed:()=>run(async()=>{for(const job of await jobs())if(job.kind==='DISCOVER_EXPORT'&&job.effect?.boundary==='POSSIBLE'){const result=await exportStatus(job),latest=await core.read('jobs',job.id);if(result.value.state==='COMPLETE'&&latest.effect?.boundary!=='POSSIBLE')await core.queue.transition(latest.id,latest.rev,{state:'COMPLETE',recovery:null});}}),
+  changed:()=>run(async()=>{for(let job of await jobs())if(job.kind==='DISCOVER_BATCH'&&job.effect?.boundary==='POSSIBLE'&&enabled(await core.read('modules',id))){const result=await observation(job,true);job=await core.read('jobs',job.id);if(job.effect?.boundary!=='POSSIBLE')await core.queue.transition(job.id,job.rev,{state:result.value.state==='COMPLETE'?'COMPLETE':result.value.state==='WAITING'?'WAITING':'HELD',dueAt:result.value.dueAt??clock(),recovery:result.value.state==='HELD'?{action:'OPEN_DISCOVER',code:result.value.code}:null});}else if(job.kind==='DISCOVER_EXPORT'&&job.effect?.boundary==='POSSIBLE'){const result=await exportStatus(job),latest=await core.read('jobs',job.id);if(result.value.state==='COMPLETE'&&latest.effect?.boundary!=='POSSIBLE')await core.queue.transition(latest.id,latest.rev,{state:'COMPLETE',recovery:null});}}),
  };
 }
