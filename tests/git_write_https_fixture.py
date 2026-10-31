@@ -1,7 +1,7 @@
 """Independent GitHub-shaped HTTPS fixture backed by real Git plumbing.
 Every object/ref stays in a disposable bare repository. No external remotes.
 """
-import base64,datetime,hashlib,http.server,json,pathlib,re,socket,ssl,subprocess,sys,threading,uuid
+import base64,datetime,hashlib,http.server,json,os,pathlib,re,socket,ssl,subprocess,sys,threading,uuid
 from urllib.parse import urlsplit
 from git_https_fixture import GitFixture,TOKEN,declaration
 SHA=re.compile(r'^[a-f0-9]{40}$')
@@ -129,12 +129,19 @@ def serve(root,nonce,port):
      if moved.returncode:self.record(path,422,{'force':False,'sha':sha});return self.send({},422)
      status=200
      if controls['lose_applied_ref']:
-      update_controls(root,{'lose_applied_ref':False});self.record(path,status,{'lost':True,'force':False,'sha':sha});self.close_connection=True
+      update_controls(root,{'lose_applied_ref':False});self.record(path,status,{'lost':True,'lossBoundary':'RESPONSE_BODY','force':False,'sha':sha});self.close_connection=True
+      # Begin a valid HTTP response, then lose its application receipt body.
+      # A zero-byte disconnect can be transparently retried by the HTTP stack.
+      self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length','512');self.send_header('Connection','close');self.end_headers();self.wfile.write(b'{\"ref\":');self.wfile.flush()
       try:self.connection.shutdown(socket.SHUT_RDWR)
       except OSError:pass
       self.connection.close();return
     else:self.record(path,403);return self.send({},403)
     self.record(path,status,{'sha':sha,**({'force':False} if kind=='refs/heads/main' else {})});return self.send({'ref':'refs/heads/main','object':{'type':'commit','sha':sha}} if kind=='refs/heads/main' else {'sha':sha},status)
  context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(str(root/'git-server.pem'),str(root/'git-server.key'));context.set_alpn_protocols(['http/1.1'])
- with http.server.ThreadingHTTPServer(('127.0.0.1',int(port)),Handler) as server:server.socket=context.wrap_socket(server.socket,server_side=True);print('GIT_READY',flush=True);server.serve_forever()
+ with http.server.ThreadingHTTPServer(('127.0.0.1',int(port)),Handler) as server:
+  # Privilege is used only to bind the disposable loopback TLS listener.
+  owner=root.stat()
+  if os.geteuid()==0 and owner.st_uid!=0:os.setgroups([]);os.setgid(owner.st_gid);os.setuid(owner.st_uid)
+  server.socket=context.wrap_socket(server.socket,server_side=True);print('GIT_READY',flush=True);server.serve_forever()
 if __name__=='__main__' and sys.argv[1]=='server':serve(*sys.argv[2:])

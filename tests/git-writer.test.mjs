@@ -57,3 +57,7 @@ test('removed-owner tombstone retains exact Git attribution and resolves read-on
 test('a mismatched Core target folder cannot obtain a write through the scoped service',async t=>{
  const f=await fixture(t),job=await f.enqueue({kind:'PREPARE',slug:'requested-folder'});await f.core.mutate([{table:'generators',id:job.targetId,value:{folder:'generators/different-folder',repositoryId:'314159'}}],{step:'FIXTURE_WRONG_GIT_TARGET',result:'COMPLETE'});assert.equal((await f.drain()).code,'GIT_TARGET_SCOPE_DENIED');assert.equal(f.model.calls.length,0);
 });
+
+test('a delayed stale callback cannot change a completed Git job or receipt',async t=>{
+ const f=await fixture(t),request={kind:'PREPARE',slug:'stale-callback'},old=await f.enqueue(request);assert.equal((await f.drain()).state,'COMPLETE');const before=await f.core.read('jobs',old.id),count=f.model.calls.length;await assert.rejects(f.writer.step(old,request),/STALE_REVISION/);assert.deepEqual(await f.core.read('jobs',old.id),before);assert.equal(f.model.calls.length,count);
+});

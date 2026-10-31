@@ -60,7 +60,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
   return {schema:1,operationId:active.operationId,commit:plan.candidate,parent:plan.baseHead,tree:plan.tree,headObserved:h,verifiedAt:clock(),paths:Object.keys(plan.outputs).sort(),signature:active.signature,applied:true};
  }
  async function step(original,rawRequest,reconcile=false){
-  let job=await core.read('jobs',original.id);check(job&&job.rev===original.rev&&job.moduleId===original.moduleId&&job.targetId===original.targetId,'GIT_JOB_SCOPE_DENIED');
+  let job=await core.read('jobs',original.id);check(job&&job.moduleId===original.moduleId&&job.targetId===original.targetId,'GIT_JOB_SCOPE_DENIED');check(job.rev===original.rev,'STALE_REVISION');
   const request=normalizeGitRequest(rawRequest),signature=await requestSignature(request),{sha256}=await import('./records.mjs'),key=await sha256(new TextEncoder().encode(request.kind+'\0'+(request.version??'initial')));let g=job.git,active=g?.active;
   if(g?.receipts?.[key]){check(g.receipts[key].signature===signature,'GIT_VERSION_REUSED');return {value:{state:'COMPLETE',code:null,receipt:g.receipts[key]},jobRevision:job.rev};}
   if(active&&active.key!==key)check(active.phase==='COMPLETE','GIT_OPERATION_PENDING');
@@ -107,7 +107,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
   }
  }
  const status=job=>job?.git?{folder:job.git.active?.request?.folder??null,kind:job.git.active?.request?.kind??null,repository:job.git.repository,repositoryId:job.git.repositoryId,phase:job.git.active?.phase??null,code:job.git.code??null,candidate:job.git.active?.plan?.candidate??null,receipt:job.git.active?.receipt??null,unknown:job.effect?.boundary==='POSSIBLE'}:null;
- return {step:(job,request,reconcile=false)=>serial('git',()=>step(job,request,reconcile).catch(error=>hold(job,code(error)))),check:id=>serial('git',async()=>{const job=await core.read('jobs',id);check(job?.git?.active,'GIT_OPERATION_MISSING');return step(job,job.git.active.request,true);}),status};
+ return {step:(job,request,reconcile=false)=>serial('git',()=>step(job,request,reconcile).catch(error=>{if(['STALE_REVISION','GIT_JOB_SCOPE_DENIED'].includes(error.code))throw error;return hold(job,code(error));})),check:id=>serial('git',async()=>{const job=await core.read('jobs',id);check(job?.git?.active,'GIT_OPERATION_MISSING');return step(job,job.git.active.request,true);}),status};
 }
 function base64(bytes){let text='';for(let i=0;i<bytes.length;i+=32768)text+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(text);}
 const sort=value=>Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0));
