@@ -34,3 +34,5 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - P04 (`41220808549`): a WebDriver navigation click finished before the asynchronous module list rendered. Wait for the actual next control before clicking it. Keep independent background completion timestamps and effect assertions; an accepted navigation is not its rendered result.
 
 | P06 first CI assertions failed from assuming IDB index order matched package list order and from reading asynchronous module navigation before render finished; source logic stayed unchanged. | Keep independent outcome assertions, but compare unordered sets as sets and wait for real visible async completion; do not relax the required expected packages. A later run passed installed restart/update and source integrity unchanged. | P06 runs 41223284976, 41223366462, 41223444750. |
+
+- P07 installed run `41225264911`: Firefox's permission panel contains hidden notification templates. A broad CSS selector found a nonvisible `moz-button`. Installed tests must select the visible notification and its actual shadow button before asserting the permission result.

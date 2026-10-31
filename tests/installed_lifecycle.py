@@ -28,6 +28,15 @@ def manage(sid,kind):
 def open_fixture(sid):
  click(sid,'nav a[href="#other"]');wait(lambda:script(sid,"return !!document.querySelector('#records a[href=\"#module/fixture-module/main\"]')"));click(sid,'#records a[href="#module/fixture-module/main"]');wait(lambda:script(sid,"return !!document.querySelector('iframe.module-frame')"));frame(sid);wait(lambda:script(sid,"return !!document.getElementById('draft')"))
 
+def permission_choice(sid,allow):
+ context(sid,'chrome')
+ wait(lambda:script(sid,"return document.getElementById('notification-popup')?.state==='open'"))
+ # The panel also contains hidden notification templates. Select the visible
+ # native button, then its real shadow button, not the moz-button wrapper.
+ element=wait(lambda:script(sid,"""const selector=arguments[0];for(const host of document.querySelectorAll(selector)){const r=host.getBoundingClientRect();if(r.width>0&&r.height>0)return host.shadowRoot?.querySelector('button')??host;}return null;""",['#notification-popup .popup-notification-'+('primary' if allow else 'secondary')+'-button']))
+ call('POST',f'/session/{sid}/element/'+element['element-6066-11e4-a52e-4f735466cecf']+'/click',{})
+ context(sid,'content')
+
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text())
  assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k)
@@ -45,9 +54,9 @@ def main():
    assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid);status(sid,'BRIDGE_MISSING')
    context(sid,'chrome');prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content')
    settings(sid);wait(lambda:script(sid,"return !!document.getElementById('allow-userscripts')"));click(sid,'#allow-userscripts')
-   context(sid,'chrome');wait(lambda:script(sid,"return document.getElementById('notification-popup')?.state==='open'"));click(sid,'#notification-popup .popup-notification-secondary-button');context(sid,'content');wait(lambda:'still blocked' in script(sid,"return document.getElementById('records').textContent"))
+   permission_choice(sid,False);wait(lambda:'still blocked' in script(sid,"return document.getElementById('records').textContent"))
    receipt['checks'].append('real-optional-permission-denial/visible-recovery')
-   click(sid,'#allow-userscripts');context(sid,'chrome');wait(lambda:script(sid,"return document.getElementById('notification-popup')?.state==='open'"));click(sid,'#notification-popup .popup-notification-primary-button');context(sid,'content')
+   click(sid,'#allow-userscripts');permission_choice(sid,True)
    wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"))
    select(sid,first);click(sid,'#install-module');wait(lambda:'Installed.' in script(sid,"return document.getElementById('import-result').textContent"));open_fixture(sid);type_text(sid,'#draft','saved draft Ω');click(sid,'#save');wait(lambda:script(sid,"return document.getElementById('result').textContent")=='Saved');top(sid)
    setup=asyncjs(sid,"""
