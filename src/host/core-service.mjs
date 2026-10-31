@@ -52,7 +52,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     try {
       const value=await core();let result;
       switch(message?.operation) {
-        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await journal.tick();await accounts.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};let m=await lifecycle.request(message.id,message.kind,message.requestId);if(message.id==='pcms-discover'){await discover.changed();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}await journal.tick();await accounts.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
         case 'discover.available':result=await discover.available();break;
         case 'discover.list':result=await discover.list(message);break;
         case 'discover.get':result=await discover.get(message.id);break;
