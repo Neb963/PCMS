@@ -19,7 +19,7 @@ test('seven deterministic first-party ZIPs match strict manifest, original bytes
  for(const [id,name] of FIRST_PARTY){
   const a=bundledPackage(id,name),b=bundledPackage(id,name),v=await validatePackage(a.zip);
   assert.deepEqual(a.zip,b.zip);assert.equal(v.manifest.id,id);assert.equal(v.manifest.name,name);
-  assert.equal(v.manifest.version,id==='pcms-journal'?'0.3.0':id==='pcms-accounts'?'0.3.0':id==='pcms-discover'?'0.2.0':'0.1.0');assert.deepEqual(v.manifest.pages,id==='pcms-discover'?[{id:'check-slugs',title:'Check slugs',html:'page.html',script:'page.js'}]:[]);
+  assert.equal(v.manifest.version,id==='pcms-journal'?'0.3.0':id==='pcms-accounts'?'0.3.0':id==='pcms-discover'?'0.2.0':'0.1.0');assert.deepEqual(JSON.parse(JSON.stringify(v.manifest.pages)),id==='pcms-discover'?[{id:'check-slugs',title:'Check slugs',html:'page.html',script:'page.js'}]:[]);
   assert.deepEqual(v.manifest.capabilities,id==='pcms-journal'?['journal.query','journal.export','journal.cleanup']:id==='pcms-accounts'?['records.accounts','persona.prepare','persona.check','persona.open','persona.repair']:id==='pcms-discover'?['records.discover','jobs.discover','perchance.classify']:[]);assert.equal(v.packageHash,a.packageHash);
   assert.equal(v.manifestHash,a.manifestHash);assert.equal(await sha256(a.zip),a.packageHash);
   assert.equal(await sha256(v.files.get('background.js')),v.manifest.files[0].sha256);
