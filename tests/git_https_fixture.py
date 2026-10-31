@@ -20,7 +20,7 @@ class GitFixture:
    marker=blob(text);entries.append({**tree([{**marker,'path':'DEPLOYMENT.md'},{**blob('source sentinel '+slug),'path':'main.pjs'}]),'path':slug})
    if slug=='invalid-one':self.last_marker=marker['sha']
   root_tree=tree([{**tree(entries),'path':'generators'},{**blob('unrelated root sentinel'),'path':'README.md'}]);raw=('tree '+root_tree['sha']+'\nauthor Fixture <fixture@example.test> 1700000000 +0000\ncommitter Fixture <fixture@example.test> 1700000000 +0000\n\nFixture\n').encode();self.head=oid('commit',raw);self.objects['commits/'+self.head]={'sha':self.head,'tree':{'sha':root_tree['sha']}};self.failure=None;self.write()
-  ext=root/'git-extensions.cnf';ext.write_text('subjectAltName=DNS:api.github.com\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
+  ext=root/'git-extensions.cnf';ext.write_text('subjectAltName=DNS:api.github.com,DNS:api.mullvad.net\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
   for args in [['req','-x509','-newkey','rsa:2048','-nodes','-days','2','-subj','/CN=PCMS Git fixture CA','-keyout',str(root/'git-ca.key'),'-out',str(root/'git-ca.pem')],['req','-newkey','rsa:2048','-nodes','-subj','/CN=api.github.com','-keyout',str(root/'git-server.key'),'-out',str(root/'git-server.csr')],['x509','-req','-days','2','-in',str(root/'git-server.csr'),'-CA',str(root/'git-ca.pem'),'-CAkey',str(root/'git-ca.key'),'-CAcreateserial','-extfile',str(ext),'-out',str(root/'git-server.pem')]]:subprocess.run(['openssl',*args],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
   self.ca=ssl.PEM_cert_to_DER_cert((root/'git-ca.pem').read_text())
  def write(self):
