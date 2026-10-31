@@ -63,12 +63,13 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   const m=await admit(),after=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!after?.ok)return hold(a,job,after?.code??'DONOR_UNAVAILABLE');check(m.generation===job.generation,'STALE_GENERATION');
   check(value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');
   if(!a.flow.wasReady)check(Number.isFinite(a.flow.confirmationAt),'ACCOUNT_CONFIRM_REQUIRED');
+  check(value.tabId==null||Number.isSafeInteger(value.tabId)&&value.tabId>=0,'ACCOUNT_CONTEXT_CHANGED');
   const p=value.identity;check(p?.ok===true&&p.source==='PERCHANCE_AUTHENTICATED_IDENTITY'&&/^[a-f0-9]{64}$/.test(p.principalFingerprint??'')&&typeof p.principalLabel==='string','ACCOUNT_IDENTITY_UNKNOWN');
   check(p.observedAt>=a.flow.startedAt&&p.observedAt<=clock()&&a.routeObservedAt>=a.flow.startedAt,'ACCOUNT_CONFIRM_STALE');
   if(a.expectedPrincipal)check(a.expectedPrincipal===p.principalFingerprint,'ACCOUNT_PRINCIPAL_CHANGED');
   const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');const next=a.flow.purpose==='OPEN'?'OPEN':'READY';
   if(a.admission==='REACTIVATING'){const jobs=await accountRows('jobs',a.id);check(!jobs.some(j=>j.id!==job.id&&j.effect?.boundary==='POSSIBLE'),'ACCOUNT_WORK_UNRESOLVED');}
-  await save(a,{admission:null,archive:null,expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
+  await save(a,{admission:null,archive:null,tabId:value.tabId??a.tabId,expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
   if(a.admission==='REACTIVATING'&&next==='READY'){core.queue.unfenceAccount(a.id);await resumeArchivedJobs(a.id,job.id);}
   return result(job,next==='READY'?'COMPLETE':'CONTINUE');
  }

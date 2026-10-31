@@ -219,10 +219,10 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   if(stage==='PREREQUISITES')return prerequisites();await initialize();const found=await bound(scope);if(found.code)return fail(found.code);const p=found.profile;
   if(stage==='CREATE')return p.personaUid===scope.accountId?{ok:true,operationId,stage,...tuple(p)}:fail('ACCOUNT_CONTEXT_CHANGED');
   if(identity){
-   const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);let tab;try{tab=await api.tabs.get(scope.tabId);}catch{return fail('ACCOUNT_LOGIN_TAB_MISSING');}if(tab.cookieStoreId!==scope.containerId||!ownOrigin(tab.url))return fail('ACCOUNT_CONTEXT_CHANGED');
+   const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);let tab;try{tab=await api.tabs.get(scope.tabId);}catch{const owned=await ownedTabs(scope);if(owned.length!==1)return fail(owned.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING');tab=owned[0].tab;}if(tab.cookieStoreId!==scope.containerId||!ownOrigin(tab.url))return fail('ACCOUNT_CONTEXT_CHANGED');
    const target={tabId:tab.id,frameIds:[0]},run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target,world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('ACCOUNT_DOCUMENT_CHANGED');return rows[0].result;};
    try{const witness=await run(accountDocumentWitness),value=await run(observePerchanceIdentity,[witness]),after=await run(accountDocumentWitness),final=await protectedProfile(scope),current=await api.tabs.get(tab.id);
-    if(witness!==after||value?.ok&&value.documentWitness!==witness)return fail('ACCOUNT_DOCUMENT_CHANGED');if(final.code||current.cookieStoreId!==scope.containerId||!ownOrigin(current.url))return fail(final.code??'ACCOUNT_CONTEXT_CHANGED');if(!value?.ok)return value;return {ok:true,...tuple(final.profile),identity:value};
+    if(witness!==after||value?.ok&&value.documentWitness!==witness)return fail('ACCOUNT_DOCUMENT_CHANGED');if(final.code||current.cookieStoreId!==scope.containerId||!ownOrigin(current.url))return fail(final.code??'ACCOUNT_CONTEXT_CHANGED');if(!value?.ok)return value;return {ok:true,...tuple(final.profile),tabId:tab.id,identity:value};
    }catch(error){return fail(/^[A-Z_]+$/.test(error.message)?error.message:'ACCOUNT_IDENTITY_UNKNOWN');}
   }
   const op=saved(p,operationId,stage);if(!op)return fail('ACCOUNT_OUTCOME_UNKNOWN');if(op.phase==='FAILED')return op.value;
