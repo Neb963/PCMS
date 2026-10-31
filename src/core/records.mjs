@@ -120,6 +120,34 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
   const core={
     close:()=>db.close(),
     status:()=>transact([], 'readonly',s=>root(s)),
+    // One first-install transaction for the complete bundled fleet. The
+    // marker is global to the profile, not tied to a dataset that restore may
+    // switch. An existing registry always wins over first-install defaults.
+    moduleSeedStatus:()=>transact(['modules'],'readonly',async s=>{
+      const r=await root(s);return {initialized:!!r.moduleSeed,moduleCount:await req(s('modules').index('dataset').count(IDBKeyRange.only(r.dataset)))};
+    }),
+    seedModules:rows=>transact(['modules','events','versions','blobs','chunks'],'readwrite',async s=>{
+      const r=await root(s);
+      if(r.moduleSeed)return {state:'UNCHANGED'};
+      const count=await req(s('modules').index('dataset').count(IDBKeyRange.only(r.dataset)));
+      if(count){
+        const sequence=await append(s,r,{step:'SEED_MODULES',result:'PRESERVED'});
+        r.revision++;r.updatedAt=clock();r.moduleSeed={schema:1,state:'PRESERVED'};
+        await req(s('meta').put(r));return {state:'PRESERVED',sequence};
+      }
+      const ids=['pcms-accounts','pcms-discover','pcms-creator','pcms-deployer',
+        'pcms-refresher','pcms-journal','pcms-backup'];
+      requireCore(Array.isArray(rows)&&rows.length===ids.length&&
+        rows.every((m,i)=>m?.moduleId===ids[i]&&m.enabled===true&&m.generation===1&&
+          m.state==='READY'&&m.version===m.manifest?.version&&
+          m.moduleId===m.manifest?.id&&hash(m.packageHash)&&hash(m.manifestHash)&&
+          Array.isArray(m.refs)&&m.refs.includes(m.packageHash)&&m.refs.includes(m.manifestHash)),
+        'INVALID_BUNDLED_SEED');
+      const changes=rows.map(m=>({table:'modules',id:m.moduleId,value:m,refs:m.refs}));
+      const receipt=await writeRows(s,r,changes,{step:'SEED_MODULES',result:'COMPLETE'});
+      r.moduleSeed={schema:1,state:'SEEDED',count:ids.length};
+      await req(s('meta').put(r));return {state:'SEEDED',...receipt};
+    }),
     mutate:(changes,event)=>transact([...TABLES,'events','versions','blobs','chunks'],'readwrite',async s=>writeRows(s,await root(s),changes,event)),
     record:event=>transact(['events'],'readwrite',async s=>{const r=await root(s);const sequence=await append(s,r,event);r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {sequence,revision:r.revision};}),
     // Private packaged service access. This object is never returned by RPC.
