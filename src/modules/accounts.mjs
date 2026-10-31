@@ -8,7 +8,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
  const turns=new Map();
  const serial=(id,fn)=>{const result=(turns.get(id)??Promise.resolve()).catch(()=>{}).then(fn);turns.set(id,result);return result.finally(()=>{if(turns.get(id)===result)turns.delete(id);});};
  const module=()=>core.read('modules',MODULE);
- const available=m=>m?.packageClass==='bundled-accounts'&&['persona.prepare','persona.check','persona.open','persona.repair'].every(c=>m.manifest?.capabilities?.includes(c));
+ const available=m=>m?.id===MODULE&&['persona.prepare','persona.check','persona.open','persona.repair'].every(c=>m.manifest?.capabilities?.includes(c));
  async function admit(){const m=await module();check(available(m),'ACCOUNTS_UPDATE_REQUIRED');check(m.enabled&&!m.lifecycle,'ACCOUNTS_DISABLED');return m;}
  async function save(a,patch,step,result='COMPLETE',command=null,guard=null){
   try{await core.mutate([{table:'accounts',id:a.id,expectedRev:a.rev??0,refs:a.refs??[],value:{...a,...patch}}],{moduleId:MODULE,targetId:a.id,step,result},command,guard);}
@@ -51,9 +51,9 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   const read=()=>donor.checkBinding(scope(a),{stage:'IDENTITY',operationId,identity:true,readOnly:true});
   if(possible||observed){
    check(!possible||current.effect.operationId===operationId,'ACCOUNT_OPERATION_CHANGED');value=await read();
-   if(possible)await core.queue.reconcile(job.id,current.rev,operationId,value?.ok?{matched:true,operationId}:{resolved:true,outcome:'FAILED',code:value?.code??'ACCOUNT_IDENTITY_UNKNOWN',operationId});
+   if(possible)await core.queue.reconcile(job.id,current.rev,operationId,value?.ok?{matched:true,operationId}:{resolved:true,outcome:'FAILED',recoveryAction:'OPEN_ACCOUNT',code:value?.code??'ACCOUNT_IDENTITY_UNKNOWN',operationId});
   }else{
-   await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_IDENTITY',write:false,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {ok:latest.rev===a.rev,accountRevision:latest.rev};},call:async()=>{value=await read();},observe:async()=>value?.ok?{matched:true,operationId}:{resolved:true,outcome:'FAILED',code:value?.code??'ACCOUNT_IDENTITY_UNKNOWN',operationId}});
+   await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_IDENTITY',write:false,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {ok:latest.rev===a.rev,accountRevision:latest.rev};},call:async()=>{value=await read();},observe:async()=>value?.ok?{matched:true,operationId}:{resolved:true,outcome:'FAILED',recoveryAction:'OPEN_ACCOUNT',code:value?.code??'ACCOUNT_IDENTITY_UNKNOWN',operationId}});
   }
   const finalJob=await core.read('jobs',job.id);if(finalJob.effect?.boundary==='POSSIBLE')return hold(a,job,'ACCOUNT_IDENTITY_UNKNOWN');
   if(!value?.ok)return hold(a,job,value?.code??'ACCOUNT_IDENTITY_UNKNOWN');
@@ -77,13 +77,13 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    check(['CREATE','SELECT','CREATE_ROUTE','ASSIGN','VERIFY','OPEN'].includes(stage),'ACCOUNT_STAGE_INVALID');
    if(possible||observed){
     check(!possible||current.effect.operationId===operationId,'ACCOUNT_OPERATION_CHANGED');const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});
-    if(!value?.ok){if(possible&&(value?.noDispatch||value?.resolved))await core.queue.reconcile(job.id,current.rev,operationId,{resolved:true,outcome:'FAILED',code:value.code,operationId});return hold(a,job,value?.code??'ACCOUNT_OUTCOME_UNKNOWN');}
+    if(!value?.ok){if(possible&&(value?.noDispatch||value?.resolved))await core.queue.reconcile(job.id,current.rev,operationId,{resolved:true,outcome:'FAILED',recoveryAction:'OPEN_ACCOUNT',code:value.code,operationId});return hold(a,job,value?.code??'ACCOUNT_OUTCOME_UNKNOWN');}
     if(possible)await core.queue.reconcile(job.id,current.rev,operationId,{matched:true,operationId});
     a=await core.read('accounts',a.id);return await apply(a,job,stage,value);
    }
    if(reconcile)return result(job,'READY');await admit();
    const prerequisites=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!prerequisites?.ok)return hold(a,job,prerequisites?.code??'DONOR_UNAVAILABLE');
-   let reply;await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_'+stage,write:true,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {accountRevision:latest.rev,ok:latest.rev===a.rev&&latest.flow.jobId===job.id&&(await donor.checkBinding(scope(latest),{stage:'PREREQUISITES',readOnly:true})).ok===true};},call:async()=>{reply=await(stage==='OPEN'?donor.openProtectedTab(scope(a),{operationId,stage}):donor.preparePersona(scope(a),{operationId,stage}));},observe:async()=>{const value=(reply?.noDispatch||reply?.resolved)?reply:await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return value?.ok?{matched:true,operationId}:(value?.noDispatch||value?.resolved)?{resolved:true,outcome:'FAILED',code:value.code,operationId}:{matched:false,operationId};}});
+   let reply;await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_'+stage,write:true,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {accountRevision:latest.rev,ok:latest.rev===a.rev&&latest.flow.jobId===job.id&&(await donor.checkBinding(scope(latest),{stage:'PREREQUISITES',readOnly:true})).ok===true};},call:async()=>{reply=await(stage==='OPEN'?donor.openProtectedTab(scope(a),{operationId,stage}):donor.preparePersona(scope(a),{operationId,stage}));},observe:async()=>{const value=(reply?.noDispatch||reply?.resolved)?reply:await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return value?.ok?{matched:true,operationId}:(value?.noDispatch||value?.resolved)?{resolved:true,outcome:'FAILED',recoveryAction:'OPEN_ACCOUNT',code:value.code,operationId}:{matched:false,operationId};}});
    const updated=await core.read('jobs',job.id);if(updated.state==='FAILED'){const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return hold(await core.read('accounts',a.id),job,updated.recovery?.code??value?.code??'ACCOUNT_SETUP_FAILED');}
    return effect(updated,true);
   }catch(error){

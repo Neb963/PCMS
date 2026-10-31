@@ -34,7 +34,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   const capability=accountCall?'persona.prepare':journalCall?(args.name.startsWith('journal.cleanup')?'journal.cleanup':'journal.export'):operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
   if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
   if(accountCall){
-   if(binding.mode!=='background'||!binding.jobId||active.packageClass!=='bundled-accounts'||!accountEffect||(args.name==='accounts.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
+   if(binding.mode!=='background'||!binding.jobId||active.id!=='pcms-accounts'||!accountEffect||(args.name==='accounts.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
    const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.accountId!==binding.accountId||job.targetId!==binding.targetId||job.rev!==binding.expectedRevision)throw Error('STALE_REVISION');
    const result=await accountEffect(job,args.name==='accounts.status');binding.expectedRevision=result.jobRevision;return result.value;
   }
