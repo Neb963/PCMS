@@ -1,6 +1,6 @@
 # Current work
 
-**P04 — Sandbox runner and module pages: IN PROGRESS.**
+**P04 — Sandbox runner and module pages: VERIFIED; merge/postmerge verification next.**
 
 P03 COMPLETE in PR #3, merge `9a4f69fb1d96eda29c20f2c624ca5f94bf779608`, tree `71f2ef1cd4efe0a269e2e1ff1d27079b564c053a`, equal to verified candidate. Postmerge run [41219969827](https://github.com/Neb963/PCMS/actions/runs/41219969827): focused and installed PASS. Final candidate run `41219873098`: 30 focused checks; Firefox 155.0 build 20260817142839, sandbox 6, XPI hash `0bfb6d07dd866f970c01472816117f08c14f228880064596179b943bb6bb3727`. Actual background running→stopped, independent one-effect count, visible Pause/Resume and new-process persistent Unknown/Pause pass.
 
@@ -11,12 +11,12 @@ P03 COMPLETE in PR #3, merge `9a4f69fb1d96eda29c20f2c624ca5f94bf779608`, tree `7
 - [x] Host sanitized local markup/styles/media in sandbox CSP; keep all privileged execution packaged. Use fixed host maintenance capability classes, never package-declared Backup authority.
 - [x] Reconstruct enabled runner frames on cold event-page evaluation, schedule finite queue turns and retain Unknown/recheck jobs. Safe stop tears down runners and returns lifecycle receipts; advanced package replacement/website disposal remains P07.
 - [x] Add Other module list, same-page pinning before Settings, module-only secondary menu, namespaced draft persistence and exact Open Modules recovery. ZIP selection/validation is P05; do not ship a fixture package or test bypass as a product feature.
-- [ ] T: binding/capability/target denials, finite response validation, stale generation, scope and disabled state. B: persistently installed XPI, real module page action through Core to independently observed fixture job result with dashboard closed; native event-page terminate/wake, page error, keyboard/narrow layout and preserved draft.
+- [x] T: binding/capability/target denials, finite response validation, stale generation, scope and disabled state. B: persistently installed XPI, real module page action through Core to independently observed fixture job result with dashboard closed; native event-page terminate/wake, page error, keyboard/narrow layout and preserved draft.
 - [ ] Publish meaningful checkpoints; verify remote HEAD/tree and focused/installed evidence; merge verified P04, verify postmerge main and automatically plan P05.
 
 ## Evidence / holds
 
-P04 T/B: PASS on checkpoint `414cd634cc50971b746b7dda043a9a766bfa123d`, run `41220951380`; final status/navigation/recording corrections require current-candidate checks. P01–P03 accepted non-live evidence is reused where unchanged. No live route/provider operation is authorized here. The XPI is incomplete until the later module/workflow slices.
+P04 T/B: final PASS on `e6b56c17f339d6d2dcb092038754b6d81caf31e3`, run `41221088508`. 34 focused checks; Firefox 155.0 build 20260817142839, sandbox 6. Tested XPI hash `386dfc1f1953b6363522466cdad76489876b2c287f54e3a128cebb40fb595965`. P01–P03 accepted non-live evidence is reused where unchanged. No live route/provider operation is authorized here. The XPI is incomplete until the later module/workflow slices.
 
 ## Next action
 
@@ -29,3 +29,5 @@ Checkpoint `076131eccff09ea7e571fefca9b5404e51faede7` is pushed in draft PR #4. 
 First P04 installed run `41220808549` passed sandbox restrictions, saved draft and exact finite background completion after dashboard closure/termination. It failed when the harness immediately clicked Other's asynchronously loaded link without waiting for its render. Added that specific render wait; retained the same completion/time/hash oracles. Added actual keyboard Tab/Enter draft save. Final CSP also restricts privileged child frames to packaged self URLs, preventing module self-navigation to remote pages.
 
 The installed module journey now passes all its oracles, including keyboard Tab/Enter, closed-dashboard completion, real background stop/wake, draft restore, page error recovery and same-page pinning. Final compatible corrections refresh only visible dashboard status and record module page/start/stop results; module navigation shows the actual selected primary entry.
+
+Final receipts and visually inspected narrow module UI: https://github.com/Neb963/PCMS/actions/runs/41221088508/artifacts/13049902127. This checkpoint changes handoff documentation only; code/harness/CI remain the verified candidate. Next: merge PR #4, verify remote main tree and postmerge checks, then plan P05 automatically.
