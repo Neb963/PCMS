@@ -18,3 +18,7 @@ P01–P08 are merged. P08 [PR #8](https://github.com/Neb963/PCMS/pull/8) merged 
 The tested Firefox 155 implementation's removeFile awaits native removal but does not itself refresh DownloadItem.exists; search serializes stored target metadata. Keep a durable API acknowledgement distinct from later metadata and independent disk evidence. Do not force removal/history erasure from stale metadata. This extends the new product boundary; do not repeat basic Downloads feasibility.
 
 P09 code and required T/B/DSK are NOT TESTED. Backup-specific prior-complete behavior is P31/P34. No live provider/route/Git effects are authorized. After P09, continue with the next eligible phase (normally P10); do not stop for interphase confirmation.
+
+## Current checkpoint
+
+P09 implementation in progress: Core receipt-owned cleanup with durable remove/readback state, export-only payload release and pinned-prefix local pruning; narrow Journal cleanup capability, finite module steps and Settings retention/attention UI are wired. Existing focused Journal/Downloads/seed tests: 17 PASS locally. New retention boundary tests and required installed B/DSK remain NOT TESTED. No new provider effects. Next: complete authority/recovery/pin tests, then real Firefox disk journey and phase checkpoint.
