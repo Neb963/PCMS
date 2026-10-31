@@ -6,7 +6,7 @@ from urllib.parse import urlsplit
 from git_https_fixture import GitFixture,TOKEN,declaration
 SHA=re.compile(r'^[a-f0-9]{40}$')
 def git(root,*args,data=None,check=True):
- p=subprocess.run(['git','-c','core.hooksPath=/dev/null','--git-dir',str(pathlib.Path(root)/'remote.git'),*args],input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+ p=subprocess.run(['git','-c','core.hooksPath=/dev/null','-c','safe.directory='+str(pathlib.Path(root)/'remote.git'),'--git-dir',str(pathlib.Path(root)/'remote.git'),*args],input=data,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
  if check and p.returncode:raise RuntimeError('INDEPENDENT_GIT_COMMAND_FAILED')
  return p.stdout if check else p
 def put_blob(root,data):return git(root,'hash-object','-w','--stdin',data=data).decode().strip()
@@ -59,13 +59,13 @@ def serve(root,nonce,port):
    self.end_headers();self.wfile.write(data);self.close_connection=True
   def record(self,path,status,extra={}):
    with open(root/'git-requests.jsonl','a') as log:log.write(json.dumps({'method':self.command,'path':path,'status':status,'authorized':self.headers.get('Authorization')=='Bearer '+TOKEN,**extra})+'\n')
-  def request(self):
+  def request_scope(self):
    url=urlsplit(self.path);prefix='/repos/fixture/catalog'
    if self.headers.get('Host')!='api.github.com' or not url.path.startswith(prefix):return None
    return url.path.removeprefix(prefix),url.query
   def do_GET(self):
    if self.path=='/__pcms_shutdown/'+nonce:threading.Thread(target=self.server.shutdown,daemon=True).start();return self.send({'stopped':True})
-   scope=self.request()
+   scope=self.request_scope()
    if scope is None:return self.send({},404)
    path,query=scope
    with lock:
@@ -100,7 +100,7 @@ def serve(root,nonce,port):
   def do_POST(self):self.write_effect()
   def do_PATCH(self):self.write_effect()
   def write_effect(self):
-   scope=self.request()
+   scope=self.request_scope()
    if scope is None:return self.send({},404)
    path,query=scope
    with lock:

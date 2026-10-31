@@ -49,13 +49,15 @@ def main():
   except Exception as error:
    receipt['error']=str(error);receipt['writes']=writes(fixture)
    if sid:
-    try:top(sid);dashboard(sid);receipt['state']=inspect(sid,job_id) if job_id else inspect(sid);(OUT/'git-writer-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
+    try:top(sid);dashboard(sid);receipt['state']=inspect(sid,job_id) if job_id else inspect(sid);receipt['uiResult']=script(sid,"return document.getElementById('git-result')?.textContent??document.getElementById('git-job-result')?.textContent??''");(OUT/'git-writer-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise
   finally:
    if sid:
     try:stop(sid,profile)
     except Exception:pass
-   proc.terminate();proc.wait(timeout=10);log.close();fixture.close();(OUT/'installed-git-writer.json').write_text(json.dumps(receipt,indent=2)+'\n')
+   proc.terminate();proc.wait(timeout=10);log.close();fixture.close();receipt['fixtureDiagnostics']=fixture.proc.stderr.read()[-4000:];
+   if receipt.get('error'):print(json.dumps(receipt),flush=True)
+   (OUT/'installed-git-writer.json').write_text(json.dumps(receipt,indent=2)+'\n')
  print(json.dumps(receipt),flush=True)
 if __name__=='__main__':main()
