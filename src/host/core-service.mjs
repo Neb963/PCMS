@@ -4,6 +4,7 @@ import {PackageError} from '../modules/package.mjs';
 import {createModuleHost} from './module-host.mjs';
 import {createLifecycle} from '../modules/lifecycle.mjs';
 import {createWebsiteScripts} from './website-scripts.mjs';
+import {createGitWriter} from '../core/git-writer.mjs';
 import {createGitCatalog} from '../core/git-catalog.mjs';
 import {createAccounts} from '../modules/accounts.mjs';
 import {refreshAccountPins} from './account-pins.mjs';
@@ -15,7 +16,7 @@ import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -26,12 +27,12 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     await value.queue.boot();
     await value.record({step:'CORE_START',result:'COMPLETE'});
     await seed(value);
-    git=createGitCatalog({core:value});await git.initialize();
+    git=createGitCatalog({core:value});await git.initialize();gitWriter=createGitWriter({core:value});
     accounts=createAccounts({core:value,donor:accountAdapter,pins:refreshAccountPins});await accounts.initialize();
     downloads=api?.downloads?createDownloads({core:value,api,profileId:(await value.status()).profileId}):null;
     journal=createJournal({core:value,downloads,retention:api?.downloads?createRetention({core:value,api,profileId:(await value.status()).profileId}):null});await journal.initialize();if(downloads)await journal.changed();await journal.tick();
     if(globalThis.document&&api){
-      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect});
+      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect,gitEffect:(job,reconcile)=>gitWriter.step(job,{kind:'PREPARE',slug:job.input.slug},reconcile)});
       scripts=createWebsiteScripts({core:value,api,load:modules.load,context:websiteContext});
       const host=modules.lifecycle;
       lifecycle=createLifecycle({core:value,host:{...host,
@@ -50,6 +51,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       const value=await core();let result;
       switch(message?.operation) {
         case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await journal.tick();await accounts.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'git.jobCheck':{const observation=await gitWriter.check(message.id),job=await value.read('jobs',message.id);if(!job.ownerMissing&&job.state==='HELD'&&job.effect?.boundary!=='POSSIBLE'&&['READY','CONTINUE','COMPLETE'].includes(observation.value.state))await value.queue.transition(job.id,job.rev,{state:'WAITING',dueAt:Date.now(),recovery:null});if(modules)void modules.turn().catch(()=>{});await schedule(value);result=observation.value;break;}
         case 'git.status':result=await git.status();break;
         case 'git.configure':result=await git.configure({repository:message.repository,credential:message.credential});void git.tick().finally(()=>schedule(value)).catch(()=>{});await schedule(value);break;
         case 'git.reconnect':result=await git.reconnect();void git.tick().finally(()=>schedule(value)).catch(()=>{});await schedule(value);break;
@@ -84,7 +86,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'queue.pause':result=await value.queue.pause(message.requestId);break;
         case 'queue.resume':result=await value.queue.resume(message.requestId);await schedule(value);break;
         case 'queue.list':{const page=await value.queue.list({cursor:message.cursor,search:message.search??'',state:message.state??''});result={...page,rows:page.rows.map(j=>project('jobs',j))};break;}
-        case 'queue.get':result=await value.get('jobs',message.id);break;
+        case 'queue.get':{const job=await value.read('jobs',message.id);result=job?{...project('jobs',job),git:gitWriter.status(job)}:null;break;}
         case 'queue.batch':result=await value.queue.batch(message.id);break;
         case 'counts':result=await value.counts();break;
         case 'events':result=await journal.events(message);break;

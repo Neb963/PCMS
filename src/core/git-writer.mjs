@@ -13,7 +13,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
  async function head(g){const r=await reader(g,'/git/ref/heads/main');check(r?.ref==='refs/heads/main'&&r.object?.type==='commit'&&gitSha(r.object.sha),'GIT_MAIN_UNVERIFIED');return r.object.sha;}
  async function relation(g,base,tip){if(base===tip)return 'identical';const r=await reader(g,'/compare/'+base+'...'+tip);check(r?.base_commit?.sha===base&&gitSha(r.merge_base_commit?.sha)&&['ahead','behind','diverged','identical'].includes(r.status),'GIT_HISTORY_UNVERIFIED');return r.status;}
  async function save(job,git,step){await core.mutate([{table:'jobs',id:job.id,expectedRev:job.rev,value:{...job,git},refs:job.refs??[]}],{jobId:job.id,targetId:job.targetId,moduleId:job.moduleId,step,result:'COMPLETE'});return core.read('jobs',job.id);}
- const result=async(job,state,error=null)=>({value:{state,code:error,receipt:(await core.read('jobs',job.id)).git?.active?.receipt??null},jobRevision:(await core.read('jobs',job.id)).rev});
+ const result=async(job,state,error=null)=>{const current=await core.read('jobs',job.id);return {value:{state,code:error,receipt:current.git?.active?.receipt??null},jobRevision:current.rev};};
  async function hold(job,error){job=await core.read('jobs',job.id);if(job.git){job=await save(job,{...job.git,code:error},'HOLD_GIT_OPERATION');if(job.effect?.boundary!=='POSSIBLE')await core.queue.releaseGit(job.id);}return result(job,'HELD',error);}
  async function scope(job,request,connection){
   check(connection&&validRepository(connection.repository)&&typeof connection.repositoryId==='string','GIT_CONNECTION_REQUIRED');
@@ -56,7 +56,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
   const commit=await object(g,'commits',h),graph=await createGitGraph(commit.tree.sha,(kind,sha)=>object(g,kind,sha));
   const expected={...plan.protectedInputs,...Object.fromEntries(Object.entries(plan.outputs).map(([p,v])=>[p,v?.sha??null]))};
   for(const [path,sha]of Object.entries(expected))check(((await graph.entry(active.request.folder+'/'+path))?.sha??null)===sha,'GIT_CHANGED_AFTER_COMMIT');
-  if(active.request.kind==='SOURCE')check(JSON.stringify(sort(await graph.source(active.request.folder)))===JSON.stringify(sort(plan.source)),'GIT_CHANGED_AFTER_COMMIT');
+  if(active.request.kind!=='PREPARE')check(JSON.stringify(sort(await graph.source(active.request.folder)))===JSON.stringify(sort(plan.source)),'GIT_CHANGED_AFTER_COMMIT');
   return {schema:1,operationId:active.operationId,commit:plan.candidate,parent:plan.baseHead,tree:plan.tree,headObserved:h,verifiedAt:clock(),paths:Object.keys(plan.outputs).sort(),signature:active.signature,applied:true};
  }
  async function step(original,rawRequest,reconcile=false){
@@ -74,6 +74,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
   try{
    if(active.phase==='PLAN'){if(reconcile)return result(job,'READY');if(!g.locked){job=await core.queue.claimGit(job.id,job.rev,g.repositoryId);g=job.git;}job=await makePlan(job,g,active,await head(g));return result(job,'CONTINUE');}
    if(active.phase==='COMPLETE')return result(job,'COMPLETE');
+   if(active.phase==='ABORTED_OWNER_MISSING')return result(job,'HELD','OWNER_MISSING');
    if(active.phase==='VERIFY'){const receipt=await verify(g,active);job=await save(job,{...g,code:null,receipts:{...g.receipts,[key]:receipt},active:{...active,phase:'COMPLETE',receipt}},'VERIFY_GIT_OPERATION');await core.queue.releaseGit(job.id);return result(job,'COMPLETE');}
    if(active.phase==='REF_CHECK'){
     const h=await head(g);if(h!==active.plan.baseHead){check(await relation(g,active.plan.baseHead,h)==='ahead','GIT_HISTORY_CONFLICT');active={...active,attempt:active.attempt+1,candidates:[...active.candidates,{sha:active.plan.candidate,disposition:'UNATTACHED'}]};job=await makePlan(job,g,active,h);return result(job,'CONTINUE');}
@@ -92,6 +93,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
     job=await core.read('jobs',job.id);if(job.effect?.boundary==='POSSIBLE')return hold(job,'GIT_WRITE_OUTCOME_UNKNOWN');if(job.state==='FAILED')return hold(job,job.recovery.code);
    }
    job=await core.read('jobs',job.id);g=job.git;active=g.active;const effect=job.effects.find(e=>e.operationId===operationId);
+   if(job.ownerMissing){let receipt=null;if(desc.kind==='ref'&&effect.disposition==='APPLIED')receipt=await verify(g,active);job=await save(job,{...g,code:'OWNER_MISSING',active:{...active,phase:receipt?'COMPLETE':'ABORTED_OWNER_MISSING',receipt},receipts:receipt?{...g.receipts,[key]:receipt}:g.receipts},'OBSERVE_REMOVED_OWNER_GIT');await core.queue.releaseGit(job.id);return result(job,'HELD','OWNER_MISSING');}
    if(desc.kind==='ref'){
     if(effect.disposition==='REJECTED'){const h=await head(g);check(h!==active.plan.baseHead&&await relation(g,active.plan.baseHead,h)==='ahead','GIT_REF_REJECTED');active={...active,attempt:active.attempt+1,candidates:[...active.candidates,{sha:active.plan.candidate,disposition:'REJECTED'}]};job=await makePlan(job,g,active,h);}
     else job=await save(job,{...g,active:{...active,phase:'VERIFY'}},'OBSERVE_GIT_REF');

@@ -72,7 +72,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   // disabled known-safe owners can yield it without discarding their job.
   claimGit:(jobId,expectedRev,repositoryId)=>tx(async(s,r)=>{
     check(valid(repositoryId),'GIT_REPOSITORY_INVALID');const job=await read(s,r,'jobs',jobId);check(job?.rev===expectedRev,'STALE_REVISION');check(!job.git||job.git.repositoryId===repositoryId,'GIT_REPOSITORY_CHANGED');
-    for(const other of await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))))if(other.id!==jobId&&other.git?.locked&&other.git.repositoryId===repositoryId){const m=await read(s,r,'modules',other.moduleId);if(other.effect?.boundary==='POSSIBLE'||m?.enabled&&!m.lifecycle)check(false,'GIT_REPOSITORY_BUSY');await save(s,r,other,{git:{...other.git,locked:false}},'YIELD_GIT_RESOURCE','COMPLETE');}
+    for(const other of await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))))if(other.id!==jobId&&other.git?.locked&&other.git.repositoryId===repositoryId){const m=await read(s,r,'modules',other.moduleId);const ownerMissing=other.ownerMissing===true||other.accountId&&!await read(s,r,'accounts',other.accountId);if(other.effect?.boundary==='POSSIBLE'||m?.enabled&&!m.lifecycle&&!ownerMissing)check(false,'GIT_REPOSITORY_BUSY');await save(s,r,other,{git:{...other.git,locked:false}},'YIELD_GIT_RESOURCE','COMPLETE');}
     return save(s,r,job,{git:{schema:1,...job.git,repositoryId,locked:true}},'CLAIM_GIT_RESOURCE','COMPLETE');
   }),
   releaseGit:jobId=>tx(async(s,r)=>{
@@ -153,12 +153,12 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   reconcile:async(jobId,expectedRev,operationId,observation)=>tx(async(s,r)=>{
     const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
     check(job.effect?.operationId===operationId&&job.effect.boundary==='POSSIBLE','WRONG_OPERATION');
-    const failed=observation?.resolved===true&&observation.outcome==='FAILED';
+    const failed=observation?.resolved===true&&observation.outcome==='FAILED',ownerMissing=job.ownerMissing===true;
     check((observation?.matched===true||failed)&&observation.operationId===operationId,'OUTCOME_UNKNOWN');
     if(observation.disposition!=null)check(!failed&&['APPLIED','REJECTED'].includes(observation.disposition),'INVALID_OBSERVATION');
     if(failed&&observation.recoveryAction!=null)check(valid(observation.recoveryAction),'INVALID_OBSERVATION');
     if(failed)check(typeof observation.code==='string'&&/^[A-Z][A-Z0-9_]*$/.test(observation.code),'INVALID_OBSERVATION');
-    return save(s,r,job,{state:failed?'FAILED':'WAITING',recovery:failed?{action:observation.recoveryAction??'INSPECT_EXPORT',code:observation.code}:null,effect:{...job.effect,boundary:'OBSERVED',...(observation.disposition?{disposition:observation.disposition}:{}),...failed?{outcome:'FAILED'}:{}},effects:[...(job.effects??[]),{operationId,kind:job.effect.kind,boundary:'OBSERVED',...(observation.disposition?{disposition:observation.disposition}:{}),...failed?{outcome:'FAILED'}:{}}],needsCheck:true,lease:null},'EFFECT_READBACK',failed?'FAILED':'OBSERVED');
+    return save(s,r,job,{state:failed?'FAILED':ownerMissing?'HELD':'WAITING',recovery:ownerMissing?{action:'INSPECT_OWNER_MISSING',code:'OWNER_MISSING'}:failed?{action:observation.recoveryAction??'INSPECT_EXPORT',code:observation.code}:null,effect:{...job.effect,boundary:'OBSERVED',...(observation.disposition?{disposition:observation.disposition}:{}),...failed?{outcome:'FAILED'}:{}},effects:[...(job.effects??[]),{operationId,kind:job.effect.kind,boundary:'OBSERVED',...(observation.disposition?{disposition:observation.disposition}:{}),...failed?{outcome:'FAILED'}:{}}],needsCheck:true,lease:null},'EFFECT_READBACK',failed?'FAILED':'OBSERVED');
   }),
   list:({cursor=null,limit=50,search='',state=''}={})=>transact(['versions'],'readonly',async s=>{
     const r=await root(s),cut=cursor?.cut??r.sequence,after=cursor?.after??[-1,''];
