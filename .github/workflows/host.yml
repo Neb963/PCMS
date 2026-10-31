@@ -1,4 +1,4 @@
-name: Protected host
+name: Core checkpoint
 on:
   push:
     branches: [main]
@@ -21,13 +21,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
-          name: pcms-p01-${{ github.event.pull_request.head.sha || github.sha }}
+          name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
-            build/pcms-p01.xpi
+            build/pcms-dev.xpi
             build/identity.json
   installed:
     runs-on: ubuntu-latest
@@ -50,12 +51,12 @@ jobs:
             bash scripts/setup-firefox.sh
           fi
       - run: npm run build
-      - name: Persistent host journey (normal sandbox)
-        run: python3 tests/installed_host.py build/pcms-p01.xpi
+      - name: Persistent records journey (normal sandbox)
+        run: python3 tests/installed_records.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-p01-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-records-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json

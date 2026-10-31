@@ -1,3 +1,4 @@
+import {createCoreService} from './core-service.mjs';
 import {hostStatus} from './bootstrap.mjs';
 import {createDashboardAction} from './dashboard-action.mjs';
 export const STATUS_PORT = 'pcms-host-status';
@@ -5,13 +6,23 @@ export function trustedShell(api, sender) {
   return sender?.id === api.runtime.id && sender.url?.split(/[?#]/)[0] === api.runtime.getURL('ui/index.html');
 }
 export function registerShell(api) {
+  const records=createCoreService();
+  // Register synchronously, then start durable recording without a UI.
+  api.runtime.onMessage?.addListener((message,sender)=>{
+    if(message?.channel!=='pcms-core')return;
+    if(!trustedShell(api,sender))return Promise.resolve({ok:false,code:'SENDER_DENIED'});
+    return records.handle(message);
+  });
+  if(typeof indexedDB!=='undefined')void records.start().catch(()=>{});
   let shellFailure = null;
   const action = createDashboardAction(api, () => {
     shellFailure = 'DASHBOARD_OPEN_FAILED';
+    if(typeof indexedDB!=='undefined')void records.start().then(c=>c.record({step:'OPEN_DASHBOARD',result:'FAILED'})).catch(()=>{});
     void api.action.setBadgeText({text: '!'}).catch(() => {});
     void api.action.setTitle({title: 'PCMS dashboard could not open. Try the icon again.'}).catch(() => {});
   }, () => {
     shellFailure = null;
+    if(typeof indexedDB!=='undefined')void records.start().then(c=>c.record({step:'OPEN_DASHBOARD',result:'COMPLETE'})).catch(()=>{});
     void api.action.setBadgeText({text: ''}).catch(() => {});
     void api.action.setTitle({title: 'Open PCMS dashboard'}).catch(() => {});
   });
