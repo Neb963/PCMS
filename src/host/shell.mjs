@@ -6,12 +6,12 @@ export function trustedShell(api, sender) {
   return sender?.id === api.runtime.id && sender.url?.split(/[?#]/)[0] === api.runtime.getURL('ui/index.html');
 }
 export function registerShell(api) {
-  const records=createCoreService({alarms:api.alarms});
+  const records=createCoreService({alarms:api.alarms,api});
   // Register synchronously, then start durable recording without a UI.
   api.runtime.onMessage?.addListener((message,sender)=>{
     if(message?.channel!=='pcms-core')return;
     if(!trustedShell(api,sender))return Promise.resolve({ok:false,code:'SENDER_DENIED'});
-    return records.handle(message);
+    return records.handle(message,sender);
   });
   if(typeof indexedDB!=='undefined')void records.start().catch(()=>{});
   let shellFailure = null;

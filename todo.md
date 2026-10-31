@@ -6,11 +6,11 @@ P03 COMPLETE in PR #3, merge `9a4f69fb1d96eda29c20f2c624ca5f94bf779608`, tree `7
 
 ## Implementation plan (before code)
 
-- [ ] Implement the packaged opaque sandbox runner with defineModule/start/runStep/reconcile/stop and query/action/saveView RPC. Background runs finite steps over durable checkpoints; no keepalive loop or page-owned job.
-- [ ] Bind exact frame window/channel to host-held module hash/generation/boot and target scope. Deny forged/stale/disabled/wrong-target/undeclared requests and raw browser/native/authenticated fetch. Add strict website sender/world/container/document binding helpers; no provider authority comes from DOM messages.
-- [ ] Host sanitized local markup/styles/media in sandbox CSP; keep all privileged execution packaged. Use fixed host maintenance capability classes, never package-declared Backup authority.
-- [ ] Reconstruct enabled runner frames on cold event-page evaluation, schedule finite queue turns and retain Unknown/recheck jobs. Safe stop tears down runners and returns lifecycle receipts; advanced package replacement/website disposal remains P07.
-- [ ] Add Other module list, same-page pinning before Settings, module-only secondary menu, namespaced draft persistence and exact Open Modules recovery. ZIP selection/validation is P05; do not ship a fixture package or test bypass as a product feature.
+- [x] Implement the packaged opaque sandbox runner with defineModule/start/runStep/reconcile/stop and query/action/saveView RPC. Background runs finite steps over durable checkpoints; no keepalive loop or page-owned job.
+- [x] Bind exact frame window/channel to host-held module hash/generation/boot and target scope. Deny forged/stale/disabled/wrong-target/undeclared requests and raw browser/native/authenticated fetch. Add strict website sender/world/container/document binding helpers; no provider authority comes from DOM messages.
+- [x] Host sanitized local markup/styles/media in sandbox CSP; keep all privileged execution packaged. Use fixed host maintenance capability classes, never package-declared Backup authority.
+- [x] Reconstruct enabled runner frames on cold event-page evaluation, schedule finite queue turns and retain Unknown/recheck jobs. Safe stop tears down runners and returns lifecycle receipts; advanced package replacement/website disposal remains P07.
+- [x] Add Other module list, same-page pinning before Settings, module-only secondary menu, namespaced draft persistence and exact Open Modules recovery. ZIP selection/validation is P05; do not ship a fixture package or test bypass as a product feature.
 - [ ] T: binding/capability/target denials, finite response validation, stale generation, scope and disabled state. B: persistently installed XPI, real module page action through Core to independently observed fixture job result with dashboard closed; native event-page terminate/wake, page error, keyboard/narrow layout and preserved draft.
 - [ ] Publish meaningful checkpoints; verify remote HEAD/tree and focused/installed evidence; merge verified P04, verify postmerge main and automatically plan P05.
 
@@ -21,3 +21,5 @@ P04 T/B: NOT TESTED. P01–P03 accepted non-live evidence is reused where unchan
 ## Next action
 
 Implement the bound sandbox RPC and finite runner over existing Core records/queue.
+
+Initial P04 source and four focused binding/step/CSS tests are implemented; T passes locally. Required B is still NOT TESTED. The module package fixture exists only in tests and is inserted through packaged Core storage for this pre-ZIP-host slice; no test capability or endpoint is shipped.
