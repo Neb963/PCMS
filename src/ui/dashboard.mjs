@@ -136,7 +136,7 @@ async function renderOther(area){
 async function renderModuleSettings(area){
  area.append(node('h2','Modules'));const rows=node('div');renderInstall(area,()=>renderModuleRows(rows));
  const permission=await core('modules.permission');
- if(permission.ok&&!permission.result.granted){const button=node('button','Allow website scripts');button.id='allow-userscripts';button.type='button';const result=node('p');result.setAttribute('role','status');button.addEventListener('click',async()=>{try{const granted=await browser.permissions.request({permissions:['userScripts']});result.textContent=granted?'Website scripts allowed.':'Website scripts are still blocked. You can allow them here later.';if(granted){await core('modules.rebuild');await renderRecords('settings');}}catch{result.textContent='Firefox could not grant website scripts. Check this extension’s permissions.';}});area.append(button,result);}
+ if(permission.ok&&!permission.result.granted){const button=node('button','Allow website scripts');button.id='allow-userscripts';button.type='button';const result=node('p');result.setAttribute('role','status');button.addEventListener('click',async()=>{try{const granted=await browser.permissions.request({permissions:['userScripts']});result.textContent=granted?'Website scripts allowed.':'Website scripts are still blocked. You can allow them here later.';if(granted){await core('modules.rebuild');if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}}catch{result.textContent='Firefox could not grant website scripts. Check this extension’s permissions.';}});area.append(button,result);}
 
  const status=await core('modules.seed.status');
  if(!status.ok){area.append(failure(status.code));}
@@ -146,7 +146,7 @@ async function renderModuleSettings(area){
   const retry=node('button','Retry bundled setup');retry.type='button';retry.id='retry-module-seed';
   const outcome=node('p');outcome.id='seed-result';outcome.setAttribute('role','status');
   retry.addEventListener('click',async()=>{retry.disabled=true;const response=await core('modules.seed.retry');
-   if(response.ok){await updateModuleNavigation();await renderRecords('settings');}
+   if(response.ok){await updateModuleNavigation();if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}
    else{outcome.replaceChildren(failure(response.code));retry.disabled=false;}});
   area.append(notice,detail,retry,outcome);
  }
@@ -160,7 +160,7 @@ async function renderModuleRows(area){
   const outcome=node('p');outcome.setAttribute('role','status');outcome.className='lifecycle-result';
   if(module.lifecycle)outcome.textContent=(module.lifecycle.kind==='DISABLE'?'Disabling':'Updating')+' — '+(module.lifecycle.code||'Stopping safely');
   for(const [kind,label] of module.lifecycle?[['CONTINUE','Check safe stop'],...module.lifecycle.code==='MODULE_REBUILD_FAILED'&&module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]:[...module.stagedVersion?[['UPDATE','Update to '+module.stagedVersion]]:[],[module.enabled?'DISABLE':'ENABLE',module.enabled?'Disable':'Enable'],...module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]){
-   const button=node('button',label);button.type='button';button.dataset.lifecycle=kind;button.addEventListener('click',async()=>{button.disabled=true;outcome.textContent='In progress';const response=await core('module.lifecycle',{id:module.id,kind,requestId:crypto.randomUUID()});if(response.ok){await updateModuleNavigation();await renderRecords('settings');}else{outcome.replaceChildren(failure(response.code));button.disabled=false;}});section.append(button);
+   const button=node('button',label);button.type='button';button.dataset.lifecycle=kind;button.addEventListener('click',async()=>{button.disabled=true;outcome.textContent='In progress';const response=await core('module.lifecycle',{id:module.id,kind,requestId:crypto.randomUUID()});if(response.ok){await updateModuleNavigation();if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}else{outcome.replaceChildren(failure(response.code));button.disabled=false;}});section.append(button);
   }
   if(module.lifecycle?.code==='MODULE_STOP_INCOMPLETE'){const open=node('button','Open affected editor');open.type='button';open.addEventListener('click',async()=>{const result=await core('module.editor',{id:module.id});if(!result.ok)outcome.replaceChildren(failure(result.code));});section.append(open);}
   section.append(outcome);

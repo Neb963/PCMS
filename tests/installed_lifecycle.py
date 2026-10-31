@@ -44,6 +44,7 @@ def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text())
  assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k)
  receipt={'tier':'B','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]}
+ assert receipt['xpiSha256']==identity['xpiSha256'] and identity['dirty'] is False
  server=http.server.ThreadingHTTPServer(('127.0.0.1',0),Editor);threading.Thread(target=server.serve_forever,daemon=True).start()
  with tempfile.TemporaryDirectory(prefix='pcms-lifecycle-') as tmp:
   root=pathlib.Path(tmp);profile=root/'profile';profile.mkdir();home=root/'home';home.mkdir();first=package(root/'first.zip','1.0.0');update=package(root/'update.zip','1.1.0')
@@ -75,7 +76,7 @@ def main():
    wait(lambda:module(sid).get('lifecycle',{}).get('code')=='MODULE_STOP_INCOMPLETE',25);held=module(sid);assert held['version']=='1.0.0' and held['generation']==2 and not held['enabled'],held
    # Old bound sandbox requests cannot enqueue after the durable fence.
    denied=asyncjs(sid,"const {bindingAllows}=await import(browser.runtime.getURL('modules/bindings.mjs'));return bindingAllows({window:null,channel:'old',moduleId:'fixture-module',hash:'old',generation:1,capabilities:new Set(['ui.view'])},{source:null,channel:'old',current:arguments[0],operation:'ui.view'});",[held]);assert denied is False
-   click(sid,'#records section[data-module="fixture-module"] button:not([data-lifecycle])');wait(lambda:call('GET',f'/session/{sid}/window')==editor_handle)
+   wait(lambda:script(sid,"return !!document.querySelector('#records section[data-module=\"fixture-module\"] button:not([data-lifecycle])')"));click(sid,'#records section[data-module="fixture-module"] button:not([data-lifecycle])');context(sid,'chrome');wait(lambda:script(sid,"return gBrowser.selectedBrowser.currentURI.spec")==('http://127.0.0.1:'+str(server.server_port)+'/editor'));context(sid,'content');call('POST',f'/session/{sid}/window',{'handle':editor_handle})
    assert script(sid,"return document.getElementById('editor').value")==expected_source
    assert script(sid,"return document.getElementById('chat').textContent")=='retained fixture AI context'
    assert script(sid,"return !!document.getElementById('owned-module-node')")
