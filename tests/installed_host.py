@@ -147,13 +147,16 @@ def main():
             receipt['checks'].append('new-process/persistent-addon/cold-blocked-start')
             # Simulate existing Alpha data in this disposable profile; preserve
             # exact sentinel bytes and prove the host refuses implicit adoption.
-            script(sid,"""const done=arguments[arguments.length-1];
-              browser.storage.local.set({state:{fixture:'preserve-existing-donor-data'}})
-              .then(()=>browser.storage.local.remove('pcmsHostProfile')).then(()=>done(true));""",asynchronous=True)
+            expected=script(sid,"""const done=arguments[arguments.length-1];
+              browser.storage.local.set({'p01-existing-donor-fixture':'preserve-existing-donor-data'})
+              .then(()=>browser.storage.local.remove('pcmsHostProfile'))
+              .then(()=>browser.storage.local.get(['state','p01-existing-donor-fixture'])).then(done);""",asynchronous=True)
+            assert expected.get('state',{}).get('global'), 'VALID_EXISTING_DONOR_FIXTURE_REQUIRED'
+            assert expected['p01-existing-donor-fixture']=='preserve-existing-donor-data' 
             stop(sid,profile);sid=None
             sid,_=session(binary,profile);toolbar(sid);dashboard(sid);status(sid,'CLEAN_PROFILE_REQUIRED')
-            stored=script(sid,"const done=arguments[arguments.length-1];browser.storage.local.get('state').then(done);",asynchronous=True)
-            assert stored=={'state':{'fixture':'preserve-existing-donor-data'}},stored
+            stored=script(sid,"const done=arguments[arguments.length-1];browser.storage.local.get(['state','p01-existing-donor-fixture']).then(done);",asynchronous=True)
+            assert stored==expected,('EXISTING_DONOR_BYTES_CHANGED',stored)
             receipt['checks'].append('existing-donor-data-refused-and-preserved')
             receipt['result']='PASS'
         except Exception:
