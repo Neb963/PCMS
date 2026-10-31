@@ -63,7 +63,9 @@ def toolbar(session):
       if(!node)throw Error('REAL_TOOLBAR_ACTION_NOT_FOUND');
       window.pcmsToolbarEvents=[];
       for(const type of ['mousedown','mouseup','click','command'])node.addEventListener(type,e=>window.pcmsToolbarEvents.push({type:e.type,trusted:e.isTrusted,target:e.target.id,button:e.button}),{once:true});
-      return id;
+      const action=node.querySelector('.webextension-browser-action');
+      if(!action)throw Error('REAL_TOOLBAR_BUTTON_NOT_FOUND');
+      return action.id;
     """)
     element=call('POST',f'/session/{session}/element',{'using':'css selector','value':'#'+widget})
     call('POST',f'/session/{session}/element/'+element['element-6066-11e4-a52e-4f735466cecf']+'/click',{})
@@ -149,8 +151,8 @@ def main():
                       return {backgroundState:ext?.backgroundState,errors:ext?.errors,
                         background:ext?.manifest?.background,
                         listeners:[...ext?.persistentListeners?.keys()||[]],
-                        views:[...ext?.views||[]].map(v=>({type:v.viewType,url:v.uri?.spec,window:typeof v.contentWindow,html:v.contentWindow?.document?.documentElement?.outerHTML})),
-                        toolbar:document.getElementById('persona-route-manager_local-browser-action')?.outerHTML,
+                        views:[...ext?.views||[]].map(v=>({type:v.viewType,url:v.uri?.spec})),
+                        toolbar:[...document.querySelectorAll('[data-extensionid="persona-route-manager@local"] toolbarbutton')].map(n=>({id:n.id,class:n.className})),
                         toolbarEvents:window.pcmsToolbarEvents,
                         console:Services.console.getMessageArray().map(m=>m.message).filter(m=>/moz-extension|PCMS|PersonaMonkey|SyntaxError|background|module/i.test(m)).slice(-25),
                         tabs:[...gBrowser.tabs].map(t=>t.linkedBrowser.currentURI.spec)};""",[ID])
