@@ -17,6 +17,7 @@ test('queue requests/logical keys deduplicate across concurrent intake and stale
 });
 test('module/account round-robin and reserved maintenance turns do not starve small work',async t=>{
  const {core}=await fixture(t);
+ await core.mutate(['a','b'].map(id=>({table:'accounts',id,value:{state:'READY'}})),event);
  for(let i=0;i<12;i++)await core.queue.enqueue(input('a'+i,{accountId:i%2?'a':'b'}));
  await core.queue.enqueue(input('beta',{moduleId:'beta'}));await core.queue.enqueue(input('journal',{moduleId:'pcms-journal',kind:'EXPORT'}));
  const chosen=[];for(let i=0;i<5;i++){const job=await core.queue.next();chosen.push(job);await core.queue.transition(job.id,job.rev,{state:'COMPLETE'});}
@@ -106,4 +107,10 @@ test('Pause after committed intent cancels before call; changed module generatio
  await pause;assert.equal(calls,0);job=await core.read('jobs',job.id);assert.equal(job.effect.boundary,'BEFORE');
  await core.queue.resume();const module=await core.read('modules','alpha');await core.mutate([{table:'modules',id:'alpha',expectedRev:module.rev,value:{...module,generation:2}}],event);job=await core.read('jobs',job.id);
  await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('gap',async()=>calls++)),/STALE_GENERATION/);assert.equal(calls,0);
+});
+
+test('account archive fences dispatch after durable intent and persistent admission blocks selection/claims after reopen',async t=>{
+ const {core,name,clock}=await fixture(t);await core.mutate([{table:'accounts',id:'a',value:{state:'READY'}}],event);let job=await core.queue.enqueue(input('archive',{accountId:'a'}));job=await core.queue.claim(job.id,job.rev);let calls=0;
+ const proto=IDBObjectStore.prototype,add=proto.add;proto.add=function(row){if(this.name==='events'&&row.step==='EFFECT_INTENT')this.transaction.addEventListener('complete',()=>core.queue.fenceAccount('a'),{once:true});return add.call(this,row);};
+ try{await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('archive-gap',async()=>calls++)),/ACCOUNT_ADMISSION_HELD/);}finally{proto.add=add;}assert.equal(calls,0);assert.equal((await core.read('jobs',job.id)).effect.boundary,'BEFORE');const a=await core.read('accounts','a');await core.mutate([{table:'accounts',id:'a',expectedRev:a.rev,value:{...a,state:'ARCHIVED',admission:'ARCHIVED'}}],event);core.close();const cold=await openCore({name,clock});t.after(()=>cold.close());await cold.queue.boot();assert.equal(await cold.queue.next(),null);assert.equal(await cold.queue.deadline(),null);const j=await cold.read('jobs',job.id);await assert.rejects(cold.queue.claim(j.id,j.rev),/ACCOUNT_ADMISSION_HELD/);
 });

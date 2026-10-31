@@ -1,6 +1,6 @@
 # Current work
 
-**P11 — Account lifecycle and contextual recovery: planned from actual P10 main.**
+**P11 — Account lifecycle and contextual recovery: queue/policy/local-removal implementation checkpoint.**
 
 P01–P10 are merged. P10 [PR #10](https://github.com/Neb963/PCMS/pull/10), main `2cbcba46b681af2ad9dba15e56b7a24fbab72734`, exact reviewed tree `49e6fa332d4296294612bc08bf8d45323f4c3bdf`. Final source `2350530dc148b38ae01fba92d7b1789dcd305f8c`: 101 T/build and complete B PASS [41240772320](https://github.com/Neb963/PCMS/actions/runs/41240772320), XPI `6de93c0fdb364905fc95af2cdbc2f29614a4697e1abbbf0d9c4d48cb8c06bdfc`; postmerge [41241078106](https://github.com/Neb963/PCMS/actions/runs/41241078106) PASS. Firefox155.0/build20260817142839, normal sandbox6.
 
@@ -15,6 +15,6 @@ P01–P10 are merged. P10 [PR #10](https://github.com/Neb963/PCMS/pull/10), main
 
 ## Next
 
-Implement the bounded queue/lifecycle and local deletion contracts with focused tests, checkpoint code plus this todo frequently, then deliver/test UI and installed recovery. After verified merge, automatically plan P12 from actual main. All later safe dependency-eligible phases remain in scope.
+Queue selection/claim/dispatch now use synchronous and durable account admission fences. Finite Archive/Reactivate/confirmed Remove, donor exact local deletion/readback and scoped Core cleanup are implemented. 30 focused account/queue/donor tests PASS, including slow identity Archive, intent-to-call fencing, fresh Reactivate, lost local reply/reopen, unresolved tombstones and preserved source/other secrets. UI and required B remain OPEN. Next deliver lifecycle controls/count links and the targeted installed recovery journey. After verified merge, automatically plan P12 from actual main. All later safe dependency-eligible phases remain in scope.
 
 H/G/P1–P5 remain NOT TESTED and unauthorized. P42/P48 qualify real route/login/remove behavior; fixtures do not substitute for live acceptance. No new live provider, native host or Git operation is authorized.

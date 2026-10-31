@@ -158,6 +158,22 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       const result=await writeRows(s,r,changes,event);
       if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result}));return result;
     }),
+    // Account-only cleanup. Source/history references and unrelated secrets
+    // remain in the one dataset; no module or generic RPC receives this API.
+    removeAccountData:({accountId,jobId,expectedRev})=>transact(['accounts','jobs','generators','modules','credentials','versions','events','blobs','chunks'],'readwrite',async s=>{
+      const r=await root(s),a=await req(s('accounts').get([r.dataset,accountId]));
+      requireCore(a?.rev===expectedRev&&a.admission==='REMOVING'&&a.flow?.jobId===jobId&&a.flow.stage==='REMOVE_DATA','ACCOUNT_REMOVAL_NOT_READY');
+      const job=await req(s('jobs').get([r.dataset,jobId])),m=await req(s('modules').get([r.dataset,'pcms-accounts']));requireCore(m?.enabled&&!m.lifecycle&&m.generation===job?.generation&&!r.paused,'ACCOUNT_REMOVAL_HELD');
+      const jobs=await req(s('jobs').index('accountId').getAll(IDBKeyRange.only([r.dataset,accountId]))),changes=[{table:'accounts',id:accountId,expectedRev:a.rev,value:null}];
+      for(const j of jobs)if(j.id!==jobId){const possible=j.effect?.boundary==='POSSIBLE',value={jobId:j.id,logicalKey:j.logicalKey,moduleId:j.moduleId,targetId:j.targetId,accountId,kind:j.kind,jobSchema:j.jobSchema,generation:j.generation,state:possible?'HELD':['COMPLETE','FAILED'].includes(j.state)?j.state:'FAILED',step:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING',effect:j.effect,effects:j.effects??[],input:{},needsCheck:false,lease:null,recovery:{action:'INSPECT_OWNER_MISSING',code:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING'},dueAt:j.dueAt};changes.push({table:'jobs',id:j.id,expectedRev:j.rev,value,refs:j.refs??[]});}
+      for(const g of await req(s('generators').index('accountId').getAll(IDBKeyRange.only([r.dataset,accountId]))))changes.push({table:'generators',id:g.id,expectedRev:g.rev,value:{...g,ownerMissing:true,ownerLabel:a.label,state:'HELD',holdCode:'OWNER_MISSING'},refs:g.refs??[]});
+      await writeRows(s,r,changes,{moduleId:'pcms-accounts',targetId:accountId,jobId,step:'REMOVE_ACCOUNT_DATA',result:'COMPLETE'});
+      let c=await req(s('credentials').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(c){if(c.value.accountId===accountId)await req(c.delete());c=await req(c.continue()||c.request);}
+      // Old account snapshots and old job inputs must not resurrect removed
+      // local data through paging or a later backup. Events are secret-safe.
+      for(const [table,recordId]of [['accounts',accountId],...jobs.filter(j=>j.id!==jobId).map(j=>['jobs',j.id])]){let v=await req(s('versions').openCursor(IDBKeyRange.bound([r.dataset,table,recordId,0],[r.dataset,table,recordId,Number.MAX_SAFE_INTEGER])));while(v){if(table==='accounts'||v.value.sequence<r.sequence)await req(v.delete());v=await req(v.continue()||v.request);}}
+      return {state:'REMOVED',id:accountId};
+    }),
     record:event=>transact(['events'],'readwrite',async s=>{const r=await root(s);const sequence=await append(s,r,event);r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {sequence,revision:r.revision};}),
     pruneJournal:({beforeTime,exportedThrough})=>transact(['events','pins','jobs'],'readwrite',async s=>{
       requireCore(Number.isFinite(beforeTime)&&Number.isSafeInteger(exportedThrough)&&exportedThrough>=0,'INVALID_RETENTION');const r=await root(s),pins=[];let pc=await req(s('pins').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(pc){if(pc.value.journalRange)pins.push(pc.value.journalRange);pc=await req(pc.continue()||pc.request);}for(const job of await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))))if(job.moduleId==='pcms-journal'&&job.kind==='EXPORT'&&!['COMPLETE','FAILED'].includes(job.state))pins.push({first:job.input.first,last:job.input.last});let removed=0,last=r.journalPrunedThrough??0;
@@ -215,7 +231,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }),
     view:name=>transact(['views'],'readonly',async s=>{requireCore(id(name),'INVALID_VIEW');const r=await root(s);return (await req(s('views').get([r.dataset,name])))?.value??null;}),
     credentials:{
-      set:(name,value)=>transact(['credentials','events'],'readwrite',async s=>{requireCore(id(name)&&typeof value==='string','INVALID_CREDENTIAL');const r=await root(s);await append(s,r,{step:'SET_CREDENTIAL',result:'COMPLETE'});const old=await req(s('credentials').get([r.dataset,name]));await req(s('credentials').put({key:[r.dataset,name],value,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
+      set:(name,value,accountId=null)=>transact(['credentials','events'],'readwrite',async s=>{requireCore(id(name)&&typeof value==='string'&&(accountId===null||id(accountId)),'INVALID_CREDENTIAL');const r=await root(s);await append(s,r,{step:'SET_CREDENTIAL',result:'COMPLETE'});const old=await req(s('credentials').get([r.dataset,name]));await req(s('credentials').put({key:[r.dataset,name],value,accountId,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
       get:name=>transact(['credentials'],'readonly',async s=>{const r=await root(s);return (await req(s('credentials').get([r.dataset,name])))?.value??null;})
     }
   };

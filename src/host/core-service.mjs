@@ -51,9 +51,10 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'host.status':result=await hostStatus(api);break;
         case 'accounts.status':result=await accounts.status();break;
         case 'accounts.list':result=await accounts.list(message);break;
+        case 'accounts.related':result=await accounts.related(message.id,message.table,message.cursor);break;
         case 'accounts.get':result=await accounts.get(message.id);break;
         case 'accounts.add':result=await accounts.add({label:message.label,requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
-        case 'accounts.command':result=await accounts.command({id:message.id,kind:message.kind,requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'accounts.command':result=await accounts.command({id:message.id,kind:message.kind,requestId:message.requestId,confirmed:message.confirmed});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'accounts.check':result=await accounts.check(message.id);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'journal.check':await journal.changed();if(modules)await modules.turn();await schedule(value);result=await journal.status();break;
         case 'journal.status':result=await journal.status();break;

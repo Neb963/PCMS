@@ -74,4 +74,4 @@ async function accountCall(name,scope,operation){
  if(!donor||failure)return {ok:false,code:failure??'DONOR_STARTING'};
  await donor.initialize();return donor.accounts[name](scope,operation);
 }
-export const accountAdapter=Object.freeze({preparePersona:(scope,op)=>accountCall('preparePersona',scope,op),checkBinding:(scope,op)=>accountCall('checkBinding',scope,op),openProtectedTab:(scope,op)=>accountCall('openProtectedTab',scope,op),repairRoute:(scope,op)=>accountCall('repairRoute',scope,op)});
+export const accountAdapter=Object.freeze({removePersona:(scope,op)=>accountCall('removePersona',scope,op),observeRemoval:(scope,op)=>accountCall('observeRemoval',scope,op),preparePersona:(scope,op)=>accountCall('preparePersona',scope,op),checkBinding:(scope,op)=>accountCall('checkBinding',scope,op),openProtectedTab:(scope,op)=>accountCall('openProtectedTab',scope,op),repairRoute:(scope,op)=>accountCall('repairRoute',scope,op)});
