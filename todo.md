@@ -1,32 +1,24 @@
 # Current work
 
-**P14 — Persistent slug checking: implemented and verified; merge pending.**
+**P15 — Available slug to verified Git folder: planned from verified main.**
 
-P01–P13 are merged. Base main `39d58ffab7ae72fdac6c78d0449abfbf4979ddbe`, exact tree `380624e38c486609605a01f0a5349b08a811e03a`; P13 postmerge [41249373581](https://github.com/Neb963/PCMS/actions/runs/41249373581) PASS.
+P01–P14 are merged. P14 [PR #14](https://github.com/Neb963/PCMS/pull/14), main `1e43de0c904c1c3f49e43be6546325f7bf580f82`, exact tree `31c1c2a6c73bc2319badb1d59eaba3ac2259237a`; postmerge [41251682213](https://github.com/Neb963/PCMS/actions/runs/41251682213) PASS. Final P14 source5c24c8be passed149 T/build and required B in41251432831, XPI5cb7b52b1d603f975a6b7085de3ea408fb1abeabe35e025b64d5a38f48d6ab8c. Exact/rendered classification, both Pause layers, Disable/Enable, closed dashboard, restart/admission recovery and independent export bytes with Journal disabled passed.
 
-## Completed P14 plan and outcome
+## P15 implementation plan
 
-Discover0.2 uses finite steps in the one Core queue. The saved batch preserves original input, native normalization/rejections/collisions, per-row result/date, pending position and attempt identity. One dedicated protected checking tab requires exact account/container/route/URL/document and fresh authenticated principal. It never borrows login/editor/human tabs. Uncertain/manual documents stay open; module safe stop disposes its passive observer and parks the context.
-
-Only layout whitespace folds around the exact accepted Available/reserved literals. Known rendered output, including loaded required frames, proves Taken; shell/empty/inaccessible/changed/partial/challenge/transport cases stay Unknown. Unknown stops until explicit Resume; completed rows never automatically recheck. A failed account admission leaves the slug Pending with a dated typed attempt. Global/batch Pause and module Disable retain work.
-
-Generators→Check slugs opens the actual registered sandbox page: Import/Start/Pause/Resume/Export/check, saved drafts/account/batch/row selection and Core snapshot batch paging. Core Downloads exports checked JSON/CSV ZIP bytes with durable receipt independently of Journal. No Git or provider mutation was added.
-
-## Required evidence
-
-- Final source `5c24c8be60711a62072dd1c4b6434a0ef52300d2`, tree `26485e5284a814cad518203cb8dac3864cbd9f05`.
-- [41251432831](https://github.com/Neb963/PCMS/actions/runs/41251432831): **149 T/build + required installed B PASS**; production XPI SHA256 `5cb7b52b1d603f975a6b7085de3ea408fb1abeabe35e025b64d5a38f48d6ab8c`.
-- B: Firefox155.0/build20260817142839, normal sandbox6/certificates; actual module controls with trusted keyboard activation; independently rendered protected HTTPS fixtures.
-- Exact linked Available, reserved and framed Taken; changed message Unknown; seven retained rows (five checked, one collision, one rejected); sequential minimum interval; global/batch Pause; closed-dashboard progress; Unknown stop; actual Discover Disable/Enable with no hidden check.
-- Real process restart preserved input/account/batch/row and dates. A stale route left the final slug Pending. Actual Accounts/Open completed a new fresh check before explicit Resume. Each completed slug had one fixture navigation.
-- Actual Export/check with Journal disabled: independent disk reopen of1,469-byte ZIP, SHA256 `d419fb8bcd2fd234fbc6104ebe57afe2b5e29590b2b0e8dbd4e3ca01e64894e9`; exact original/results, collision/rejection, JSON/CSV hashes and receipt verified.
-- T additionally covers exact Unicode/punctuation/typo variants, conflicts/frames, Pause races, lost saved-read ACK/no repeat, disabled-generation readback/safe stop and bounded admission retry.
-- Earlier failed/cancelled runs are not PASS. Actual lessons are in learned.md.
+1. Upgrade the actual Discover package to0.3 with the existing scoped github.prepareFolder capability. After a dated Available observation, persist one linked preparation job for that observation/repository through the existing Core queue. Resume incomplete linkage on startup/reconnect; no reclassification or second scheduler. Taken/Unknown/rejected/collision rows enqueue nothing.
+2. Pin repository identity, slug and the originating positive observation in Core-owned job metadata. Use the existing hashed folder target and actual background callback with exact job/target/generation checks. Before every step, retain repository/observation scope. Do not use page authority, raw tokens/URLs or account/provider mutation.
+3. Reuse P13's PREPARE planner/effects/repository resource/readback unchanged: require entire folder absence; write only the exact default four-line PCMS-1/v1/DEVELOP/NOT_READY marker, with no source/placeholder files. Preserve existing folders, root instructions, unrelated bytes/modes and ordinary concurrency; no force/reset or REST expected_sha.
+4. Keep the Available result/date independent of Git outcome. Persist per-row job link, current cause and verified receipt. Missing connection offers Connections; uncertain effects expose same-operation readback, never blind retry. Existing folders are preserved and reported. A distinct observation cannot silently adopt an old historical receipt as current verification.
+5. Surface actual preparation progress/result and bounded recovery on the Discover page and existing Work, plus exact Git folder/Generators navigation. After verified Git completion, request the existing catalog observation so the folder-only row appears; do not label publication/creation complete. Explicit connection changes must not retarget a pinned job.
+6. T covers exact initial bytes, positive-only admission/linkage recovery/dedup, connection scope/change, existing-folder races and retained observation on failures. Reuse P13 object/ref/concurrency/lost-ACK tests with original evidence; add actual caller integration coverage rather than duplicate the writer.
+7. Required B starts from actual Check slugs in the production XPI using the protected rendered provider fixture plus independent bare Git HTTPS fixture. Observe one attributed commit and marker-only catalog row, fault a preparation/ref reply, perform real restart/scoped readback, and independently inspect history/trees/source sentinels for no overwrite/duplicate. Keep normal sandbox/CSP/certificates; all sockets remain disposable fixture-only.
+8. Push meaningful code+todo checkpoints, verify remote files/commits/trees, run required focused/build/affected B in existing CI, merge lightweight PR, verify postmerge main and automatically continue P16.
 
 ## Next action and holds
 
-Merge [PR #14](https://github.com/Neb963/PCMS/pull/14), verify exact postmerge main tree and required CI, then automatically plan and implement P15 (Available slug → verified marker-only Git folder). Do not stop between phases.
+P15 code is not yet written. Next add the Core-owned Available→preparation linkage and finite scoped callback, then actual per-row UI/recovery and the combined installed caller fixture.
 
-The local execution environment remains unavailable; all changes are exact verified GitHub file/tree/commit checkpoints and tests ran in existing CI. No later local command is claimed run.
+The local execution environment remains unavailable. Continue exact remote GitHub checkpoints and existing CI; do not claim unavailable local commands or deferred tests as PASS.
 
-G/H/P1–P5 remain NOT TESTED and unauthorized. P44 separately qualifies current live slug rules/messages/frames. P42–P49 need explicit disposable resources/effects; fixture success does not authorize live operations.
+G/H/P1–P5 remain NOT TESTED and unauthorized. P43 requires explicit disposable real Git target/effects before real Git acceptance; P44 later qualifies the live classifier/Creator. Fixture success authorizes no live provider/Git operation.
