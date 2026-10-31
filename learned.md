@@ -30,3 +30,5 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - P01: the malformed previous-install fixture normalized away the blocked policy and correctly triggered donor rollback (`41216186356`). Profile-preservation checks must start with valid existing donor state and compare its exact pre/post bytes; do not weaken the donor’s storage security fence to retain an invalid fixture.
 
 - P02: realm-specific `instanceof Uint8Array` rejected valid incoming bytes and cold IDB reads in installed Firefox (`41218539727`, `41218634832`). Validate byte-view type across realms and copy inputs into the service's realm. A passing fake-indexeddb test alone cannot establish this browser boundary.
+
+- P04 (`41220808549`): a WebDriver navigation click finished before the asynchronous module list rendered. Wait for the actual next control before clicking it. Keep independent background completion timestamps and effect assertions; an accepted navigation is not its rendered result.
