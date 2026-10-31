@@ -5,6 +5,7 @@ import {zipSync,strToU8} from 'fflate';
 import {createHash} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {readFileSync} from 'node:fs';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 export const FIRST_PARTY=[
  ['pcms-accounts','Accounts'],['pcms-discover','Discover'],
@@ -47,9 +48,16 @@ export function bundledPackage(id,name){
  const manifest={format:1,id,name,version:definition.version,coreApi:1,jobSchema:1,
   readsJobSchemas:[1],capabilities:[...definition.capabilities],entries:{background:'background.js'},
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};
+ const payload={'background.js':[background,{mtime:stamp}]};
+ if(id==='pcms-discover'){
+  for(const [file,source]of [['page.html','discover-page.html'],['page.js','discover-page.js']]){
+   const bytes=new Uint8Array(readFileSync(new URL('../src/modules/'+source,import.meta.url)));payload[file]=[bytes,{mtime:stamp}];manifest.files.push({path:file,bytes:bytes.length,sha256:sha(bytes)});
+  }
+  manifest.pages=[{id:'check-slugs',title:'Check slugs',html:'page.html',script:'page.js'}];
+ }
  const manifestBytes=strToU8(JSON.stringify(manifest));
  const zip=zipSync({'module.json':[manifestBytes,{mtime:stamp}],
-  'background.js':[background,{mtime:stamp}]},{level:6});
+  ...payload},{level:6});
  return {id,name,manifest,zip,manifestHash:sha(manifestBytes),packageHash:sha(zip)};
 }
 export async function writeBundledPackages(stage){
