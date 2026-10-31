@@ -61,3 +61,8 @@ test('a mismatched Core target folder cannot obtain a write through the scoped s
 test('a delayed stale callback cannot change a completed Git job or receipt',async t=>{
  const f=await fixture(t),request={kind:'PREPARE',slug:'stale-callback'},old=await f.enqueue(request);assert.equal((await f.drain()).state,'COMPLETE');const before=await f.core.read('jobs',old.id),count=f.model.calls.length;await assert.rejects(f.writer.step(old,request),/STALE_REVISION/);assert.deepEqual(await f.core.read('jobs',old.id),before);assert.equal(f.model.calls.length,count);
 });
+
+test('the Work Git readback control preserves a separate human-review hold and checkpoint',async t=>{
+ const f=await fixture(t),request={kind:'PREPARE',slug:'review-preserved'},job=await f.enqueue(request);assert.equal((await f.drain()).state,'COMPLETE');let j=await f.core.read('jobs',job.id);j=await f.core.queue.transition(j.id,j.rev,{state:'HELD',checkpoint:{candidate:'accepted-source',chat:'same-native-chat'},recovery:{action:'OPEN_REVIEW',code:'HUMAN_REVIEW_REQUIRED'}});const oldFetch=globalThis.fetch;let outbound=0;globalThis.fetch=async()=>{outbound++;throw Error('UNEXPECTED_EXTERNAL_CALL');};
+ try{const {createCoreService}=await import('../src/host/core-service.mjs'),service=createCoreService({open:async()=>f.core,api:null}),r=await service.handle({operation:'git.jobCheck',id:j.id});assert.equal(r.ok,true,JSON.stringify(r));assert.equal(r.result.state,'COMPLETE');const after=await f.core.read('jobs',j.id);assert.equal(after.state,'HELD');assert.deepEqual(after.recovery,j.recovery);assert.deepEqual(after.checkpoint,j.checkpoint);assert.equal(outbound,0);}finally{globalThis.fetch=oldFetch;}
+});
