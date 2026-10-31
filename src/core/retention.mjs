@@ -18,14 +18,15 @@ export function createRetention({core,api,profileId,clock=Date.now}){
  const service={
   async stage({type,moduleId,afterId,retentionDays}){
    check(['journal','backup'].includes(type)&&moduleId==='pcms-'+type&&Number.isSafeInteger(retentionDays)&&retentionDays>0,'RETENTION_POLICY_INVALID');if(!await allowed(type))return;
-   const after=await core.read('files',afterId);check(after?.state==='COMPLETE'&&after.profileId===profileId&&after.type===type,'RETENTION_COMPLETE_REQUIRED');
+   const after=await core.read('files',afterId);check(after?.state==='COMPLETE'&&after.profileId===profileId&&after.type===type&&after.moduleId===moduleId,'RETENTION_COMPLETE_REQUIRED');
    for(let r of await rows())if(owner(r,type)&&r.id!==afterId&&r.completedAt<clock()-retentionDays*DAY&&r.completedAt<after.completedAt&&r.cleanup?.phase!=='COMPLETE'){
     const job=await core.queue.enqueue({requestId:'cleanup-'+type+'-'+r.id,logicalKey:type+':cleanup:'+r.id,moduleId,targetId:r.id,kind:'CLEANUP',input:{fileId:r.id},dueAt:clock()});
+    if(job.state==='WAITING'&&job.dueAt>clock()&&job.effect?.boundary!=='POSSIBLE')await core.queue.transition(job.id,job.rev,{state:'WAITING',dueAt:clock()});
     if(!r.cleanup){r=await core.read('files',r.id);await save(r,{phase:'QUEUED',jobId:job.id,afterId,code:null,checks:0},'WAITING');}
    }
   },
   async effect(job,{type,afterId,retentionDays},reconcile=false){
-   check(job.kind==='CLEANUP'&&job.moduleId==='pcms-'+type&&job.targetId===job.input.fileId,'RETENTION_SCOPE_DENIED');let r=await core.read('files',job.input.fileId);check(owner(r,type),'RETENTION_OWNER_DENIED');
+   check(job.kind==='CLEANUP'&&job.moduleId==='pcms-'+type&&job.targetId===job.input.fileId,'RETENTION_SCOPE_DENIED');let r=await core.read('files',job.input.fileId);check(owner(r,type),'RETENTION_OWNER_DENIED');check(!r.cleanup?.jobId||r.cleanup.jobId===job.id,'RETENTION_SCOPE_DENIED');
    if(r.cleanup?.phase==='COMPLETE')return result(job,r,'COMPLETE');
    const current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',ack=r.cleanup?.removedAckAt!=null;
    if(!possible&&!ack){

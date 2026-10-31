@@ -32,6 +32,7 @@ def main():
    # Isolated fixture advances only receipt dates, not Downloads identity or bytes.
    asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();for(const id of arguments[0]){const f=await c.read('files',id);await c.mutate([{table:'files',id,expectedRev:f.rev,refs:f.refs,value:{...f,completedAt:Date.now()-91*86400000}}],{step:'FIXTURE_AGE',result:'COMPLETE'});}c.close();await browser.downloads.erase({id:arguments[1]});return true;""",[[f['id'] for f in files],missing['downloadId']])
    moved_path=disk/moved['filename'];moved_to=disk/'moved-outside-owned-path.zip';moved_path.rename(moved_to);moved_bytes=moved_to.read_bytes();missing_path=disk/missing['filename'];missing_bytes=missing_path.read_bytes();owned_path=disk/owned['filename']
+   settings(sid);wait(lambda:script(sid,"return !!document.querySelector('section[data-module=\"pcms-journal\"] [data-lifecycle=\"DISABLE\"]')"));click(sid,'section[data-module="pcms-journal"] [data-lifecycle="DISABLE"]');wait(lambda:not inspect(sid)['enabled']);time.sleep(2);assert owned_path.is_file() and missing_path.read_bytes()==missing_bytes and manual_path.read_bytes()==manual_bytes;journal(sid);click(sid,'#enable-journal');wait(lambda:script(sid,"return !!document.getElementById('export-journal')"));receipt['checks'].append('actual-Journal-Disable/expired-files-kept/Enable-with-retention-preserved')
    blocked=disk/'PCMS'/'Blocked';blocked.write_bytes(b'blocked destination sentinel');set_input(sid,'#journal-folder','PCMS/Blocked/Journal');click(sid,'#save-journal-settings');wait(lambda:inspect(sid)['journal']['folder']=='PCMS/Blocked/Journal');wait(lambda:script(sid,"return !document.getElementById('export-journal').disabled"));click(sid,'#export-journal');wait(lambda:inspect(sid)['journal']['lastExport']['state']=='FAILED',35);assert owned_path.is_file() and missing_path.read_bytes()==missing_bytes and moved_to.read_bytes()==moved_bytes and manual_path.read_bytes()==manual_bytes
    receipt['checks'].append('real-Settings/default-90/invalid-zero/persist-120-and-90/real-failed-new-export/preserve-earlier-complete/manual/unrelated/moved/history-cleared-files')
    set_input(sid,'#journal-folder','PCMS/Journal');click(sid,'#save-journal-settings');wait(lambda:inspect(sid)['journal']['folder']=='PCMS/Journal');click(sid,'#pause-core');wait(lambda:script(sid,"return document.getElementById('queue-status').textContent")=='Paused');wait(lambda:script(sid,"return !document.getElementById('export-journal').disabled"));click(sid,'#export-journal');close_dashboard(sid)
@@ -47,7 +48,9 @@ def main():
    receipt['error']=str(error)
    if sid:
     try:receipt['state']=retention_state(sid)
-    except Exception:pass
+    except Exception:
+     try:context(sid,'content');toolbar(sid);dashboard(sid);receipt['stateAfterDiagnosticReopen']=retention_state(sid)
+     except Exception:pass
     try:(OUT/'retention-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    raise

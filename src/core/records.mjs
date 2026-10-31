@@ -227,7 +227,7 @@ function attachBlobs(core,transact,root,checkedRefs,append,clock) {
     bytes=new Uint8Array(bytes);const blobId=await sha256(bytes);
     return transact(['blobs','chunks','events','pins'],'readwrite',async s=>{
       const r=await root(s),key=[r.dataset,blobId];
-      if(pinId){const pinKey=[r.dataset,pinId],old=await req(s('pins').get(pinKey));await req(s('pins').put({key:pinKey,refs:[...new Set([...(old?.refs??[]),blobId])]}));}
+      if(pinId){const pinKey=[r.dataset,pinId],old=await req(s('pins').get(pinKey));await req(s('pins').put({...old,key:pinKey,refs:[...new Set([...(old?.refs??[]),blobId])]}));}
       if(await req(s('blobs').get(key))){if(pinId){await append(s,r,{step:'PIN_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}return blobId;}
       const chunkSize=1024*1024,chunks=Math.ceil(bytes.length/chunkSize);
       for(let i=0;i<chunks;i++)await req(s('chunks').add({key:[r.dataset,blobId,i],bytes:bytes.slice(i*chunkSize,(i+1)*chunkSize)}));
@@ -256,7 +256,7 @@ function attachBlobs(core,transact,root,checkedRefs,append,clock) {
     let previous='';for(const file of manifest){requireCore(file.path>previous&&file.sha256===file.blobId,'INVALID_MANIFEST');previous=file.path;requireCore((await core.bytes(file.blobId)).length===file.bytes,'SOURCE_LENGTH_MISMATCH');}
     return manifest;
   };
-  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);const closure=await checkedRefs(s,r,refs);await req(s('pins').put({key:[r.dataset,captureId],refs:closure}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
+  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);const closure=await checkedRefs(s,r,refs);const key=[r.dataset,captureId],old=await req(s('pins').get(key));await req(s('pins').put({...old,key,refs:closure}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
   core.pinJournal=(captureId,{first,last})=>transact(['pins','events'],'readwrite',async s=>{requireCore(id(captureId)&&Number.isSafeInteger(first)&&first>0&&Number.isSafeInteger(last)&&last>=first,'INVALID_CAPTURE');const r=await root(s);requireCore(first>(r.journalPrunedThrough??0)&&last<=r.sequence,'JOURNAL_RANGE_INVALID');const key=[r.dataset,captureId],old=await req(s('pins').get(key));await req(s('pins').put({...old,key,refs:old?.refs??[],journalRange:{first,last}}));await append(s,r,{step:'PIN_JOURNAL',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
   core.releasePin=captureId=>transact(['pins','events'],'readwrite',async s=>{const r=await root(s);await req(s('pins').delete([r.dataset,captureId]));await append(s,r,{step:'RELEASE_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
   core.collect=()=>transact(['versions','pins','blobs','chunks','events'],'readwrite',async s=>{
