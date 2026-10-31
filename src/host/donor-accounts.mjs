@@ -272,8 +272,8 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
  // editor or user tab. Uncertain/manual documents are preserved and parked.
  async function observeSlug(scope,{slug,operationId,tab:prior,readOnly=false,fresh=false,admit,saveTab}){
   if(nativeSlug(slug)!==slug)return fail('SLUG_INVALID');
-  const url=PERCHANCE+slug,ready=await prerequisites();if(!ready.ok)return ready;
-  let found=await protectedProfile(scope);if(found.code)return fail(found.code);
+  const url=PERCHANCE+slug,ready=await prerequisites();if(!ready.ok)return {...ready,noObservation:true};
+  let found=await protectedProfile(scope);if(found.code)return fail(found.code,{noObservation:true});
   const run=async(tabId,options={},frameId=0)=>{const rows=await api.scripting.executeScript({target:{tabId,frameIds:[frameId]},world:'ISOLATED',func:captureSlugDocument,args:[options]});if(rows?.length!==1||rows[0].frameId!==frameId||rows[0].error)throw Error('SLUG_DOCUMENT_CHANGED');return rows[0].result;};
   let tab=null,snapshot=null,state=prior;
   try{
@@ -286,7 +286,7 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
      }
     }catch{}
     if(!tab){
-     if(readOnly||!fresh)return fail('DISCOVER_TAB_NEEDS_INSPECTION');
+     if(readOnly||!fresh)return fail('DISCOVER_TAB_NEEDS_INSPECTION',{noObservation:true});
      // Explicit Resume permits a fresh checking context; the old document
      // remains open, with its manual content intact and no automation owner.
      try{await run(prior.tabId,{dispose:true});const tag=await api.sessions.getTabValue(prior.tabId,'pcmsDiscoverTab');if(tag?.accountId===prior.accountId)await api.sessions.setTabValue(prior.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});}catch{}

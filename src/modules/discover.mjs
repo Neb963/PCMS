@@ -19,7 +19,7 @@ export function createDiscover({core,donor,downloads,clock=Date.now}){
   if((job.discover.mode!=='RUNNING'||fences.has(job.id))&&job.effect?.boundary!=='POSSIBLE')return output(job,'HELD',job.discover.code??'DISCOVER_PAUSED');
   const index=job.discover.rows.findIndex(row=>row.state==='PENDING');
   if(index<0){await save(job,{discover:{...job.discover,mode:'COMPLETE',code:null,completedAt:clock()}});return output(job,'COMPLETE');}
-  const operationId=job.id+'-slug-'+index,key='discover-observation:'+operationId;
+  const attempt=job.discover.rows[index].attempt??0,operationId=job.id+'-slug-'+index+(attempt?'-attempt-'+attempt:''),key='discover-observation:'+operationId;
   let latest=await core.read('jobs',job.id),receipt=await core.view(key);
   const observe=async()=>({matched:!!(await core.view(key)),operationId});
   const read=async onlyRead=>{
@@ -28,7 +28,7 @@ export function createDiscover({core,donor,downloads,clock=Date.now}){
    await guard();
    const observed=await donor.observeSlug(scope(a),{slug:job.discover.rows[index].slug,operationId,tab,readOnly:onlyRead,fresh:job.discover.freshTab===true,
     admit:guard,saveTab:value=>core.saveView('discover-observer',value,crypto.randomUUID())});
-   const value=classifySlug(observed?.ok?observed.page:{transportError:true}),result={schema:1,operationId,slug:job.discover.rows[index].slug,index,...value,basis:observed?.ok?value.basis:observed?.code??'SLUG_TRANSPORT_ERROR',checkedAt:clock()};
+   const value=observed?.noObservation?{result:null,blocked:true}:classifySlug(observed?.ok?observed.page:{transportError:true}),result={schema:1,operationId,slug:job.discover.rows[index].slug,index,...value,basis:observed?.ok?value.basis:observed?.code??'SLUG_TRANSPORT_ERROR',checkedAt:clock()};
    await core.saveView(key,result,crypto.randomUUID());return result;
   };
   try{
@@ -44,7 +44,11 @@ export function createDiscover({core,donor,downloads,clock=Date.now}){
    }
    latest=await batch(job.id);
    check(receipt.operationId===operationId&&receipt.slug===latest.discover.rows[index].slug,'SLUG_OBSERVATION_SCOPE');
-   const rows=latest.discover.rows.map((row,i)=>i===index?{...row,state:'CHECKED',result:receipt.result,basis:receipt.basis,checkedAt:receipt.checkedAt}:row);
+   if(receipt.blocked){
+    const nextDue=clock()+10000,rows=latest.discover.rows.map((row,i)=>i===index?{...row,attempt:attempt+1,admissionCode:receipt.basis,lastAttemptAt:receipt.checkedAt}:row);
+    await save(latest,{discover:{...latest.discover,rows,mode:'PAUSED',code:receipt.basis,nextDue,freshTab:true},dueAt:nextDue});return output(job,'HELD',receipt.basis,nextDue);
+   }
+   const rows=latest.discover.rows.map((row,i)=>i===index?{...row,state:'CHECKED',admissionCode:null,result:receipt.result,basis:receipt.basis,checkedAt:receipt.checkedAt}:row);
    const unknown=receipt.result==='Unknown',failures=unknown?(latest.discover.failures??0)+1:0,nextDue=clock()+(unknown?Math.min(300000,10000*2**Math.min(failures-1,5)):2000);
    const mode=fences.has(job.id)||latest.discover.mode==='PAUSED'?'PAUSED':unknown?'UNKNOWN':rows.some(row=>row.state==='PENDING')?'RUNNING':'COMPLETE';
    await save(latest,{discover:{...latest.discover,rows,mode,code:unknown?receipt.basis:mode==='PAUSED'?'DISCOVER_PAUSED':null,failures,nextDue,freshTab:false,...mode==='COMPLETE'?{completedAt:clock()}:{}},dueAt:nextDue});
