@@ -39,7 +39,6 @@ function show(status) {
     dt.textContent=label; dd.textContent=String(value ?? 'Unknown'); list.append(dt,dd);
   }
 }
-window.addEventListener('hashchange',route);
 let received=false;
 const port=browser.runtime.connect({name:'pcms-host-status'});
 const timeout=setTimeout(()=>{if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});port.disconnect();},12000);
@@ -89,7 +88,7 @@ async function renderRecords(key){
 }
 const initial=await core('view.get');
 if(initial.ok&&initial.result){view=initial.result;if(!location.hash)history.replaceState(null,'','#'+view.route);}
-await updateModuleNavigation();route();
+await updateModuleNavigation();window.addEventListener('hashchange',route);route();
 
 async function queueStatus(){
  const response=await core('queue.status'),status=document.getElementById('queue-status'),button=document.getElementById('pause-core');

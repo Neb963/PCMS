@@ -90,6 +90,9 @@ def main():
   except Exception as error:
    receipt['error']=str(error)
    if sid:
+    try:receipt['visibleState']=script(sid,"return {url:location.href,text:document.body.textContent.slice(-4000)}")
+    except Exception:pass
+   if sid:
     try:top(sid);(OUT/'lifecycle-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    raise
