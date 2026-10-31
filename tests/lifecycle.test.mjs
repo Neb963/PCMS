@@ -61,3 +61,9 @@ test('switch transaction failure rolls back migrated jobs and pointer; cold cont
  const partial=await s.core.read('modules','fixture-module');assert.equal(partial.version,'1.0.0');assert.equal(partial.lifecycle.phase,'SWITCH');assert.equal(partial.generation,2);assert.equal((await s.core.read('jobs',s.job.id)).generation,1);
  await s.life().recover();const done=await s.core.read('modules',partial.id);assert.equal(done.version,'1.1.0');assert.equal(done.generation,2);assert.equal((await s.core.read('jobs',s.job.id)).generation,2);
 });
+test('each page receipt survives an interrupted stop and recovery identifies the exact unresolved instance',async t=>{
+ const s=await setup(t),first={instance:'first',document:'doc-one',type:'website'},second={instance:'second',document:'doc-two',type:'website'};await s.install('1.1.0');s.host.instances=async()=>[first,second];
+ s.host.stopModule=async(m,l,record)=>{await record({...first,generation:l.oldGeneration,disposedResources:1,unresolvedEffectIds:[]});const error=Error('DIRTY');error.instance=second;throw error;};
+ const held=await s.life().request('fixture-module','UPDATE','update');assert.equal(held.lifecycle.attentionInstance,'second');assert.equal(held.lifecycle.receipts.length,1);assert.equal(held.lifecycle.receipts[0].instance,'first');assert.equal(held.version,'1.0.0');
+ s.host.stopModule=async(m,l,record)=>{const receipt={...second,generation:l.oldGeneration,disposedResources:2,unresolvedEffectIds:[]};await record(receipt);return [...l.receipts,receipt];};await s.life().recover();const done=await s.core.read('modules','fixture-module');assert.equal(done.version,'1.1.0');assert.equal(done.generation,2);
+});

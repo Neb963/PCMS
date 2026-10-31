@@ -126,15 +126,17 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   async checkCandidate(m,jobs){const b=await frame({...m,validationJobs:jobs},'validate');remove(b);},
   async instances(m){return [...frames,...pageBindings.values()].filter(b=>b.moduleId===m.id).map(b=>({instance:b.channel,document:bootId,type:'sandbox'}));},
   async fence(m){notify({type:'moduleFenced',moduleId:m.id});},
-  async stopModule(m,l){
+  async stopModule(m,l,recordReceipt=async()=>{}){
    if(running)await running;
    const receipts=[];
    for(const expected of l.instances){
+    const previous=l.receipts?.find(r=>r.instance===expected.instance);if(previous){receipts.push(previous);continue;}
+    const accept=async receipt=>{await recordReceipt(receipt);receipts.push(receipt);};
     const b=[...frames,...pageBindings.values()].find(b=>b.channel===expected.instance);
-    if(!b){receipts.push({...expected,generation:l.oldGeneration,disposedResources:0,unresolvedEffectIds:[]});continue;}
-    if(frames.has(b)){receipts.push(await stop(b));continue;}
-    if(b.receipt){receipts.push(b.receipt);continue;}
-    let timer;try{const receipt=await new Promise((resolve,reject)=>{b.stopping={resolve};notify({type:'stopModulePage',token:b.channel,generation:b.generation});timer=setTimeout(()=>reject(Error('MODULE_STOP_INCOMPLETE')),10000);});receipts.push(receipt);}finally{clearTimeout(timer);}
+    if(!b){await accept({...expected,generation:l.oldGeneration,disposedResources:0,unresolvedEffectIds:[]});continue;}
+    if(frames.has(b)){await accept(await stop(b));continue;}
+    if(b.receipt){await accept(b.receipt);continue;}
+    let timer;try{const receipt=await new Promise((resolve,reject)=>{b.stopping={resolve};notify({type:'stopModulePage',token:b.channel,generation:b.generation});timer=setTimeout(()=>reject(Error('MODULE_STOP_INCOMPLETE')),10000);});await accept(receipt);}finally{clearTimeout(timer);}
    }return receipts;
   },
   async rebuild(m){await lifecycle.checkCandidate(m,[]);}

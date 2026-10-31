@@ -31,18 +31,22 @@ export function createWebsiteScripts({core,api,load,context}) {
    try{await perform;}catch{await core.record({step:'MODULE_SCRIPT_INJECT',result:'HELD',code:'MODULE_INJECTION_UNKNOWN',moduleId:m.id});}finally{group.delete(perform);if(!group.size)pending.delete(m.id);}
   }
  }
- async function stop(m,l){
+ async function stop(m,l,recordReceipt=async()=>{}){
   if(pending.has(m.id))await Promise.allSettled([...pending.get(m.id)]);
   const receipts=[];
   for(const i of l.instances.filter(i=>i.type==='website')){
+   const previous=l.receipts?.find(r=>r.instance===i.instance);if(previous){receipts.push(previous);continue;}
+   const accept=async receipt=>{await recordReceipt(receipt);receipts.push(receipt);};
+   try{
    const frames=await api.webNavigation.getAllFrames({tabId:i.tabId});
    // A documented navigation/closed document is a local teardown, never proof
    // that an uncertain provider effect did not happen (Core checks that first).
-   if(frames&&!frames.some(f=>f.documentId===i.document)){receipts.push({...i,generation:l.oldGeneration,disposedResources:0,unresolvedEffectIds:[]});continue;}
+   if(frames&&!frames.some(f=>f.documentId===i.document)){await accept({...i,generation:l.oldGeneration,disposedResources:0,unresolvedEffectIds:[]});continue;}
    const result=await api.userScripts.execute({target:{tabId:i.tabId,documentIds:[i.document]},world:'USER_SCRIPT',worldId:i.worldId,js:[{code:'globalThis.__pcmsLifecycle?.stop('+JSON.stringify(i.instance)+')'}]});
-   const r=result?.find(r=>r.documentId===i.document)?.result;check(r?.instance===i.instance&&r.document===i.document&&r.generation===l.oldGeneration,'MODULE_STOP_INCOMPLETE');receipts.push(r);
+   const r=result?.find(r=>r.documentId===i.document)?.result;check(r?.instance===i.instance&&r.document===i.document&&r.generation===l.oldGeneration,'MODULE_STOP_INCOMPLETE');await accept(r);
+   }catch(cause){const error=Error('MODULE_STOP_INCOMPLETE');error.instance=i;error.cause=cause;throw error;}
   }return receipts;
  }
- return {inject,rebuild,configure,stop,instances:m=>(m.instances??[]),unregister:async m=>{revoked.add(m.id);},async open(m){const i=m.lifecycle?.instances.find(i=>i.type==='website');check(i,'MODULE_EDITOR_MISSING');const frames=await api.webNavigation.getAllFrames({tabId:i.tabId});check(frames?.some(f=>f.documentId===i.document),'MODULE_EDITOR_MISSING');await api.tabs.update(i.tabId,{active:true});const tab=await api.tabs.get(i.tabId);await api.windows.update(tab.windowId,{focused:true});return {state:'OPENED'};}};
+ return {inject,rebuild,configure,stop,instances:m=>(m.instances??[]),unregister:async m=>{revoked.add(m.id);},async open(m){const i=m.lifecycle?.instances.find(i=>i.type==='website'&&(!m.lifecycle.attentionInstance||i.instance===m.lifecycle.attentionInstance));check(i,'MODULE_EDITOR_MISSING');const frames=await api.webNavigation.getAllFrames({tabId:i.tabId});check(frames?.some(f=>f.documentId===i.document),'MODULE_EDITOR_MISSING');await api.tabs.update(i.tabId,{active:true});const tab=await api.tabs.get(i.tabId);await api.windows.update(tab.windowId,{focused:true});return {state:'OPENED'};}};
 }
 export function wrapper(code,instance){return `(async()=>{if(globalThis.__pcmsLifecycle)return globalThis.__pcmsLifecycle.instance;const identity=${JSON.stringify(instance)},disposers=[];let stopped=false,receipt=null;const PCMS=Object.freeze({own(fn){if(stopped||typeof fn!=='function')throw Error('INVALID_DISPOSER');disposers.push(fn);}});globalThis.__pcmsLifecycle=Object.freeze({instance:identity.instance,async stop(id){if(id!==identity.instance)throw Error('WRONG_INSTANCE');if(receipt)return receipt;for(const dispose of disposers)await dispose();stopped=true;receipt={instance:id,document:identity.document,generation:identity.generation,disposedResources:disposers.length,unresolvedEffectIds:[]};return receipt;}});await (async function(PCMS){${code}\n})(PCMS);return identity.instance;})()`;}

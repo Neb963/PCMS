@@ -12,7 +12,7 @@ export function createLifecycle({core,host,clock=Date.now}) {
   for(const j of await jobs(m.id))check(candidate.manifest.readsJobSchemas.includes(j.jobSchema),'MODULE_JOB_INCOMPATIBLE');
   await host.checkCandidate({...m,...candidate,id:m.id,enabled:true,lifecycle:null},await jobs(m.id));
  }
- async function hold(m,code){return save(m,{enabled:false,state:'HELD',lifecycle:{...m.lifecycle,code}},'HELD');}
+ async function hold(m,code,instance=null){return save(m,{enabled:false,state:'HELD',lifecycle:{...m.lifecycle,code,attentionInstance:instance?.instance??null}},'HELD');}
  async function advance(id){
   let m=await core.read('modules',id);if(!m?.lifecycle)return m;
   const l=m.lifecycle;core.queue.fence(id);
@@ -22,12 +22,18 @@ export function createLifecycle({core,host,clock=Date.now}) {
   if((await jobs(id)).some(j=>j.effect?.boundary==='POSSIBLE'))return hold(m,'MODULE_EFFECT_UNKNOWN');
   if(l.phase==='STOP'){
    try{
-    const receipts=await host.stopModule(m,l);
+    const recordReceipt=async receipt=>{
+     const expected=l.instances.find(i=>i.instance===receipt?.instance);
+     check(expected&&receipt.generation===l.oldGeneration&&receipt.document===expected.document&&Number.isSafeInteger(receipt.disposedResources)&&receipt.disposedResources>=0&&Array.isArray(receipt.unresolvedEffectIds)&&!receipt.unresolvedEffectIds.length,'MODULE_STOP_INCOMPLETE');
+     const latest=await core.read('modules',id),prior=latest.lifecycle.receipts??[];
+     if(!prior.some(r=>r.instance===receipt.instance))await save(latest,{lifecycle:{...latest.lifecycle,receipts:[...prior,receipt]}},'STOPPED');
+    };
+    const receipts=await host.stopModule(m,l,recordReceipt);
     m=await core.read('modules',id);
     check(Array.isArray(receipts),'MODULE_STOP_INCOMPLETE');
     for(const instance of l.instances){const receipt=receipts.find(r=>r.instance===instance.instance);check(receipt&&receipt.generation===l.oldGeneration&&receipt.document===instance.document&&Number.isSafeInteger(receipt.disposedResources)&&receipt.disposedResources>=0&&Array.isArray(receipt.unresolvedEffectIds)&&receipt.unresolvedEffectIds.length===0,'MODULE_STOP_INCOMPLETE');}
     m=await save(m,{state:'STOPPING',lifecycle:{...m.lifecycle,phase:'SWITCH',receipts,code:null}},'STOPPED');
-   }catch{return hold(await core.read('modules',id),'MODULE_STOP_INCOMPLETE');}
+   }catch(error){return hold(await core.read('modules',id),'MODULE_STOP_INCOMPLETE',error.instance);}
   }
   if(m.lifecycle.phase==='SWITCH'){
    const candidate=m.lifecycle.kind==='UPDATE'?m.staged:m.lifecycle.kind==='ROLLBACK'?m.previous:null;
