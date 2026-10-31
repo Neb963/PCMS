@@ -1,25 +1,21 @@
 # Current work
 
-**P06 — Bundled first-install module seed: COMPLETE, MERGED.**
+**P07 — Safe module update, disable and cold recovery: IN PROGRESS.**
 
-P01–P06 are merged. P06 [PR #6](https://github.com/Neb963/PCMS/pull/6) was squash-merged at [`4fa1264a227984ccf71d2d4f3b722e7ec35c6ece`](https://github.com/Neb963/PCMS/commit/4fa1264a227984ccf71d2d4f3b722e7ec35c6ece). Verified postmerge tree `1c6ac107fb83ed7cad766a07143fc86e3b2ea371` exactly matched the verified PR head tree.
+Starting main: `f4175ddca4355de98bd94efe40772a01bf7fcdbb`. P01–P06 are merged; no open PRs or unfinished remote phase branch. P06 postmerge run [41223585280](https://github.com/Neb963/PCMS/actions/runs/41223585280) passed T/B. Reuse that unchanged seed evidence.
 
-## Completed bounded outcome
+## Implementation plan
 
-- Seven first-party local ZIPs (Accounts, Discover, Creator, Deployer, Refresher, Journal, Backup) are deterministic, hash-verified with the P05 validator, and bundled without remote code or a new permission.
-- Core atomically commits all seven enabled records, exact version/package/manifest/payload references and the first-install marker. Interrupted module-row writes roll back, and the same seed can be retried on a later startup; existing registries and module/user choices are not overwritten.
-- Modules settings shows real versions/enabled state and actionable failed-initialization retry. No nonfunctional module pages are exposed; actual module workflows belong to later phases.
-- Source/packaging and UI tests retain user-selected ZIPs, disabled-state fixtures, settings, unfinished jobs and drafts through a real browser restart and versioned in-place extension update.
-- Work stayed in the accepted single Core/module-host architecture, with donor-first protected bootstrap and normal CSP/OS sandbox. No real provider/route mutation.
+- Add a durable, single-generation lifecycle to the existing Core/module host: side-effect-free candidate start/schema check, stop admission, fence requests, drain/reconcile effects, collect exact instance stop receipts, switch package atomically, and rebuild or hold safely.
+- Keep settings, drafts, job input/checkpoints and previous package references. Enable/Disable and compatible explicit rollback use the same lifecycle. Interrupted transitions resume from persisted state, without a second controller or queue.
+- Add website instance registration/disposal and Firefox userscript world/registration reconstruction. Missing permission holds affected registration and exposes the actual browser permission action. Never reload a dirty/AI editor to force teardown.
+- Add Settings → Modules Update/Disable/Enable/rollback and contextual held-state recovery. Remove stale visible module pages after fencing; keep other modules operational.
+- T: lifecycle interruption, schema mismatch, in-flight/unknown effects, missing/forged stop receipts, stale generation, disabled jobs and maintenance separation. B: one targeted persistently installed fixture journey covering update with unfinished work/dirty editor, draft preservation, old request denial, Disable/Enable, permission denial and real restart.
 
-## Verification and provenance
+## Evidence and holds
 
-**Focused T:** 46 passed, 0 failed. **Installed B:** PASS on Firefox 155.0, build `20260817142839`, sandbox level 6. Postmerge [run 41223585280](https://github.com/Neb963/PCMS/actions/runs/41223585280), merged source `4fa1264a227984ccf71d2d4f3b722e7ec35c6ece`; tested merged XPI SHA-256 `d121bd0e912274f0f3d424fb2bc00badf468732525eecbe07cf101e3b304ceef`.
+No P07 tests run yet. Required T and B remain NOT TESTED. Real AI-editor teardown is deferred to authorized P46. No live route, GitHub-provider or Perchance mutation is authorized. Continue sequentially after each completed phase; if a required non-live tier is blocked, preserve it and select safely independent eligible work.
 
-Premerge final-code [run 41223444750](https://github.com/Neb963/PCMS/actions/runs/41223444750) also passed 46 T and installed B at code `ca484bceed7a193580cf55efb217fde7427266fc` (XPI SHA-256 `b5b7dc50b70e230863861252da3120c823c491b9b69b01ee00cb0eacf6e16fdc`). Subsequent PR changes were documentation only. Earlier CI [41223284976](https://github.com/Neb963/PCMS/actions/runs/41223284976) failed because the unit test assumed IDB insertion order and the Firefox test asserted before async Other rendering. [41223366462](https://github.com/Neb963/PCMS/actions/runs/41223366462) passed T and reached real extension update, but asserted before the async Modules list finished. Test timing and ordering assertions were corrected without weakening the required outcomes.
+## Next action
 
-**Deferred:** Active package replacement, operational Disable/Enable, generation teardown and dirty-editor preservation at P07; H/G/Perchance production behavior at the authorized later evidence tiers. This XPI is a development checkpoint, not the complete product.
-
-## Next eligible phase
-
-**P07 — Safe module update, disable and cold recovery.** Not started. The next implementation task must inspect current main, write the P07-specific plan here *before* code, execute and verify exactly that one phase. Do not repeat P06 research or installed journeys.
+Implement lifecycle and focused tests against current production records/queue/host. Push meaningful code plus this file frequently. Keep accepted specification, design and PHASES unchanged.
