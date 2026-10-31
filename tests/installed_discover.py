@@ -23,7 +23,7 @@ class SlugProvider(Provider):
   elif path=='/fixture-output/framed-name':body='<p id="rendered-output">Independent framed generator result ☃</p>'
   elif path=='/changed-name':body=AVAILABLE.replace('!','.')
   else:body='<p>No recognized fixture content</p>'
-  self.send(('<!doctype html><title>Disposable slug fixture</title>'+body).encode(),'text/html')
+  self.send(('<!doctype html><meta charset="utf-8"><title>Disposable slug fixture</title>'+body).encode(),'text/html; charset=utf-8')
 account_fixture.Provider=SlugProvider
 def inspect(sid):
  return asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();let cursor=null,jobs=[];do{const p=await c.list({table:'jobs',cursor});for(const row of p.rows)if(row.moduleId==='pcms-discover')jobs.push(await c.read('jobs',row.id));cursor=p.cursor;}while(cursor);const observer=await c.view('discover-observer'),view=await c.view('module:pcms-discover:check-slugs'),journal=await c.read('modules','pcms-journal');c.close();return {jobs,observer,view,journalEnabled:journal.enabled};""")
