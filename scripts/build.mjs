@@ -72,10 +72,12 @@ export async function build(output=path.join(ROOT,'build')) {
 
   const journalPath=path.join(stage,'core/journal-archive.mjs');
   await writeFile(journalPath,(await readFile(journalPath,'utf8')).replace("from 'fflate'","from '../codecs/fflate.mjs'"));
+  const discoverPath=path.join(stage,'core/discover-archive.mjs');
+  await writeFile(discoverPath,(await readFile(discoverPath,'utf8')).replace("from 'fflate'","from '../codecs/fflate.mjs'"));
   await cp(path.join(ROOT,'vendor/personamonkey/LICENSE'),path.join(stage,'licenses/PersonaMonkey-MIT.txt'));
   const manifest=JSON.parse(await readFile(path.join(donor,'manifest.json'),'utf8'));
   if(manifest.browser_specific_settings.gecko.id!==ID)throw Error('GECKO_ID_CHANGED');
-  manifest.name='PCMS';manifest.version='0.13.0';
+  manifest.name='PCMS';manifest.version='0.14.0';
   manifest.description='Perchance account and generator management with integrated PersonaMonkey protection.';
   manifest.browser_specific_settings.gecko.strict_min_version='154.0';
   manifest.background={scripts:['host/entry.mjs'],type:'module'};
@@ -90,7 +92,7 @@ export async function build(output=path.join(ROOT,'build')) {
   await writeFile(path.join(stage,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
   const source=execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim();
   const dirty=!!execFileSync('git',['status','--porcelain','--untracked-files=normal'],{cwd:ROOT,encoding:'utf8'}).trim();
-  const identity={format:1,phase:'P13',source,dirty,donor:provenance.commit,alphaReuse:provenance.alpha};
+  const identity={format:1,phase:'P14',source,dirty,donor:provenance.commit,alphaReuse:provenance.alpha};
   await writeFile(path.join(stage,'build-identity.json'),JSON.stringify(identity,null,2)+'\n');
   await verifyGraph(stage);
   for(const name of await files(stage))if(/\.(mjs|js)$/.test(name))execFileSync(process.execPath,['--check',path.join(stage,name)],{stdio:'pipe'});

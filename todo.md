@@ -23,3 +23,5 @@ G/H/P1–P5 remain NOT TESTED and unauthorized. P44 separately qualifies current
 Classifier checkpoint: exact accepted literals/layout folding, historical native normalization with retained collisions/rejections, and fixed isolated-world output snapshot are drafted with independent focused cases. Durable batch/adapter/UI/export and required final T/B remain OPEN.
 
 Durable policy checkpoint: batch rows/position/dates now live in the one Core job, with finite sequential read receipts, explicit Unknown/Resume, Pause fences and two-second/backoff deadlines. Core Downloads ZIP export preserves original/rejected/colliding rows with checked JSON/CSV hashes and a real file receipt. Adapter/primary UI/tests and final T/B remain OPEN.
+
+Integration checkpoint: the private donor adapter now owns fixed slug navigation/observation in one dedicated protected tab, preserving uncertain/manual contexts. Discover0.2 finite callbacks require exact bound job/target/account/revision. Core routes and bundled/build integration are connected. Primary UI, focused batch tests and installed journey are next; no final verification claim.
