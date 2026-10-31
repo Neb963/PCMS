@@ -52,7 +52,7 @@ export async function build(output=path.join(ROOT,'build')) {
     if(/^(tests|options|popup)\//.test(file))continue;
     const target=path.join(stage,file);await mkdir(path.dirname(target),{recursive:true});
     const original=await readFile(path.join(donor,file));
-    const changed=['background.js','lib/recovery-bootstrap.js','lib/mullvad-native.js'].includes(file);
+    const changed=['background.js','lib/recovery-bootstrap.js','lib/mullvad-native.js','lib/mullvad-runtime.js'].includes(file);
     await writeFile(target,changed?transformDonor(file,original.toString('utf8')):original);
   }
   await cp(path.join(ROOT,'src/host'),path.join(stage,'host'),{recursive:true});

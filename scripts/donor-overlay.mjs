@@ -1,16 +1,20 @@
+import {repairNativePrepare,repairMullvadRuntime} from './native-prepare-overlay.mjs';
+import {repairRouteProbes} from './route-probe-overlay.mjs';
 import {repairNativeTransport} from './native-transport-overlay.mjs';
 export function replaceOnce(source, before, after, label) {
   if (source.split(before).length !== 2) throw new Error('DONOR_ANCHOR_MISMATCH: '+label);
   return source.replace(before, after);
 }
 export function transformDonor(relative, source) {
-  if (relative === 'lib/mullvad-native.js') return repairNativeTransport(source);
+  if (relative === 'lib/mullvad-native.js') return repairNativePrepare(repairNativeTransport(source));
+  if (relative === 'lib/mullvad-runtime.js') return repairMullvadRuntime(source);
   if (relative === 'lib/recovery-bootstrap.js') {
     source = 'import {checkProfile, reportBootstrapFailure} from "../host/bootstrap.mjs";\n'+source;
     source = replaceOnce(source, '    await initializeRecoveryConsent();', '    await checkProfile();\n    await initializeRecoveryConsent();', 'clean-profile-before-recovery');
     return replaceOnce(source, '    console.warn("PersonaMonkey bootstrap failed; routing remains blocked");', '    reportBootstrapFailure();\n    console.warn("PersonaMonkey bootstrap failed; routing remains blocked");', 'bounded-bootstrap-failure');
   }
   if (relative !== 'background.js') return source;
+  source = repairRouteProbes(source);
   source = 'import {attachDonor} from "./host/bootstrap.mjs";\n'+source;
   // Donor services stay private. The old automation controller must not load
   // saved workflows or register its public message/port dispatchers.
