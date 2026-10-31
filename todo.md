@@ -6,10 +6,10 @@ P04 COMPLETE in PR #4, merge `c2fa491a7327891d6c1d47383ad954192d5f0caf`, tree `1
 
 ## Implementation plan (before code)
 
-- [ ] Add a packaged established streaming inflate codec and strict ZIP structure checks: central/local identity, safe integer bounds, exact entry sizes/CRC/hash, UTF-8/case-fold-safe paths, no duplicates, traversal, symlink or encrypted entries. Keep the import resource budget visible/configurable, with actual quota errors and no product capacity cap.
-- [ ] Parse module.json with duplicate-key rejection. Validate exact known fields, format/Core ABI, strict release version, job/settings schemas, capabilities, complete payload inventory and declared entry/page paths. Preserve original ZIP and manifest hashes. Reject unsupported executable dependencies before registry writes.
-- [ ] Validate side-effect-free, then stage content-addressed files under an import pin. Atomically install a new enabled package; identical bytes are a no-op. Reject changed same-version/downgrade. Higher-version replacement is staged for P07's safe lifecycle, without changing the active generation or unfinished work.
-- [ ] Add operating Settings → Modules file selection/Install and visible import budget. Show exact validation/storage cause, preserve selected file/input and existing modules/jobs on failure. Open the new module's real page through P04 without extension reinstall.
+- [x] Add a packaged established streaming inflate codec and strict ZIP structure checks: central/local identity, safe integer bounds, exact entry sizes/CRC/hash, UTF-8/case-fold-safe paths, no duplicates, traversal, symlink or encrypted entries. Keep the import resource budget visible/configurable, with actual quota errors and no product capacity cap.
+- [x] Parse module.json with duplicate-key rejection. Validate exact known fields, format/Core ABI, strict release version, job/settings schemas, capabilities, complete payload inventory and declared entry/page paths. Preserve original ZIP and manifest hashes. Reject unsupported executable dependencies before registry writes.
+- [x] Validate side-effect-free, then stage content-addressed files under an import pin. Atomically install a new enabled package; identical bytes are a no-op. Reject changed same-version/downgrade. Higher-version replacement is staged for P07's safe lifecycle, without changing the active generation or unfinished work.
+- [x] Add operating Settings → Modules file selection/Install and visible import budget. Show exact validation/storage cause, preserve selected file/input and existing modules/jobs on failure. Open the new module's real page through P04 without extension reinstall.
 - [ ] T: valid exact payload bytes and adversarial JSON/ZIP/manifest/dependency/version/resource cases, plus actual IDB quota/registry preservation. B: select actual local files, click Install, open module page and run its fixture action; exercise useful validation/quota errors and independently inspect unchanged registry/jobs.
 - [ ] Publish meaningful code/todo checkpoints; verify remote commits/trees, focused and installed checks; merge verified P05 and verify postmerge main, then plan P06 automatically.
 
@@ -20,3 +20,5 @@ P05 T/B: NOT TESTED. No provider/native operation is needed or authorized. ZIP d
 ## Next action
 
 Implement the packaged ZIP/manifest validator and atomic registry installation boundary.
+
+Initial implementation and six focused package tests pass locally: actual ZIP/payload bytes, duplicate JSON/manifest fields, unsafe/case-folded paths, encryption/symlink/truncation/header faults, CRC/hash/listing/import dependency/resource errors, atomic IDB registry installation and quota preservation, compatible update staging. Installed selection and negative-case B remains NOT TESTED. fflate 0.8.2 and Acorn 8.15.0 are pinned, bundled locally by explicit build-copy imports, with licenses.

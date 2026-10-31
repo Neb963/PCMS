@@ -4,7 +4,7 @@ const notes = {
   home:'Account and generator operations are not implemented yet.',
   generators:'Generator management is not implemented yet.', accounts:'Account management is not implemented yet.',
   refresher:'Refresher is not implemented yet.', work:'Work is kept when this dashboard closes.',
-  other:'', settings:'Connections and module ZIP installation are not implemented yet.'
+  other:'', settings:'Connections are not implemented yet.'
 };
 const messages = {
   DONOR_STARTING:'PersonaMonkey is starting. Protected work stays blocked.',
@@ -135,8 +135,8 @@ async function renderOther(area){
  const draw=()=>{list.replaceChildren();for(const m of modules.filter(m=>(m.name??m.id).toLowerCase().includes(input.value.toLowerCase()))){const li=node('li'),a=node('a',m.name??m.id);a.href=moduleURL(m);li.append(a);list.append(li);}if(!list.children.length)list.append(node('li','No matching modules.'));};input.addEventListener('input',draw);area.append(label,input,list);draw();
 }
 async function renderModuleSettings(area){
- area.append(node('h2','Modules'));const selected=location.hash.split('/')[2];
- for(const module of await moduleRecords())if(!selected||selected===module.id){const section=node('section'),title=node('h3',module.name??module.id);section.append(title,node('p',(module.version??'Unknown version')+' · '+(module.enabled?'Enabled':'Disabled')));
+ area.append(node('h2','Modules'));renderInstall(area);const selected=location.hash.split('/')[2];
+ for(const module of await moduleRecords())if(!selected||selected===module.id){const section=node('section'),title=node('h3',module.name??module.id);section.append(title,node('p',(module.version??'Unknown version')+' · '+(module.enabled?'Enabled':'Disabled')));if(module.stagedVersion)section.append(node('p','Update '+module.stagedVersion+' staged.'));
   if(module.enabled&&module.pages.length){const label=node('label'),check=node('input');check.type='checkbox';check.checked=module.pinned;check.className='module-pin';check.dataset.module=module.id;label.append(check,document.createTextNode(' Show in primary navigation'));check.addEventListener('change',async()=>{const result=await core('module.pin',{id:module.id,pinned:check.checked});if(result.ok)await updateModuleNavigation();else{check.checked=!check.checked;section.append(failure(result.code));}});section.append(label);}
   area.append(section);
  }
@@ -154,3 +154,22 @@ async function renderModule(area){
 // Refresh only the visible dashboard status; no background keepalive.
 setInterval(()=>{if(document.visibilityState==='visible')void queueStatus();},2000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void queueStatus();});
+
+const importMessages={IMPORT_BUDGET_EXCEEDED:'This ZIP needs more import space. Increase the import budget or select a smaller package.',INVALID_IMPORT_BUDGET:'Enter a positive import budget.',DUPLICATE_JSON_KEY:'module.json has a repeated field.',INVALID_JSON:'module.json is not valid JSON.',INVALID_MANIFEST_FIELDS:'The module manifest has missing or unknown fields.',INCOMPATIBLE_CORE_API:'This module needs a different Core API.',UNKNOWN_CAPABILITY:'This module requests an unsupported capability.',INVALID_RELEASE_VERSION:'Use a release version in major.minor.patch format.',INCOMPATIBLE_SCHEMA:'The module job or settings schema is incompatible.',INCOMPATIBLE_SETTINGS_SCHEMA:'This update cannot read the current settings.',INCOMPATIBLE_JOB_SCHEMA:'This update cannot read an unfinished job. Existing work is kept.',SAME_VERSION_CHANGED:'These bytes differ from the installed release. Use a higher version.',DOWNGRADE_REJECTED:'This is an older release. The active package is kept.',UNSAFE_PATH:'The ZIP contains an unsafe file path.',PATH_COLLISION:'The ZIP contains duplicate or conflicting paths.',ENCRYPTED_ZIP:'Encrypted module ZIPs are not supported.',NON_REGULAR_ZIP_ENTRY:'The ZIP contains a link or special file.',PAYLOAD_LIST_MISMATCH:'The ZIP files do not match the manifest.',PAYLOAD_HASH_MISMATCH:'A file does not match its manifest hash.',PAYLOAD_SIZE_MISMATCH:'A file does not match its declared size.',ZIP_CRC_MISMATCH:'A ZIP file failed its CRC check.',UNSUPPORTED_EXECUTABLE_DEPENDENCY:'Bundle module code locally without imports.',INVALID_EXECUTABLE:'A module script is invalid or uses an unsupported import.'};
+function renderInstall(area){
+ const form=node('div'),label=node('label','Module ZIP'),file=node('input');file.type='file';file.accept='.zip,application/zip';file.id='module-zip';label.htmlFor=file.id;
+ const budgetLabel=node('label','Import budget (MiB)'),budget=node('input');budget.type='number';budget.min='1';budget.step='1';budget.value='64';budget.id='module-budget';budgetLabel.htmlFor=budget.id;
+ const install=node('button','Install');install.type='button';install.id='install-module';const status=node('p');status.id='import-result';status.setAttribute('role','status');
+ install.addEventListener('click',async()=>{
+  const selected=file.files[0],bytesBudget=Number(budget.value)*1024*1024;if(!selected){status.textContent='Select a module ZIP.';return;}if(!Number.isSafeInteger(bytesBudget)||bytesBudget<=0){status.textContent=importMessages.INVALID_IMPORT_BUDGET;return;}
+  if(selected.size>bytesBudget){status.textContent=importMessages.IMPORT_BUDGET_EXCEEDED;return;}
+  install.disabled=true;status.textContent='Checking ZIP…';let result;
+  try{result=await core('module.install',{bytes:await selected.arrayBuffer(),budget:bytesBudget});}catch{result={ok:false,code:'STORAGE_UNAVAILABLE'};}
+  install.disabled=false;
+  if(!result.ok){status.textContent=importMessages[result.code]??errors[result.code]??'This ZIP could not be installed. Select a compatible, complete module package.';status.dataset.code=result.code;return;}
+  status.removeAttribute('data-code');status.textContent=result.result.state==='UNCHANGED'?'This exact package is already installed.':result.result.state==='STAGED'?'Update staged. The current version and jobs are kept.':'Installed.';
+  if(result.result.cleanupCode)status.append(document.createTextNode(' Import cleanup needs attention.'));
+  await updateModuleNavigation();const module=(await moduleRecords()).find(m=>m.id===result.result.id);if(module?.enabled&&module.pages.length){const link=node('a','Open '+(module.name??module.id));link.href=moduleURL(module);status.append(document.createTextNode(' '),link);}
+ });
+ form.append(label,file,budgetLabel,budget,install,status);area.append(form);
+}

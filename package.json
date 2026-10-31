@@ -12,5 +12,9 @@
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.4"
+  },
+  "dependencies": {
+    "acorn": "8.15.0",
+    "fflate": "0.8.2"
   }
 }

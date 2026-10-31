@@ -50,6 +50,7 @@ jobs:
           else
             bash scripts/setup-firefox.sh
           fi
+      - run: npm ci --ignore-scripts
       - run: npm run build
       - name: Persistent module journey (normal sandbox)
         run: python3 tests/installed_modules.py build/pcms-dev.xpi
