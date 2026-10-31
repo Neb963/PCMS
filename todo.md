@@ -1,30 +1,22 @@
 # Current work
 
-**P05 — Local ZIP selection and validation: VERIFIED; merge/postmerge next.**
+**P06 — Bundled first-install module seed: IN PROGRESS.**
 
-P04 COMPLETE in PR #4, merge `c2fa491a7327891d6c1d47383ad954192d5f0caf`, tree `12eda8231a823494a62daab6e79fc711413fde4a` (verified against candidate). Postmerge run [41221261147](https://github.com/Neb963/PCMS/actions/runs/41221261147): focused and installed PASS. P01–P04 evidence is retained in merged history/memory; no historical research is repeated.
+P01–P05 are merged into `main`. P05 PR #5 merged at `9795a433140a5be8c1c90b1f8b11e5283edd2ea2`; postmerge [run 41222521879](https://github.com/Neb963/PCMS/actions/runs/41222521879) PASS. P05 verification was on `0174246345b6612d60f381fb825532422e3a23ec`, [run 41222335600](https://github.com/Neb963/PCMS/actions/runs/41222335600). No open PR or unfinished branch found; P06 is the first dependency-eligible phase.
 
-## Implementation plan (before code)
+## P06 implementation plan — written before code
 
-- [x] Add a packaged established streaming inflate codec and strict ZIP structure checks: central/local identity, safe integer bounds, exact entry sizes/CRC/hash, UTF-8/case-fold-safe paths, no duplicates, traversal, symlink or encrypted entries. Keep the import resource budget visible/configurable, with actual quota errors and no product capacity cap.
-- [x] Parse module.json with duplicate-key rejection. Validate exact known fields, format/Core ABI, strict release version, job/settings schemas, capabilities, complete payload inventory and declared entry/page paths. Preserve original ZIP and manifest hashes. Reject unsupported executable dependencies before registry writes.
-- [x] Validate side-effect-free, then stage content-addressed files under an import pin. Atomically install a new enabled package; identical bytes are a no-op. Reject changed same-version/downgrade. Higher-version replacement is staged for P07's safe lifecycle, without changing the active generation or unfinished work.
-- [x] Add operating Settings → Modules file selection/Install and visible import budget. Show exact validation/storage cause, preserve selected file/input and existing modules/jobs on failure. Open the new module's real page through P04 without extension reinstall.
-- [x] T: valid exact payload bytes and adversarial JSON/ZIP/manifest/dependency/version/resource cases, plus actual IDB quota/registry preservation. B: select actual local files, click Install, open module page and run its fixture action; exercise useful validation/quota errors and independently inspect unchanged registry/jobs.
-- [ ] Publish meaningful code/todo checkpoints; verify remote commits/trees, focused and installed checks; merge verified P05 and verify postmerge main, then plan P06 automatically.
+- [ ] Bundle seven deterministic, valid, locally packaged module ZIPs: Accounts, Discover, Creator, Deployer, Refresher, Journal, Backup. Verify exact ZIP/manifest/payload hashes using the P05 validator. Keep unfinished workflows inert and do not expose fake operational pages or controls. Preserve the donor-first host, permissions and sandbox CSP.
+- [ ] Add a private packaged Core first-install seeder, called at startup before module runners. Stage validated package blobs with a temporary pin; commit all seven module rows **and** the dataset-independent initialization marker in one IndexedDB transaction. On failure/crash, expose no partial fleet and retry on a subsequent startup; do not restart with a second controller.
+- [ ] Never overwrite an existing module registry, chosen ZIP versions, settings, disabled state, staged updates or jobs. Keep a marker on restart, extension update and later dataset restore. Surface real seeded version/status in Settings → Modules, and list only pages with implemented operations.
+- [ ] T: deterministic/package validation/hash checks; transactional rollback and interrupted blob staging; repeated startup, existing-registry/disabled/upgrade/restore preservation and secret-safe failure recording.
+- [ ] B: persistently install the built XPI in qualifying Firefox with normal sandbox; inspect all seven enabled packages/hashes in Modules and independent IDB, then restart Firefox and update the installed extension in place while preserving changed module settings/status, jobs and user ZIP. Do not perform provider or donor-route mutations.
+- [ ] Publish meaningful GitHub checkpoints with `todo.md`; verify remote commits and tree, run focused and changed-boundary installed CI. Merge a verified P06 through a lightweight PR, verify postmerge `main`, and stop before P07.
 
 ## Evidence / holds
 
-P05 T/B: PASS on final code `0174246345b6612d60f381fb825532422e3a23ec`, run `41222335600`. 41 focused checks and installed actual file selection/Install/action, duplicate-key/budget/quota errors and unchanged registry/job/draft pass. No provider/native operation is needed or authorized. ZIP distribution remains the selected local development model, with no signed/public distribution claim. Safe active-package replacement/Disable/Enable remains P07; no update bypass is introduced.
+T and B are **NOT TESTED** on P06 code. H/G/P live effects are deferred by the accepted phase plan. P07 owns active-generation update/Disable/Enable and dirty-editor teardown; the P06 preservation fixture may set existing disabled state directly, but is not P07 operational acceptance.
 
 ## Next action
 
-Implement the packaged ZIP/manifest validator and atomic registry installation boundary.
-
-Initial implementation and six focused package tests pass locally: actual ZIP/payload bytes, duplicate JSON/manifest fields, unsafe/case-folded paths, encryption/symlink/truncation/header faults, CRC/hash/listing/import dependency/resource errors, atomic IDB registry installation and quota preservation, compatible update staging. Installed selection and negative-case B remains NOT TESTED. fflate 0.8.2 and Acorn 8.15.0 are pinned, bundled locally by explicit build-copy imports, with licenses.
-
-Checkpoint `5d66cb22722cbaf3ba18bf98ce01658b70e1139b` is pushed in draft PR #5. Focused ZIP64-directory and streaming data-descriptor cases now pass too (seven package checks, 41 focused total). The installed journey selects actual ZIP files, runs the installed sandbox action and checks precise duplicate-key/budget/quota UI errors against independently retained registry, unfinished job and draft. B remains NOT TESTED until CI passes.
-
-Installed B run `41222147628` passes on `4cb2051f4b643edc9d8f6af0a4f9a68cd3ffca48`: Firefox 155.0/build 20260817142839, sandbox 6, XPI SHA-256 `a829534521ed0061a2719d1b33a6dde339bebfff7b6d64c71e39df68224d2804`. Actual file/Install/action and duplicate-key/resource/quota preservation all pass. Final review adds secret-safe failed-import events even for validation/version failures before staging; the validator itself remains pure. Current-candidate checks remain required for that final recording correction.
-
-Final recording correction is verified by current-candidate T/B. Documentation-only checkpoint follows; production/harness/CI remain the tested code. Merge PR #5, verify main tree/postmerge checks, then automatically plan P06.
+Implement deterministic bundled resources and private atomic seed path; then exercise focused T before installed B.
