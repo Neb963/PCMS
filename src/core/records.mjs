@@ -130,6 +130,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       requireCore(!cursor||(cursor.dataset===r.dataset&&cursor.table===table&&cursor.search===search&&Number.isSafeInteger(cut)&&cut<=r.sequence&&typeof after==='string'),'STALE_CURSOR');
       const rows=[];let last=after,more=false;
       if(table==='events') {
+        if(Number(after||0)>=cut)return {rows:[],cursor:null,cut};
         let c=await req(s('events').openCursor(IDBKeyRange.bound([r.dataset,Number(after||0)],[r.dataset,cut],true,false)));
         while(c){if(!matches(c.value)){c=await req(c.continue()||c.request);continue;}if(rows.length===limit){more=true;break;}rows.push(project(table,c.value));last=String(c.value.sequence);c=await req(c.continue()||c.request);}
       } else {

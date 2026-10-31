@@ -7,6 +7,7 @@ async function fixture(t){const name='test-'+crypto.randomUUID();const core=awai
 const change=(id,value,expectedRev=0,refs=[])=>({table:'generators',id,value,expectedRev,refs});
 test('atomic rollback retains earlier rows and sequence; stale and duplicate mutations fail',async t=>{
  const {core}=await fixture(t);
+ assert.deepEqual((await core.list({table:'events'})).rows,[]);
  await core.mutate([change('one',{slug:'one'})],event);
  const before=await core.status();
  await assert.rejects(core.mutate([change('one',{slug:'changed'},1),change('two',{slug:'changed'})],event),{name:'ConstraintError'});
