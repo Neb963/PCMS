@@ -20,7 +20,7 @@ export async function decodeGitBlob(body,sha){
 export function createGitReader({transport=globalThis.fetch,clock=Date.now}){
  return async({repository,token,path='',etag=null})=>{
   check(validRepository(repository),'GIT_REPOSITORY_INVALID');check(typeof token==='string'&&token.length>=12&&/^[\x21-\x7e]+$/.test(token),'GIT_CREDENTIAL_REQUIRED');
-  check(path===''||/^\/git\/(ref\/heads\/main|commits\/[a-f0-9]{40}|trees\/[a-f0-9]{40}(\?recursive=1)?|blobs\/[a-f0-9]{40})$/.test(path),'GIT_READ_SCOPE_DENIED');
+  check(path===''||/^\/compare\/[a-f0-9]{40}\.\.\.[a-f0-9]{40}$/.test(path)||/^\/git\/(ref\/heads\/main|commits\/[a-f0-9]{40}|trees\/[a-f0-9]{40}(\?recursive=1)?|blobs\/[a-f0-9]{40})$/.test(path),'GIT_READ_SCOPE_DENIED');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);let response;
   try{try{response=await transport('https://api.github.com/repos/'+repository+path,{method:'GET',credentials:'omit',cache:'no-store',redirect:'error',signal:controller.signal,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...etag?{'If-None-Match':etag}:{}}});}
   catch{throw new CoreError('GIT_CONNECTION_UNAVAILABLE');}

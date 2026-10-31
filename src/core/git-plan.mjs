@@ -10,10 +10,10 @@ export const safeGitPath=path=>typeof path==='string'&&path.isWellFormed()&&path
 const regular=e=>e?.type==='blob'&&['100644','100755'].includes(e.mode);
 const sorted=object=>Object.fromEntries(Object.entries(object??{}).sort(([a],[b])=>a<b?-1:a>b?1:0));
 export function normalizeGitRequest(request){
- check(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(k=>['kind','slug','version','action','sourceManifest','ownedPaths','expectedInputs','expectedAffected'].includes(k)),'GIT_REQUEST_INVALID');
+ check(request&&typeof request==='object'&&!Array.isArray(request)&&Object.keys(request).every(k=>['kind','slug','folder','version','action','sourceManifest','ownedPaths','expectedInputs','expectedAffected'].includes(k)),'GIT_REQUEST_INVALID');
  check(['PREPARE','SOURCE','DONE'].includes(request.kind)&&typeof request.slug==='string'&&/^[a-z0-9][a-z0-9-]*$/.test(request.slug),'GIT_REQUEST_INVALID');
- const out={kind:request.kind,slug:request.slug,folder:'generators/'+request.slug};
- if(request.kind==='PREPARE'){check(Object.keys(request).every(k=>['kind','slug'].includes(k)),'GIT_REQUEST_INVALID');return out;}
+ const out={kind:request.kind,slug:request.slug,folder:'generators/'+request.slug};check(request.folder==null||request.folder===out.folder,'GIT_TARGET_SCOPE_DENIED');
+ if(request.kind==='PREPARE'){check(Object.keys(request).every(k=>['kind','slug','folder'].includes(k)),'GIT_REQUEST_INVALID');return out;}
  check(typeof request.version==='string'&&/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(request.version)&&['DEVELOP','DEPLOY'].includes(request.action),'GIT_REQUEST_INVALID');Object.assign(out,{version:request.version,action:request.action});
  for(const name of ['expectedInputs','expectedAffected']){const map=request[name];check(map&&typeof map==='object'&&!Array.isArray(map),'GIT_PRECONDITION_REQUIRED');for(const [path,sha]of Object.entries(map)){check(safeGitPath(path)&&(INPUTS.has(path)||SOURCE(path))&&(sha===null||gitSha(sha)),'GIT_PRECONDITION_INVALID');}out[name]=sorted(map);}
  check(gitSha(out.expectedInputs['DEPLOYMENT.md']),'GIT_PRECONDITION_REQUIRED');
