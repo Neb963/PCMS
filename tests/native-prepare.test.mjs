@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {mkdtemp,readFile,writeFile,mkdir,rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import path from 'node:path';
+import {transformDonor} from '../scripts/donor-overlay.mjs';
+async function fixture(t){const dir=await mkdtemp(path.join(tmpdir(),'pcms-native-'));t.after(()=>rm(dir,{recursive:true,force:true}));await mkdir(path.join(dir,'lib'));await mkdir(path.join(dir,'host'));const original=await readFile('vendor/personamonkey/extension/lib/mullvad-native.js','utf8');await writeFile(path.join(dir,'lib/native.mjs'),transformDonor('lib/mullvad-native.js',original));await writeFile(path.join(dir,'host/native-receipts.mjs'),await readFile('src/host/native-receipts.mjs'));const saved=new Map(),sent=[];let fail=false;const listeners={};globalThis.browser={storage:{local:{get:async key=>key==null?Object.fromEntries(saved):{[key]:saved.get(key)},set:async values=>{if(fail)throw new DOMException('quota','QuotaExceededError');for(const [k,v]of Object.entries(values))saved.set(k,structuredClone(v));},remove:async key=>saved.delete(key)}},runtime:{connectNative:()=>({onMessage:{addListener:f=>listeners.message=f},onDisconnect:{addListener:f=>listeners.disconnect=f},postMessage:m=>{sent.push(m);},disconnect(){}})}};t.after(()=>delete globalThis.browser);const api=await import('file://'+path.join(dir,'lib/native.mjs'));return {api,saved,sent,reply:()=>listeners.message({id:1,ok:true,ready:true,route_id:'route-1',relay_ip:'10.124.0.1',relay_port:1080,local_host:'127.0.0.1',local_port:45001}),fail:()=>fail=true};}
+const route={id:'route-1',host:'10.124.0.1',port:1080};
+test('native preparation persists exact intent before unchanged protocol dispatch; storage failure dispatches nothing',async t=>{
+ const f=await fixture(t);const pending=f.api.prepareExit(route,true,'a'.repeat(64));for(let i=0;i<20&&!f.sent.length;i++)await new Promise(resolve=>setImmediate(resolve));assert.equal(f.sent.length,1);assert.equal(f.sent[0].command,'prepare_exit');assert.equal(f.saved.get('personaMullvadPendingPrepare:route-1').phase,'DISPATCH_POSSIBLE');f.reply();assert.equal((await pending).local_port,45001);assert.equal(f.saved.has('personaMullvadPendingPrepare:route-1'),false);
+ f.fail();await assert.rejects(f.api.prepareExit(route,true,'b'.repeat(64)),e=>e.nativeNoDispatch===true);assert.equal(f.sent.length,1);
+});
+test('a persisted uncertain native prepare blocks a new prepare, including after module reopen',async t=>{
+ const f=await fixture(t);f.saved.set('personaMullvadPendingPrepare:route-1',{schema:2,phase:'DISPATCH_POSSIBLE',routeId:'route-1',nonce:crypto.randomUUID(),password:'c'.repeat(64),createdAtMs:Date.now(),relayIp:route.host,relayPort:1080});await assert.rejects(f.api.prepareExit(route,true,'d'.repeat(64)),e=>e.nativeNoDispatch===true&&e.nativeOutcomeUncertain===true);assert.equal(f.sent.length,0);assert.equal(f.saved.get('personaMullvadPendingPrepare:route-1').password,'c'.repeat(64));
+});

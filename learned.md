@@ -46,3 +46,9 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 
 - P09: acknowledging a wake is not executing every due job. The installed multi-file cleanup journey exposed that sequence-based wake suppression stranded other WAITING jobs after one finite turn. Keep deadlines for actual runnable work; stop alarms when jobs complete/hold, not merely when a wake was acknowledged.
 - P09: native removeFile can finish physical removal while DownloadItem.exists remains stale. Persist the API acknowledgement, wait for read-only metadata, and expose a hold without another remove. After real Firefox restart these fixture history rows disappeared; missing history stays a hold, even when independent test disk inspection proves the earlier removal. Production metadata cannot claim independent physical disk verification.
+
+- P10 T: uniqueness of an entire exit-set digest does not reserve each address. Two different IPv4/IPv6 sets can overlap. Core's unique multi-entry canonical-address index rejects shared members atomically, including archived account reservations, while preserving the single account record authority.
+
+- P10 installed run 41239243574: the separate fixture add-on did not intercept the product's extension-origin catalog fetch. The installed fixture now serves the actual fixed HTTPS URL with explicit profile-local DNS/trust, preserving normal browser certificate validation, sandbox and CSP rather than relying on cross-extension interception.
+
+- P10 compatibility review: compatible module updates preserve packageClass. Ordinary module capabilities must not depend on a newly introduced seed-only class; maintenance privileges remain explicitly class-gated. Focused regression and installed legacy-null metadata journey pass in run 41240772320.

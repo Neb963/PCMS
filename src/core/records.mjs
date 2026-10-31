@@ -48,7 +48,7 @@ export function project(table,row) {
   return out;
 }
 export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clock=Date.now}={}) {
-  const opening=indexedDB.open(name,2);
+  const opening=indexedDB.open(name,3);
   opening.onupgradeneeded=()=>{
     const db=opening.result;
     for(const name of STORES)if(!db.objectStoreNames.contains(name))db.createObjectStore(name,{keyPath:name==='meta'?'key':'key'});
@@ -61,6 +61,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     for(const [table,definitions] of Object.entries({accounts:{persona:'personaKey',principal:'principalKey',exit:'exitKey'},generators:{slug:'slugKey',folder:'folderKey'},jobs:{logical:'logicalKeyUnique'}})) {
       for(const [index,field] of Object.entries(definitions))if(!opening.transaction.objectStore(table).indexNames.contains(index))opening.transaction.objectStore(table).createIndex(index,['dataset',field],{unique:true});
     }
+    const accounts=opening.transaction.objectStore('accounts');if(!accounts.indexNames.contains('exitMembers'))accounts.createIndex('exitMembers','exitKeys',{unique:true,multiEntry:true});
     const e=opening.transaction.objectStore('events');
     for(const field of ['time','targetId','jobId','moduleId','severity'])if(!e.indexNames.contains(field))e.createIndex(field,['dataset',field,'sequence']);
     if(!e.indexNames.contains('tokens'))e.createIndex('tokens','tokenKeys',{multiEntry:true});
@@ -109,7 +110,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       const closure=await checkedRefs(s,r,refs);
       const rev=(old?.rev??0)+1;
       const row={...structuredClone(value),key:[r.dataset,recordId],dataset:r.dataset,id:recordId,schema:1,rev,sequence,createdAt:old?.createdAt??clock(),updatedAt:clock(),refs:closure,deleted:value===null};
-      if(table==='accounts')for(const [field,raw] of [['personaKey',row.personaUid],['principalKey',row.expectedPrincipal],['exitKey',row.observedExit]])if(raw!==undefined)row[field]=raw;
+      if(table==='accounts'){for(const [field,raw] of [['personaKey',row.personaUid],['principalKey',row.expectedPrincipal],['exitKey',row.observedExit]]){delete row[field];if(raw!=null)row[field]=raw;}delete row.exitKeys;if(Array.isArray(row.exitAddresses))row.exitKeys=row.exitAddresses.map(exit=>r.dataset+':'+exit);}
       if(table==='generators'){if(row.slug)row.slugKey=row.slug;if(row.repositoryId&&row.folder)row.folderKey=[row.repositoryId,row.folder];}
       if(table==='jobs'){if(row.logicalKey)row.logicalKeyUnique=row.logicalKey;row.workRank=['HELD','FAILED'].includes(row.state)?0:row.state==='RUNNING'?1:['WAITING','READY'].includes(row.state)?2:3;}
       if(value===null)await req(s(table).delete(row.key));else await req(s(table).put(row));
@@ -150,9 +151,10 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       await req(s('meta').put(r));return {state:'SEEDED',...receipt};
     }),
     command:name=>transact(['commands'],'readonly',async s=>{requireCore(id(name),'INVALID_REQUEST');const r=await root(s);return req(s('commands').get([r.dataset,name]));}),
-    mutate:(changes,event,command=null)=>transact([...TABLES,'events','versions','blobs','chunks','commands'],'readwrite',async s=>{
+    mutate:(changes,event,command=null,guard=null)=>transact([...TABLES,'events','versions','blobs','chunks','commands'],'readwrite',async s=>{
       const r=await root(s);
       if(command){requireCore(id(command.id)&&typeof command.signature==='string','INVALID_REQUEST');const previous=await req(s('commands').get([r.dataset,command.id]));if(previous){requireCore(previous.signature===command.signature,'REQUEST_CONFLICT');return previous.result;}}
+      if(guard){requireCore(id(guard.moduleId)&&Number.isSafeInteger(guard.generation)&&id(guard.jobId)&&Number.isSafeInteger(guard.jobRevision),'INVALID_GUARD');const m=await req(s('modules').get([r.dataset,guard.moduleId])),job=await req(s('jobs').get([r.dataset,guard.jobId]));requireCore(m?.enabled&&!m.lifecycle&&m.generation===guard.generation,'STALE_GENERATION');requireCore(job?.rev===guard.jobRevision&&job.moduleId===guard.moduleId&&job.generation===guard.generation,'STALE_REVISION');}
       const result=await writeRows(s,r,changes,event);
       if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result}));return result;
     }),

@@ -1,7 +1,7 @@
 // Finite queue primitives. Modules own their steps; Core owns admission/effects.
 export function createQueue({transact,root,writeRows,append,req,check,clock}) {
  const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
- const tables=['jobs','generators','modules','versions','events','blobs','chunks','commands'];
+ const tables=['accounts','jobs','generators','modules','versions','events','blobs','chunks','commands'];
  const tx=work=>transact(tables,'readwrite',async s=>work(s,await root(s)));
  const read=(s,r,table,id)=>req(s(table).get([r.dataset,id]));
  const valid=v=>typeof v==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,199}$/.test(v);
@@ -99,6 +99,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const admitted=await serial(async()=>{
       const job=await tx(async(s,r)=>{
         const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
+        if(evidence.accountRevision!=null){const account=await read(s,r,'accounts',job.accountId);check(account?.rev===evidence.accountRevision,'STALE_ACCOUNT');}
         const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
         check(job.state!=='COMPLETE'&&job.state!=='FAILED','JOB_FINISHED');check(job.dueAt<=clock(),'NOT_DUE');
         check(job.effect?.boundary!=='POSSIBLE','RECONCILE_REQUIRED');
@@ -118,7 +119,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     });
     try {
       await admitted.sent;
-      const observation=await observe({operationId});check(observation?.matched===true,'OUTCOME_UNKNOWN');
+      const observation=await observe({operationId});check(observation?.matched===true||observation?.resolved===true&&observation.outcome==='FAILED','OUTCOME_UNKNOWN');
       return await api.reconcile(jobId,admitted.job.rev,operationId,observation);
     } catch {
       await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);if(current.effect?.operationId===operationId&&current.effect.boundary==='POSSIBLE')await save(s,r,current,{state:'HELD',recovery:{action:'RECONCILE',code:'OUTCOME_UNKNOWN'}},'EFFECT_OUTCOME','UNKNOWN');});
@@ -132,8 +133,9 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     check(job.effect?.operationId===operationId&&job.effect.boundary==='POSSIBLE','WRONG_OPERATION');
     const failed=observation?.resolved===true&&observation.outcome==='FAILED';
     check((observation?.matched===true||failed)&&observation.operationId===operationId,'OUTCOME_UNKNOWN');
+    if(failed&&observation.recoveryAction!=null)check(valid(observation.recoveryAction),'INVALID_OBSERVATION');
     if(failed)check(typeof observation.code==='string'&&/^[A-Z][A-Z0-9_]*$/.test(observation.code),'INVALID_OBSERVATION');
-    return save(s,r,job,{state:failed?'FAILED':'WAITING',recovery:failed?{action:'INSPECT_EXPORT',code:observation.code}:null,effect:{...job.effect,boundary:'OBSERVED',...failed?{outcome:'FAILED'}:{}},effects:[...(job.effects??[]),{operationId,kind:job.effect.kind,boundary:'OBSERVED',...failed?{outcome:'FAILED'}:{}}],needsCheck:true,lease:null},'EFFECT_READBACK',failed?'FAILED':'OBSERVED');
+    return save(s,r,job,{state:failed?'FAILED':'WAITING',recovery:failed?{action:observation.recoveryAction??'INSPECT_EXPORT',code:observation.code}:null,effect:{...job.effect,boundary:'OBSERVED',...failed?{outcome:'FAILED'}:{}},effects:[...(job.effects??[]),{operationId,kind:job.effect.kind,boundary:'OBSERVED',...failed?{outcome:'FAILED'}:{}}],needsCheck:true,lease:null},'EFFECT_READBACK',failed?'FAILED':'OBSERVED');
   }),
   list:({cursor=null,limit=50,search='',state=''}={})=>transact(['versions'],'readonly',async s=>{
     const r=await root(s),cut=cursor?.cut??r.sequence,after=cursor?.after??[-1,''];

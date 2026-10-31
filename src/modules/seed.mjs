@@ -1,5 +1,6 @@
 // Private first-install path: validate packaged bytes through the same strict
 // local-ZIP validator as user-selected modules; do not grant module code Core.
+import {bundledContract} from './bundled-contract.mjs';
 import {validatePackage} from './package.mjs';
 const ids=['pcms-accounts','pcms-discover','pcms-creator','pcms-deployer',
  'pcms-refresher','pcms-journal','pcms-backup'];
@@ -23,8 +24,8 @@ export async function seedBundled(core,{read=async path=>{
  for(const entry of index.packages){
   const candidate=await validatePackage(await read(bundledUrl(entry.id)));
   if(candidate.manifest.id!==entry.id||candidate.packageHash!==entry.packageHash||
-   candidate.manifestHash!==entry.manifestHash||candidate.manifest.version!==(entry.id==='pcms-journal'?'0.3.0':'0.1.0')||
-   JSON.stringify(candidate.manifest.capabilities)!==JSON.stringify(entry.id==='pcms-journal'?['journal.query','journal.export','journal.cleanup']:[])||candidate.manifest.pages.length||
+   candidate.manifestHash!==entry.manifestHash||candidate.manifest.version!==bundledContract[entry.id].version||
+   JSON.stringify(candidate.manifest.capabilities)!==JSON.stringify(bundledContract[entry.id].capabilities)||candidate.manifest.pages.length||
    candidate.manifest.entries.background!=='background.js')throw Error('BUNDLED_PACKAGE_MISMATCH');
   candidates.push(candidate);
  }
@@ -39,7 +40,7 @@ export async function seedBundled(core,{read=async path=>{
    refs.push(manifestHash,packageHash);
    rows.push({moduleId:c.manifest.id,name:c.manifest.name,version:c.manifest.version,
     enabled:true,generation:1,state:'READY',packageClass:
-    c.manifest.id==='pcms-journal'?'bundled-journal':c.manifest.id==='pcms-backup'?'bundled-backup':null,
+    bundledContract[c.manifest.id].packageClass,
     settings:{},settingsSchema:c.manifest.settingsSchema,manifest:c.manifest,
     packageHash,manifestHash,payload,refs});
   }

@@ -1,0 +1,10 @@
+// Packaged first-party baselines. Updates never replace an existing registry.
+export const bundledContract={
+ 'pcms-accounts':{version:'0.2.0',capabilities:['records.accounts','persona.prepare','persona.check','persona.open','persona.repair'],packageClass:'bundled-accounts'},
+ 'pcms-discover':{version:'0.1.0',capabilities:[],packageClass:null},
+ 'pcms-creator':{version:'0.1.0',capabilities:[],packageClass:null},
+ 'pcms-deployer':{version:'0.1.0',capabilities:[],packageClass:null},
+ 'pcms-refresher':{version:'0.1.0',capabilities:[],packageClass:null},
+ 'pcms-journal':{version:'0.3.0',capabilities:['journal.query','journal.export','journal.cleanup'],packageClass:'bundled-journal'},
+ 'pcms-backup':{version:'0.1.0',capabilities:[],packageClass:'bundled-backup'}
+};
