@@ -1,7 +1,6 @@
 // Private first-install path: validate packaged bytes through the same strict
 // local-ZIP validator as user-selected modules; do not grant module code Core.
 import {validatePackage} from './package.mjs';
-import {sha256} from '../core/records.mjs';
 const ids=['pcms-accounts','pcms-discover','pcms-creator','pcms-deployer',
  'pcms-refresher','pcms-journal','pcms-backup'];
 const pinId='bundled-first-install';
