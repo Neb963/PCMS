@@ -22,7 +22,7 @@
 ## Evidence and holds
 
 - T: **PASS**, all 7 focused tests locally and on GitHub at `8a14f0530285a59312a31a84d1ef80034c342570`. Vendor bytes, complete import graph, syntax and deterministic XPI checks pass.
-- B: **NOT TESTED**. Initial CI run `41214431538` failed before Firefox launch: the Mozilla checksum parser assumed every manifest row had exactly two whitespace fields. Match the exact archive path and first digest field; retain the SHA-512 comparison. Run the same installed journey after the parser repair.
+- B: **NOT TESTED**. Initial CI run `41214431538` failed before Firefox launch: the Mozilla checksum parser assumed every manifest row had exactly two whitespace fields. Match the exact archive path and first digest field; retain the SHA-512 comparison. Parser repair succeeded. Run `41214513710` installed the XPI persistently on Firefox 155.0b1 with normal sandbox preferences, then failed in the harness at the retired CustomizableUI module URL before the icon click. Use Firefox’s current `moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs` path; keep actual WebDriver toolbar clicks. Code review also found a cold-click status race; wait for the finite donor attachment result and clear a recovered toolbar error.
 - Connected Firefox information request returned MCP internal error before any browser operation. Use a clean local/CI Firefox environment if available; do not modify an existing user profile.
 - H: **NOT TESTED**, deferred to P42 for working bridge/protected contexts. No live provider or native route mutation is in scope.
 - This is an incomplete development checkpoint. Module seed/workflows and durable Core records belong to later phases.

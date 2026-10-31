@@ -56,7 +56,7 @@ def stop(sid, profile):
 def toolbar(session):
     context(session,'chrome')
     widget=script(session,"""
-      const {CustomizableUI}=ChromeUtils.importESModule('resource:///modules/CustomizableUI.sys.mjs');
+      const {CustomizableUI}=ChromeUtils.importESModule('moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs');
       const id='persona-route-manager_local-browser-action';
       CustomizableUI.addWidgetToArea(id,CustomizableUI.AREA_NAVBAR);
       const node=document.getElementById(id);

@@ -93,3 +93,13 @@ test('changed donor anchors reject the build instead of silently skipping a repa
   assert.throws(()=>transformDonor('background.js','unexpected'),/ANCHOR/);
   assert.throws(()=>transformDonor('lib/mullvad-native.js','unexpected'),/ANCHOR/);
 });
+test('cold status request waits for donor attachment and reports bootstrap failure without hanging',async()=>{
+  const fresh=await import('../src/host/bootstrap.mjs?cold-status-test');
+  const pending=fresh.hostStatus({permissions:{contains:async()=>false}});
+  await new Promise(resolve=>setTimeout(resolve,5));
+  fresh.attachDonor({initialize:async()=>{},security:()=>({ready:true,privacySafe:true}),nativeStatus:async()=>({installed:false})});
+  assert.equal((await pending).code,'BRIDGE_MISSING');
+  const failed=await import('../src/host/bootstrap.mjs?failed-cold-status-test');
+  const failure=failed.hostStatus({});failed.reportBootstrapFailure();
+  assert.equal((await failure).code,'DONOR_BOOTSTRAP_FAILED');
+});

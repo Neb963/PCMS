@@ -2,8 +2,13 @@
 export const PROFILE_KEY = 'pcmsHostProfile';
 let donor = null;
 let failure = null;
-export function attachDonor(value) { donor = value; }
-export function reportBootstrapFailure() { if (failure !== 'CLEAN_PROFILE_REQUIRED') failure = 'DONOR_BOOTSTRAP_FAILED'; }
+let settleStartup;
+const startup = new Promise(resolve => { settleStartup = resolve; });
+export function attachDonor(value) { donor = value; settleStartup(); }
+export function reportBootstrapFailure() {
+  if (failure !== 'CLEAN_PROFILE_REQUIRED') failure = 'DONOR_BOOTSTRAP_FAILED';
+  settleStartup();
+}
 
 export function createProfileCheck(api) {
   let pending;
@@ -32,6 +37,13 @@ export function createProfileCheck(api) {
 export const checkProfile = typeof browser === 'undefined' ? null : createProfileCheck(browser);
 
 export async function hostStatus(api) {
+  // A toolbar click can wake this page before the donor's dynamic import.
+  // Wait only for this request, never keep the event page alive in a loop.
+  if (!donor && !failure) {
+    let timer;
+    try { await Promise.race([startup, new Promise(resolve => { timer = setTimeout(resolve, 8000); })]); }
+    finally { clearTimeout(timer); }
+  }
   const result = {phase: 'P01', admission: 'BLOCKED', code: failure || 'DONOR_STARTING',
     donorReady: false, privacySafe: false, bridge: 'NOT_CHECKED',
     userScriptsPermission: false};

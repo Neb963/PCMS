@@ -10,6 +10,10 @@ export function registerShell(api) {
     shellFailure = 'DASHBOARD_OPEN_FAILED';
     void api.action.setBadgeText({text: '!'}).catch(() => {});
     void api.action.setTitle({title: 'PCMS dashboard could not open. Try the icon again.'}).catch(() => {});
+  }, () => {
+    shellFailure = null;
+    void api.action.setBadgeText({text: ''}).catch(() => {});
+    void api.action.setTitle({title: 'Open PCMS dashboard'}).catch(() => {});
   });
   action.register();
   // Register all wake listeners synchronously; no arbitrary keepalive alarm.
