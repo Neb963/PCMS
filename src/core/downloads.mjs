@@ -32,7 +32,7 @@ export function createDownloads({core,api,profileId,clock=Date.now,urls=URL}){
    let sent,didStart=false;try{sent=api.downloads.download({url:sourceUrl,filename:r.filename,saveAs:false,conflictAction:'uniquify'});}catch(error){sent=Promise.reject(error);}
    return Promise.resolve(sent).then(downloadId=>{didStart=true;return serial(r.id,async()=>{const current=await core.read('files',r.id);check(Number.isSafeInteger(downloadId),'EXPORT_ID_UNKNOWN');return save(current,{downloadId,sourceUrl,state:'IN_PROGRESS'},'IN_PROGRESS');});}).catch(async error=>{
     // API rejection does not silently authorize retry of an uncertain request.
-    await serial(r.id,async()=>{const current=await core.read('files',r.id);const known=!didStart&&['FILE_NO_SPACE','FILE_ACCESS_DENIED','FILE_FAILED','FILE_NAME_TOO_LONG'].includes(error?.message),code=known?(error.message==='FILE_NO_SPACE'?'DOWNLOAD_NO_SPACE':'DOWNLOAD_ACCESS_DENIED'):'DOWNLOAD_START_UNKNOWN';await save(current,{sourceUrl,state:known?'FAILED':'UNKNOWN',code},known?'FAILED':'UNKNOWN');});throw Error('DOWNLOAD_START_UNKNOWN');
+    await serial(r.id,async()=>{const current=await core.read('files',r.id);const known=!didStart,code=known?(error.message==='FILE_NO_SPACE'?'DOWNLOAD_NO_SPACE':['FILE_ACCESS_DENIED','FILE_FAILED','FILE_NAME_TOO_LONG'].includes(error.message)?'DOWNLOAD_ACCESS_DENIED':'DOWNLOAD_START_FAILED'):'DOWNLOAD_START_UNKNOWN';await save(current,{sourceUrl,state:known?'FAILED':'UNKNOWN',code},known?'FAILED':'UNKNOWN');});throw Error('DOWNLOAD_START_UNKNOWN');
    });
   },
   reconcile:id=>serial(id,async()=>{
