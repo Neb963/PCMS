@@ -36,6 +36,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(accountCall){
    if(binding.mode!=='background'||!binding.jobId||active.id!=='pcms-accounts'||!accountEffect||(args.name==='accounts.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
    const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.accountId!==binding.accountId||job.targetId!==binding.targetId||job.rev!==binding.expectedRevision)throw Error('STALE_REVISION');
+   if(['FAILED','COMPLETE'].includes(job.state))throw Error('JOB_FINISHED');
    const result=await accountEffect(job,args.name==='accounts.status');binding.expectedRevision=result.jobRevision;return result.value;
   }
   if(journalCall){

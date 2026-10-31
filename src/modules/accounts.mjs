@@ -69,6 +69,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
  }
  async function effect(job,reconcile=false){
   check(job.moduleId===MODULE&&job.accountId===job.targetId,'ACCOUNT_SCOPE_DENIED');let a=await core.read('accounts',job.accountId);check(a,'ACCOUNT_MISSING');check(a.state!=='ARCHIVED','ACCOUNT_ARCHIVED');
+  if(job.state==='FAILED')return result(job,'HELD',job.recovery?.code??'ACCOUNT_OPERATION_FAILED');
   if(a.flow.jobId!==job.id||a.flow.requestId!==job.input.requestId)return result(job,'HELD','ACCOUNT_COMMAND_SUPERSEDED');
   if(END.has(a.flow.stage))return result(job,'COMPLETE');
   const stage=a.flow.stage,operationId=job.id+'-'+stage,current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);
