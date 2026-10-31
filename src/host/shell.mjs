@@ -33,6 +33,12 @@ export function registerShell(api) {
   api.alarms.onAlarm.addListener(alarm => {if(alarm.name==='pcms-queue')void records.wake().catch(()=>{});});
   api.downloads.onChanged.addListener(() => {});
   api.runtime.onConnect.addListener(port => {
+    if(port.name==='pcms-core-rpc'){
+      if(!trustedShell(api,port.sender)){port.disconnect();return;}
+      const coreDocument=crypto.randomUUID(),sender={...port.sender,coreDocument};
+      port.onMessage.addListener(message=>{void records.handle(message,sender).then(response=>{try{port.postMessage({rpcId:message.rpcId,response});}catch{}});});
+      port.onDisconnect.addListener(()=>records.closeDocument(coreDocument));return;
+    }
     if (port.name !== STATUS_PORT) return;
     if (!trustedShell(api, port.sender)) { port.disconnect(); return; }
     void hostStatus(api).then(status => port.postMessage({...status, shellFailure, icon: action.status()}))

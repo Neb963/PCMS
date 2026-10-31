@@ -47,7 +47,11 @@ port.onDisconnect.addListener(()=>{clearTimeout(timeout);if(!received)show({code
 
 let disposeModule=null;
 let view={journalFilter:'',route:'home',scroll:0,workSearch:'',workState:''},pageCursor=null,nextCursor=null;
-const core=async(operation,extra={})=>{try{return await browser.runtime.sendMessage({channel:'pcms-core',operation,...extra});}catch{return {ok:false,code:'CORE_UNAVAILABLE'};}};
+let corePort=null;const requests=new Map();
+function connection(){if(corePort)return corePort;const port=browser.runtime.connect({name:'pcms-core-rpc'});corePort=port;
+ port.onMessage.addListener(({rpcId,response})=>{const request=requests.get(rpcId);if(request){requests.delete(rpcId);request(response);}});
+ port.onDisconnect.addListener(()=>{if(corePort===port)corePort=null;for(const resolve of requests.values())resolve({ok:false,code:'CORE_UNAVAILABLE'});requests.clear();});return port;}
+const core=(operation,extra={})=>new Promise(resolve=>{const rpcId=crypto.randomUUID();requests.set(rpcId,resolve);try{connection().postMessage({channel:'pcms-core',rpcId,operation,...extra});}catch{requests.delete(rpcId);resolve({ok:false,code:'CORE_UNAVAILABLE'});}});
 const errors={STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function failure(code){const n=node('p',errors[code]||'Core records are unavailable. Restart Firefox to check again.');n.setAttribute('role','alert');n.dataset.code=code;return n;}

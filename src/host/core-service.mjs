@@ -8,7 +8,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     const value=await open();
     await value.queue.boot();
     await value.record({step:'CORE_START',result:'COMPLETE'});
-    if(globalThis.document&&api){modules=createModuleHost({core:value,api,onDue:()=>schedule(value)});await modules.start();}
+    if(globalThis.document&&api){modules=createModuleHost({core:value,api,onDue:()=>schedule(value)});await modules.start();await modules.turn();}
     const due=await value.queue.deadline();if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}
     return value;
   })().catch(error=>{pending=null;throw error;});
@@ -17,7 +17,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       const value=await core();let result;
       switch(message?.operation) {
         case 'modules.list':{const rows=[];let cursor=null;do{const page=await value.list({table:'modules',limit:200,cursor});rows.push(...page.rows);cursor=page.cursor;}while(cursor);result=await Promise.all(rows.map(async p=>{const m=await value.read('modules',p.id);return {...p,pinned:m.pinned===true,pages:m.manifest?.pages??[]};}));break;}
-        case 'module.open':if(!modules)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};result=await modules.preparePage(message.id,message.pageId,sender);break;
+        case 'module.open':if(!sender.coreDocument)return {ok:false,code:'DOCUMENT_DENIED'};if(!modules)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};result=await modules.preparePage(message.id,message.pageId,sender);break;
         case 'module.rpc':if(!modules)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};result=await modules.pageRPC(message.token,message.message,sender);break;
         case 'module.pin':{const m=await value.read('modules',message.id);if(!m||!m.enabled)return {ok:false,code:'MODULE_DISABLED'};await value.mutate([{table:'modules',id:m.id,value:{...m,pinned:message.pinned===true},expectedRev:m.rev,refs:m.refs}],{step:'PIN_MODULE',result:'COMPLETE',moduleId:m.id});result={pinned:message.pinned===true};break;}
         case 'queue.status':result=await value.queue.status();break;
@@ -40,5 +40,5 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     } catch(error){return {ok:false,code:/^(MODULE_[A-Z_]+|PAGE_[A-Z_]+|DOCUMENT_DENIED|CAPABILITY_DENIED|TARGET_DENIED|ACTION_DENIED)$/.test(error?.message)?error.message:publicError(error)};}
   }
   async function schedule(value){const due=await value.queue.deadline();if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}}
-  return {start:core,handle,wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(modules)await modules.turn();await value.queue.acknowledgeWake(cut);await schedule(value);}};
+  return {start:core,handle,closeDocument:id=>modules?.closeDocument(id),wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(modules)await modules.turn();await value.queue.acknowledgeWake(cut);await schedule(value);}};
 }

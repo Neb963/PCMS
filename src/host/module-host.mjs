@@ -88,7 +88,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(running)return running;
   running=(async()=>{
    await start();const reconcileJobs=await core.queue.reconciliation();const recovery=reconcileJobs.find(j=>!reconciled.has(j.id));const job=recovery??await core.queue.next();if(!job)return;if(recovery)reconciled.add(job.id);
-   const runner=backgrounds.get(job.moduleId);if(!runner){await core.queue.transition(job.id,job.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'RUNNER_UNAVAILABLE'}});return;}
+   const runner=backgrounds.get(job.moduleId);if(!runner){if(recovery)return;await core.queue.transition(job.id,job.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'RUNNER_UNAVAILABLE'}});return;}
    runner.targetId=job.targetId;runner.accountId=job.accountId;runner.reconciling=!!recovery;
    try{const result=validateStep(await request(runner,'STEP',{job,reconcile:!!recovery}));
     const latestModule=await current(runner);if(!bindingAllows(runner,{source:runner.window,channel:runner.channel,current:latestModule,operation:'ui.view'}))throw Error('STALE_GENERATION');
@@ -104,15 +104,15 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
  async function preparePage(moduleId,pageId,sender){
   const module=await core.read('modules',moduleId);if(!module?.enabled||!module.manifest)throw Error('MODULE_DISABLED');
   const page=module.manifest.pages.find(p=>p.id===pageId);if(!page)throw Error('PAGE_MISSING');
-  const token=crypto.randomUUID(),senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.documentId,sender.url]);
+  const token=crypto.randomUUID(),senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.coreDocument,sender.url]);
   const binding={moduleId,hash:module.packageHash,generation:module.generation,bootId,mode:'page',pageId,channel:token,window:null,capabilities:new Set([...module.manifest.capabilities,'ui.view']),targetId:null,senderKey};
   pageBindings.set(token,binding);
   return {token,moduleId,pageId,generation:module.generation,hash:module.packageHash,title:page.title,html:sanitizeMarkup(await load(module,page.html),document),css:page.style?sanitizeStyle(await load(module,page.style)):'',script:await load(module,page.script)};
  }
  async function pageRPC(token,message,sender){
-  const binding=pageBindings.get(token),senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.documentId,sender.url]);
+  const binding=pageBindings.get(token),senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.coreDocument,sender.url]);
   if(!binding||binding.senderKey!==senderKey)throw Error('DOCUMENT_DENIED');
   return rpc(binding,{...message,channel:binding.channel});
  }
- return {start,turn,openPage,stop,preparePage,pageRPC,close(){window.removeEventListener('message',message);for(const b of frames){b.iframe.remove();for(const p of b.pending.values()){clearTimeout(p.timer);p.reject(Error('MODULE_STOPPED'));}}frames.clear();backgrounds.clear();}};
+ return {start,turn,openPage,stop,preparePage,pageRPC,closeDocument:id=>{for(const [token,b] of pageBindings)if(JSON.parse(b.senderKey)[3]===id)pageBindings.delete(token);},close(){window.removeEventListener('message',message);for(const b of frames){b.iframe.remove();for(const p of b.pending.values()){clearTimeout(p.timer);p.reject(Error('MODULE_STOPPED'));}}frames.clear();backgrounds.clear();}};
 }

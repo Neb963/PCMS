@@ -23,3 +23,5 @@ P04 T/B: NOT TESTED. P01–P03 accepted non-live evidence is reused where unchan
 Implement the bound sandbox RPC and finite runner over existing Core records/queue.
 
 Initial P04 source and four focused binding/step/CSS tests are implemented; T passes locally. Required B is still NOT TESTED. The module package fixture exists only in tests and is inserted through packaged Core storage for this pre-ZIP-host slice; no test capability or endpoint is shipped.
+
+Checkpoint `076131eccff09ea7e571fefca9b5404e51faede7` is pushed in draft PR #4. The installed module journey is now implemented. It uses a real test-only ZIP payload registry, clicks the sandbox page, checks denied credentials/browser/network, persists a draft and observes exact finite-job output timestamped before dashboard reopen after native termination/alarm wake. Document authority now uses an actual per-document runtime Port nonce and is revoked on disconnect; it does not infer identity from null origin or absent sender fields. B remains open until CI passes.
