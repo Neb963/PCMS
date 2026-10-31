@@ -29,7 +29,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const commandKey=[r.dataset,'queue:'+requestId],signature=JSON.stringify([logicalKey,moduleId,targetId,accountId,kind,jobSchema,input,[...refs].sort()]);
     const prior=await req(s('commands').get(commandKey));if(prior){check(prior.signature===signature,'REQUEST_CONFLICT');return read(s,r,'jobs',prior.jobId);}
     const existing=await req(s('jobs').index('logical').get([r.dataset,logicalKey]));
-    if(existing){check(existing.moduleId===moduleId&&existing.targetId===targetId&&existing.kind===kind&&JSON.stringify(existing.input)===JSON.stringify(input),'JOB_INPUT_CONFLICT');await req(s('commands').put({key:commandKey,jobId:existing.id,signature}));await append(s,r,event(existing,'ENQUEUE_JOB','EXISTING'));r.revision++;await req(s('meta').put(r));return existing;}
+    if(existing){check(existing.moduleId===moduleId&&existing.targetId===targetId&&existing.kind===kind&&JSON.stringify(existing.input)===JSON.stringify(input),'JOB_INPUT_CONFLICT');await req(s('commands').put({key:commandKey,jobId:existing.id,signature}));await append(s,r,event(existing,'ENQUEUE_JOB','EXISTING'));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return existing;}
     const module=await read(s,r,'modules',moduleId);check(module?.enabled===true,'MODULE_DISABLED');check(Number.isSafeInteger(module.generation)&&module.generation>0&&jobSchema===(module.jobSchema??1),'JOB_SCHEMA_INCOMPATIBLE');
     const job={id:crypto.randomUUID(),jobId:null,logicalKey,moduleId,targetId,accountId,kind,jobSchema,input:structuredClone(input),state:'WAITING',step:'QUEUED',dueAt,batchId,createdAt:clock(),generation:module.generation,needsCheck:true,effects:[]};job.jobId=job.id;
     // Intake is durable even while paused. It cannot dispatch until Resume.
@@ -39,7 +39,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   },
   pause:(requestId=crypto.randomUUID())=>{
    check(valid(requestId),'INVALID_REQUEST');const gate=++gateVersion;blocked=true; // Close admission synchronously before any storage await.
-   return tx(async(s,r)=>{const key=[r.dataset,'pause:'+requestId];if(await req(s('commands').get(key))){if(gate===gateVersion)blocked=r.paused;return {state:r.paused?'PAUSED':'RUNNING'};}r.paused=true;r.admissionEpoch=(r.admissionEpoch??0)+1;await req(s('commands').put({key}));await append(s,r,{step:'PAUSE_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));const running=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));return {state:running.some(j=>j.state==='RUNNING'&&j.effect?.boundary==='POSSIBLE')?'PAUSING':'PAUSED'};});
+   return tx(async(s,r)=>{const key=[r.dataset,'pause:'+requestId];if(await req(s('commands').get(key))){if(gate===gateVersion)blocked=r.paused;return {state:r.paused?'PAUSED':'RUNNING'};}r.paused=true;r.admissionEpoch=(r.admissionEpoch??0)+1;await req(s('commands').put({key}));await append(s,r,{step:'PAUSE_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));const running=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));return {state:running.some(j=>j.state==='RUNNING'&&j.effect?.boundary==='POSSIBLE')?'PAUSING':'PAUSED'};});
   },
   resume:async(requestId=crypto.randomUUID())=>{
    check(valid(requestId),'INVALID_REQUEST');const gate=++gateVersion;
@@ -51,7 +51,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     r.paused=false;r.admissionEpoch=(r.admissionEpoch??0)+1;
     const jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));
     for(const job of jobs)if(['WAITING','READY'].includes(job.state))await save(s,r,job,{state:'WAITING',needsCheck:true,dueAt:Math.max(clock(),job.dueAt??0),lease:null},'RESUME_JOB','WAITING');
-    await append(s,r,{step:'RESUME_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));return {state:'RUNNING',paused:false};
+    await append(s,r,{step:'RESUME_CORE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {state:'RUNNING',paused:false};
    });if(gate===gateVersion)blocked=result.paused;return result;
   },
   status:async()=>transact(['jobs'], 'readonly',async s=>{const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))),running=jobs.filter(j=>j.state==='RUNNING'&&j.effect?.boundary==='POSSIBLE').length;return {state:r.paused?(running?'PAUSING':'PAUSED'):blocked?'BLOCKED':'RUNNING',paused:r.paused,active:running,bootId};}),
@@ -150,7 +150,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     for(const job of jobs)if(job.batchId===batchId)result[job.state==='COMPLETE'?'completed':job.state==='RUNNING'?'active':job.state==='HELD'||job.state==='FAILED'?'held':'waiting']++;
     return result;
   }),
-  acknowledgeWake:()=>tx(async(s,r)=>{r.lastWake=clock();r.wakeSequence=r.sequence+1;await append(s,r,{step:'QUEUE_WAKE',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));}),
+  acknowledgeWake:()=>tx(async(s,r)=>{r.lastWake=clock();r.wakeSequence=r.sequence+1;await append(s,r,{step:'QUEUE_WAKE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
   deadline:()=>transact(['jobs','modules'],'readonly',async s=>{
     const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));let next=null;
     for(const job of jobs)if(['WAITING','READY'].includes(job.state)&&(job.dueAt>(r.lastWake??-Infinity)||job.sequence>(r.wakeSequence??0))){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
