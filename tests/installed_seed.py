@@ -101,7 +101,7 @@ def main():
     AddonManager.getAddonByID(arguments[0]).then(a=>done({version:a.version,active:a.isActive,temporary:a.temporarilyInstalled}));
    """,[ID],True);assert installed=={'version':'0.6.1','active':True,'temporary':False},installed;context(sid,'content')
    toolbar(sid);dashboard(sid);wait(lambda:inspect(sid)==before,30)
-   settings(sid);assert all(module.split('pcms-')[1].capitalize() in script(sid,"return document.getElementById('records').textContent") for module in BUILTINS)
+   settings(sid);wait(lambda:all(module.split('pcms-')[1].capitalize() in script(sid,"return document.getElementById('records').textContent") for module in BUILTINS),20)
    receipt['checks'].append('real-in-place-extension-update-version-0.6.1/no-reseed-preserves-user-registry')
    (OUT/'seed.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')));receipt['result']='PASS'
   except Exception as error:
