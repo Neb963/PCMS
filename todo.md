@@ -18,3 +18,5 @@ P01–P07 are implemented and merged. P07 [PR #7](https://github.com/Neb963/PCMS
 No P08 code or tests exist yet. Required T/B/DSK are NOT TESTED. Large-volume/interrupted-download stress remains P40/P41. Retention/deletion is P09. Live G/H/P1–P5 remain NOT TESTED and require named disposable authorization; no such action is planned here.
 
 Implement the Core Downloads/receipt boundary and focused tests first, with meaningful pushed checkpoints. Continue sequentially after P08 verification/merge; do not stop for interphase confirmation.
+
+P07 postmerge [41227136530](https://github.com/Neb963/PCMS/actions/runs/41227136530) passed T/B on exact merged main. P08 first code checkpoint: Core Downloads now persists content-addressed bytes and file receipts before dispatch, reconciles exact extension/path/time/size identity, and retains Unknown/ambiguous/interrupted states without replay. Core has a profile identity independent of dataset IDs. Five focused Downloads checks and the affected records tests pass. Journal workflow/UI and required B/DSK remain unimplemented/unpassed.

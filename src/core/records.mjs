@@ -79,7 +79,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
   await transact([], 'readwrite',async s=>{
     const saved=await req(s('meta').get('root'));
     requireCore(!saved||(saved.schema===1&&id(saved.dataset)&&Number.isSafeInteger(saved.sequence)&&Number.isSafeInteger(saved.revision)),'UNSUPPORTED_DATASET');
-    if(!saved)await req(s('meta').put({key:'root',schema:1,dataset:crypto.randomUUID(),sequence:0,revision:0,paused:false,createdAt:clock(),updatedAt:clock()}));
+    if(!saved)await req(s('meta').put({key:'root',schema:1,dataset:crypto.randomUUID(),profileId:crypto.randomUUID(),sequence:0,revision:0,paused:false,createdAt:clock(),updatedAt:clock()}));
   });
   const root=s=>req(s('meta').get('root'));
   const append=async(s,r,event)=>{
@@ -117,6 +117,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }
     r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {revision:r.revision,sequence};
   };
+  await transact(['events'],'readwrite',async s=>{const r=await root(s);if(!r.profileId){r.profileId=crypto.randomUUID();await append(s,r,{step:'PROFILE_IDENTITY',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}});
   const core={
     close:()=>db.close(),
     status:()=>transact([], 'readonly',s=>root(s)),
