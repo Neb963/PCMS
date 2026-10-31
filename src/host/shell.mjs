@@ -6,7 +6,7 @@ export function trustedShell(api, sender) {
   return sender?.id === api.runtime.id && sender.url?.split(/[?#]/)[0] === api.runtime.getURL('ui/index.html');
 }
 export function registerShell(api) {
-  const records=createCoreService();
+  const records=createCoreService({alarms:api.alarms});
   // Register synchronously, then start durable recording without a UI.
   api.runtime.onMessage?.addListener((message,sender)=>{
     if(message?.channel!=='pcms-core')return;
@@ -30,7 +30,7 @@ export function registerShell(api) {
   // Register all wake listeners synchronously; no arbitrary keepalive alarm.
   api.runtime.onStartup.addListener(() => {});
   api.runtime.onInstalled.addListener(() => {});
-  api.alarms.onAlarm.addListener(() => {});
+  api.alarms.onAlarm.addListener(alarm => {if(alarm.name==='pcms-queue')void records.wake().catch(()=>{});});
   api.downloads.onChanged.addListener(() => {});
   api.runtime.onConnect.addListener(port => {
     if (port.name !== STATUS_PORT) return;

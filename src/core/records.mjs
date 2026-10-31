@@ -1,3 +1,4 @@
+import {createQueue} from './queue.mjs';
 // The only PCMS record store. Callers are packaged Core services, never ZIP code.
 export const DATABASE = 'pcms-core';
 export const TABLES = ['accounts','generators','jobs','modules','files'];
@@ -31,7 +32,7 @@ export function safeEvent(event) {
 const fields={
   accounts:['accountId','label','state','principalLabel','personaUid','observedAt','holdCode'],
   generators:['generatorId','slug','accountId','repositoryId','folder','listing','state','observedAt','holdCode'],
-  jobs:['jobId','logicalKey','moduleId','targetId','accountId','state','step','dueAt','recovery','batchId'],
+  jobs:['jobId','logicalKey','moduleId','targetId','accountId','state','step','dueAt','recovery','batchId','kind','effect'],
   modules:['moduleId','name','version','enabled','generation','state'],
   files:['captureId','type','automatic','filename','bytes','sha256','state','completedAt'],
   events:['sequence','time','operationId','jobId','targetId','moduleId','step','result','code','severity','evidence']
@@ -42,26 +43,29 @@ export function project(table,row) {
   const out={id:row.id,rev:row.rev,sequence:row.sequence};
   for(const key of fields[table])if(row[key]!==undefined)out[key]=structuredClone(row[key]);
   // Typed recovery contains no opaque module/provider data.
+  if(out.effect)out.effect={operationId:out.effect.operationId,boundary:out.effect.boundary,kind:out.effect.kind};
   if(out.recovery) out.recovery={action:id(out.recovery.action)?out.recovery.action:'INSPECT',code:id(out.recovery.code)?out.recovery.code:'UNKNOWN'};
   return out;
 }
 export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clock=Date.now}={}) {
-  const opening=indexedDB.open(name,1);
+  const opening=indexedDB.open(name,2);
   opening.onupgradeneeded=()=>{
     const db=opening.result;
-    for(const name of STORES)db.createObjectStore(name,{keyPath:name==='meta'?'key':'key'});
+    for(const name of STORES)if(!db.objectStoreNames.contains(name))db.createObjectStore(name,{keyPath:name==='meta'?'key':'key'});
     for(const table of TABLES) {
       const s=opening.transaction.objectStore(table);
-      s.createIndex('dataset','dataset');
-      s.createIndex('updated',['dataset','sequence']);
-      for(const field of ({accounts:['state'],generators:['accountId','listing','state'],jobs:['moduleId','state','dueAt','targetId','accountId'],modules:['state'],files:['state','type']})[table])s.createIndex(field,['dataset',field]);
+      if(!s.indexNames.contains('dataset'))s.createIndex('dataset','dataset');
+      if(!s.indexNames.contains('updated'))s.createIndex('updated',['dataset','sequence']);
+      for(const field of ({accounts:['state'],generators:['accountId','listing','state'],jobs:['moduleId','state','dueAt','targetId','accountId'],modules:['state'],files:['state','type']})[table])if(!s.indexNames.contains(field))s.createIndex(field,['dataset',field]);
     }
     for(const [table,definitions] of Object.entries({accounts:{persona:'personaKey',principal:'principalKey',exit:'exitKey'},generators:{slug:'slugKey',folder:'folderKey'},jobs:{logical:'logicalKeyUnique'}})) {
-      for(const [index,field] of Object.entries(definitions))opening.transaction.objectStore(table).createIndex(index,['dataset',field],{unique:true});
+      for(const [index,field] of Object.entries(definitions))if(!opening.transaction.objectStore(table).indexNames.contains(index))opening.transaction.objectStore(table).createIndex(index,['dataset',field],{unique:true});
     }
     const e=opening.transaction.objectStore('events');
-    for(const field of ['time','targetId','jobId','moduleId','severity'])e.createIndex(field,['dataset',field,'sequence']);
-    e.createIndex('tokens','tokenKeys',{multiEntry:true});
+    for(const field of ['time','targetId','jobId','moduleId','severity'])if(!e.indexNames.contains(field))e.createIndex(field,['dataset',field,'sequence']);
+    if(!e.indexNames.contains('tokens'))e.createIndex('tokens','tokenKeys',{multiEntry:true});
+    const versions=opening.transaction.objectStore('versions');
+    if(!versions.indexNames.contains('workOrder'))versions.createIndex('workOrder',['dataset','workRank','id','sequence']);
   };
   const db=await req(opening);
   db.onversionchange=()=>db.close();
@@ -75,7 +79,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
   await transact([], 'readwrite',async s=>{
     const saved=await req(s('meta').get('root'));
     requireCore(!saved||(saved.schema===1&&id(saved.dataset)&&Number.isSafeInteger(saved.sequence)&&Number.isSafeInteger(saved.revision)),'UNSUPPORTED_DATASET');
-    if(!saved)await req(s('meta').put({key:'root',schema:1,dataset:crypto.randomUUID(),sequence:0,revision:0,paused:false}));
+    if(!saved)await req(s('meta').put({key:'root',schema:1,dataset:crypto.randomUUID(),sequence:0,revision:0,paused:false,createdAt:clock(),updatedAt:clock()}));
   });
   const root=s=>req(s('meta').get('root'));
   const append=async(s,r,event)=>{
@@ -104,20 +108,20 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       requireCore((old?.rev??0)===expectedRev,'STALE_REVISION');
       const closure=await checkedRefs(s,r,refs);
       const rev=(old?.rev??0)+1;
-      const row={...structuredClone(value),key:[r.dataset,recordId],dataset:r.dataset,id:recordId,schema:1,rev,sequence,refs:closure,deleted:value===null};
+      const row={...structuredClone(value),key:[r.dataset,recordId],dataset:r.dataset,id:recordId,schema:1,rev,sequence,createdAt:old?.createdAt??clock(),updatedAt:clock(),refs:closure,deleted:value===null};
       if(table==='accounts')for(const [field,raw] of [['personaKey',row.personaUid],['principalKey',row.expectedPrincipal],['exitKey',row.observedExit]])if(raw!==undefined)row[field]=raw;
       if(table==='generators'){if(row.slug)row.slugKey=row.slug;if(row.repositoryId&&row.folder)row.folderKey=[row.repositoryId,row.folder];}
-      if(table==='jobs'&&row.logicalKey)row.logicalKeyUnique=row.logicalKey;
+      if(table==='jobs'){if(row.logicalKey)row.logicalKeyUnique=row.logicalKey;row.workRank=['HELD','FAILED'].includes(row.state)?0:row.state==='RUNNING'?1:['WAITING','READY'].includes(row.state)?2:3;}
       if(value===null)await req(s(table).delete(row.key));else await req(s(table).put(row));
       await req(s('versions').add({...row,key:[r.dataset,table,recordId,sequence],table}));
     }
-    r.revision++;await req(s('meta').put(r));return {revision:r.revision,sequence};
+    r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {revision:r.revision,sequence};
   };
   const core={
     close:()=>db.close(),
     status:()=>transact([], 'readonly',s=>root(s)),
     mutate:(changes,event)=>transact([...TABLES,'events','versions','blobs','chunks'],'readwrite',async s=>writeRows(s,await root(s),changes,event)),
-    record:event=>transact(['events'],'readwrite',async s=>{const r=await root(s);const sequence=await append(s,r,event);r.revision++;await req(s('meta').put(r));return {sequence,revision:r.revision};}),
+    record:event=>transact(['events'],'readwrite',async s=>{const r=await root(s);const sequence=await append(s,r,event);r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {sequence,revision:r.revision};}),
     // Private packaged service access. This object is never returned by RPC.
     read: (table,recordId)=>transact([table],'readonly',async s=>{requireCore(TABLES.includes(table),'READ_DENIED');const r=await root(s);return req(s(table).get([r.dataset,recordId]));}),
     get:async(table,recordId)=>project(table,await core.read(table,recordId)),
@@ -154,30 +158,32 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       requireCore(id(name)&&id(requestId),'INVALID_VIEW');const r=await root(s);
       const previous=await req(s('commands').get([r.dataset,requestId]));if(previous)return previous.result;
       // Views/drafts are never placed in events or generic public record queries.
+      const old=await req(s('views').get([r.dataset,name]));
       const sequence=await append(s,r,{step:'SAVE_VIEW',result:'COMPLETE',targetId:name});
-      await req(s('views').put({key:[r.dataset,name],value:structuredClone(value),sequence}));r.revision++;
-      const result={revision:r.revision,sequence};await req(s('commands').put({key:[r.dataset,requestId],result}));await req(s('meta').put(r));return result;
+      await req(s('views').put({key:[r.dataset,name],value:structuredClone(value),sequence,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;
+      const result={revision:r.revision,sequence};await req(s('commands').put({key:[r.dataset,requestId],result}));await req(s('meta').put({...r,updatedAt:clock()}));return result;
     }),
     view:name=>transact(['views'],'readonly',async s=>{requireCore(id(name),'INVALID_VIEW');const r=await root(s);return (await req(s('views').get([r.dataset,name])))?.value??null;}),
     credentials:{
-      set:(name,value)=>transact(['credentials','events'],'readwrite',async s=>{requireCore(id(name)&&typeof value==='string','INVALID_CREDENTIAL');const r=await root(s);await append(s,r,{step:'SET_CREDENTIAL',result:'COMPLETE'});await req(s('credentials').put({key:[r.dataset,name],value}));r.revision++;await req(s('meta').put(r));}),
+      set:(name,value)=>transact(['credentials','events'],'readwrite',async s=>{requireCore(id(name)&&typeof value==='string','INVALID_CREDENTIAL');const r=await root(s);await append(s,r,{step:'SET_CREDENTIAL',result:'COMPLETE'});const old=await req(s('credentials').get([r.dataset,name]));await req(s('credentials').put({key:[r.dataset,name],value,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
       get:name=>transact(['credentials'],'readonly',async s=>{const r=await root(s);return (await req(s('credentials').get([r.dataset,name])))?.value??null;})
     }
   };
-  attachBlobs(core,transact,root,checkedRefs,append);
+  attachBlobs(core,transact,root,checkedRefs,append,clock);
+  core.queue=createQueue({transact,root,writeRows,append,req,check:requireCore,clock});
   return core;
 }
-function attachBlobs(core,transact,root,checkedRefs,append) {
+function attachBlobs(core,transact,root,checkedRefs,append,clock) {
   core.putBytes=async (bytes,pinId=null,refs=[])=>{
     requireCore(ArrayBuffer.isView(bytes)&&Object.prototype.toString.call(bytes)==='[object Uint8Array]','INVALID_BYTES');
     bytes=new Uint8Array(bytes);const blobId=await sha256(bytes);
     return transact(['blobs','chunks','events','pins'],'readwrite',async s=>{
       const r=await root(s),key=[r.dataset,blobId];
       if(pinId){const pinKey=[r.dataset,pinId],old=await req(s('pins').get(pinKey));await req(s('pins').put({key:pinKey,refs:[...new Set([...(old?.refs??[]),blobId])]}));}
-      if(await req(s('blobs').get(key))){if(pinId){await append(s,r,{step:'PIN_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put(r));}return blobId;}
+      if(await req(s('blobs').get(key))){if(pinId){await append(s,r,{step:'PIN_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}return blobId;}
       const chunkSize=1024*1024,chunks=Math.ceil(bytes.length/chunkSize);
       for(let i=0;i<chunks;i++)await req(s('chunks').add({key:[r.dataset,blobId,i],bytes:bytes.slice(i*chunkSize,(i+1)*chunkSize)}));
-      await req(s('blobs').add({key,dataset:r.dataset,blobId,bytes:bytes.length,chunks,refs}));await append(s,r,{step:'STORE_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put(r));return blobId;
+      await req(s('blobs').add({key,dataset:r.dataset,blobId,bytes:bytes.length,chunks,refs}));await append(s,r,{step:'STORE_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return blobId;
     });
   };
   core.bytes=blobId=>transact(['blobs','chunks'],'readonly',async s=>{
@@ -202,8 +208,8 @@ function attachBlobs(core,transact,root,checkedRefs,append) {
     let previous='';for(const file of manifest){requireCore(file.path>previous&&file.sha256===file.blobId,'INVALID_MANIFEST');previous=file.path;requireCore((await core.bytes(file.blobId)).length===file.bytes,'SOURCE_LENGTH_MISMATCH');}
     return manifest;
   };
-  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);const closure=await checkedRefs(s,r,refs);await req(s('pins').put({key:[r.dataset,captureId],refs:closure}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put(r));});
-  core.releasePin=captureId=>transact(['pins','events'],'readwrite',async s=>{const r=await root(s);await req(s('pins').delete([r.dataset,captureId]));await append(s,r,{step:'RELEASE_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put(r));});
+  core.pin=(captureId,refs)=>transact(['pins','blobs','chunks','events'],'readwrite',async s=>{requireCore(id(captureId),'INVALID_CAPTURE');const r=await root(s);const closure=await checkedRefs(s,r,refs);await req(s('pins').put({key:[r.dataset,captureId],refs:closure}));await append(s,r,{step:'PIN_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
+  core.releasePin=captureId=>transact(['pins','events'],'readwrite',async s=>{const r=await root(s);await req(s('pins').delete([r.dataset,captureId]));await append(s,r,{step:'RELEASE_CAPTURE',result:'COMPLETE',targetId:captureId});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
   core.collect=()=>transact(['versions','pins','blobs','chunks','events'],'readwrite',async s=>{
     const r=await root(s),refs=new Set();
     // Retained versions are history. History pruning must explicitly release
@@ -214,6 +220,6 @@ function attachBlobs(core,transact,root,checkedRefs,append) {
     }
     let c=await req(s('blobs').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper]))),removed=0;
     while(c){if(!refs.has(c.value.blobId)){for(let i=0;i<c.value.chunks;i++)await req(s('chunks').delete([r.dataset,c.value.blobId,i]));await req(c.delete());removed++;}c=await req(c.continue()||c.request);}
-    await append(s,r,{step:'COLLECT_BLOBS',result:'COMPLETE'});r.revision++;await req(s('meta').put(r));return {removed};
+    await append(s,r,{step:'COLLECT_BLOBS',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {removed};
   });
 }
