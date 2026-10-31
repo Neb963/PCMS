@@ -51,12 +51,12 @@ jobs:
             bash scripts/setup-firefox.sh
           fi
       - run: npm run build
-      - name: Persistent queue journey (normal sandbox)
-        run: python3 tests/installed_queue.py build/pcms-dev.xpi
+      - name: Persistent module journey (normal sandbox)
+        run: python3 tests/installed_modules.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-queue-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-modules-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json

@@ -1,9 +1,10 @@
+import {openModulePage} from './module-page.mjs';
 const titles = {home:'Home',generators:'Generators',accounts:'Accounts',refresher:'Refresher',work:'Work',other:'Other',settings:'Settings'};
 const notes = {
   home:'Account and generator operations are not implemented yet.',
   generators:'Generator management is not implemented yet.', accounts:'Account management is not implemented yet.',
   refresher:'Refresher is not implemented yet.', work:'Work is kept when this dashboard closes.',
-  other:'No module pages are installed.', settings:'Module and connection settings are not implemented yet.'
+  other:'', settings:'Connections and module ZIP installation are not implemented yet.'
 };
 const messages = {
   DONOR_STARTING:'PersonaMonkey is starting. Protected work stays blocked.',
@@ -18,12 +19,14 @@ const messages = {
   STATUS_UNAVAILABLE:'Startup status is unavailable. Restart the clean profile to check again.'
 };
 function route() {
-  const key = location.hash.slice(1).split('/')[0] in titles ? location.hash.slice(1).split('/')[0] : 'home';
-  document.getElementById('heading').textContent = titles[key];
-  document.getElementById('page-note').textContent = notes[key];
+  const primary=location.hash.slice(1).split('/')[0];
+  const key=primary==='module'?'module':primary in titles?primary:'home';
+  document.getElementById('heading').textContent = titles[key]??'Module';
+  document.getElementById('page-note').textContent = notes[key]??'';
   void renderRecords(key);
   for (const link of document.querySelectorAll('nav a')) {
-    if (link.hash === '#'+key) link.setAttribute('aria-current','page');
+    const selected=key==='module'?(link.dataset.pinnedModule===location.hash.split('/')[1]||link.hash==='#other'&&![...document.querySelectorAll('[data-pinned-module]')].some(a=>a.dataset.pinnedModule===location.hash.split('/')[1])):link.hash==='#'+key;
+    if (selected) link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
   }
 }
@@ -43,8 +46,13 @@ const timeout=setTimeout(()=>{if(!received)show({code:'STATUS_UNAVAILABLE',admis
 port.onMessage.addListener(status=>{received=true;clearTimeout(timeout);show(status);port.disconnect();});
 port.onDisconnect.addListener(()=>{clearTimeout(timeout);if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});});
 
+let disposeModule=null;
 let view={journalFilter:'',route:'home',scroll:0,workSearch:'',workState:''},pageCursor=null,nextCursor=null;
-const core=async(operation,extra={})=>{try{return await browser.runtime.sendMessage({channel:'pcms-core',operation,...extra});}catch{return {ok:false,code:'CORE_UNAVAILABLE'};}};
+let corePort=null;const requests=new Map();
+function connection(){if(corePort)return corePort;const port=browser.runtime.connect({name:'pcms-core-rpc'});corePort=port;
+ port.onMessage.addListener(({rpcId,response})=>{const request=requests.get(rpcId);if(request){requests.delete(rpcId);request(response);}});
+ port.onDisconnect.addListener(()=>{if(corePort===port)corePort=null;for(const resolve of requests.values())resolve({ok:false,code:'CORE_UNAVAILABLE'});requests.clear();});return port;}
+const core=(operation,extra={})=>new Promise(resolve=>{const rpcId=crypto.randomUUID();requests.set(rpcId,resolve);try{connection().postMessage({channel:'pcms-core',rpcId,operation,...extra});}catch{requests.delete(rpcId);resolve({ok:false,code:'CORE_UNAVAILABLE'});}});
 const errors={STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function failure(code){const n=node('p',errors[code]||'Core records are unavailable. Restart Firefox to check again.');n.setAttribute('role','alert');n.dataset.code=code;return n;}
@@ -55,7 +63,9 @@ async function persist(){
 }
 async function renderRecords(key){
  void queueStatus();
- const area=document.getElementById('records');area.replaceChildren();
+ const area=document.getElementById('records');if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
+ if(key==='module'){await renderModule(area);return;}
+ if(key==='other'){await renderOther(area);return;}
  if(key==='home'){
    const response=await core('counts');if(location.hash.slice(1)&&location.hash!=='#home')return;
    if(!response.ok){area.append(failure(response.code));return;}
@@ -64,6 +74,8 @@ async function renderRecords(key){
    area.append(counts,node('p','Directory visibility: Not measured'));
  }else if(key==='work'){await renderWork(area);
  }else if(key==='settings'){
+   if(location.hash.split('/')[1]==='modules'){await renderModuleSettings(area);return;}
+   const modulesLink=node('a','Modules');modulesLink.href='#settings/modules';area.append(modulesLink);
    const title=node('h2','Journal'),label=node('label','Filter recorded work'),input=node('input');input.id='journal-filter';input.value=view.journalFilter;label.htmlFor=input.id;
    const save=node('button','Save view');save.id='save-view';save.type='button';
    const progress=node('p');progress.id='view-result';progress.setAttribute('role','status');
@@ -77,7 +89,7 @@ async function renderRecords(key){
 }
 const initial=await core('view.get');
 if(initial.ok&&initial.result){view=initial.result;if(!location.hash)location.hash='#'+view.route;}
-route();
+await updateModuleNavigation();route();
 
 async function queueStatus(){
  const response=await core('queue.status'),status=document.getElementById('queue-status'),button=document.getElementById('pause-core');
@@ -111,3 +123,34 @@ async function renderWork(area){
  input.addEventListener('input',()=>{view.workSearch=input.value;cursor=null;void persist();void load();});select.addEventListener('change',()=>{view.workState=select.value;cursor=null;void persist();void load();});
  next.addEventListener('click',()=>{cursor=nextPage;void load();});area.append(label,input,select,list,next);await load();
 }
+
+async function moduleRecords(){const response=await core('modules.list');return response.ok?response.result:[];}
+const moduleURL=m=>'#module/'+m.id+'/'+m.pages[0].id;
+async function updateModuleNavigation(){
+ for(const link of document.querySelectorAll('[data-pinned-module]'))link.remove();
+ const settings=document.querySelector('nav a[href="#settings"]');for(const module of await moduleRecords())if(module.enabled&&module.pinned&&module.pages.length){const a=node('a',module.name??module.id);a.href=moduleURL(module);a.dataset.pinnedModule=module.id;settings.before(a);}
+}
+async function renderOther(area){
+ const modules=(await moduleRecords()).filter(m=>m.enabled&&!m.pinned&&m.pages.length),label=node('label','Find a module'),input=node('input'),list=node('ul');label.htmlFor='module-search';input.id='module-search';
+ const draw=()=>{list.replaceChildren();for(const m of modules.filter(m=>(m.name??m.id).toLowerCase().includes(input.value.toLowerCase()))){const li=node('li'),a=node('a',m.name??m.id);a.href=moduleURL(m);li.append(a);list.append(li);}if(!list.children.length)list.append(node('li','No matching modules.'));};input.addEventListener('input',draw);area.append(label,input,list);draw();
+}
+async function renderModuleSettings(area){
+ area.append(node('h2','Modules'));const selected=location.hash.split('/')[2];
+ for(const module of await moduleRecords())if(!selected||selected===module.id){const section=node('section'),title=node('h3',module.name??module.id);section.append(title,node('p',(module.version??'Unknown version')+' · '+(module.enabled?'Enabled':'Disabled')));
+  if(module.enabled&&module.pages.length){const label=node('label'),check=node('input');check.type='checkbox';check.checked=module.pinned;check.className='module-pin';check.dataset.module=module.id;label.append(check,document.createTextNode(' Show in primary navigation'));check.addEventListener('change',async()=>{const result=await core('module.pin',{id:module.id,pinned:check.checked});if(result.ok)await updateModuleNavigation();else{check.checked=!check.checked;section.append(failure(result.code));}});section.append(label);}
+  area.append(section);
+ }
+}
+async function renderModule(area){
+ const [,moduleId,requestedPage]=location.hash.slice(1).split('/'),module=(await moduleRecords()).find(m=>m.id===moduleId),pageId=requestedPage??module?.pages[0]?.id;
+ const error=()=>{area.replaceChildren(node('p','This module page could not open.'));const link=node('a','Open Modules');link.href='#settings/modules/'+moduleId;area.append(link);};
+ if(!module?.enabled||!pageId){error();return;}
+ document.getElementById('heading').textContent=module.name??moduleId;
+ if(module.pages.length>1){const menu=node('div');menu.setAttribute('role','navigation');menu.setAttribute('aria-label',module.name+' pages');for(const page of module.pages){const a=node('a',page.title);a.href='#module/'+moduleId+'/'+page.id;menu.append(a,document.createTextNode(' '));}area.append(menu);}
+ const container=node('div');area.append(container);
+ try{disposeModule=await openModulePage({core,moduleId,pageId,container,onError:error});}catch{error();}
+}
+
+// Refresh only the visible dashboard status; no background keepalive.
+setInterval(()=>{if(document.visibilityState==='visible')void queueStatus();},2000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void queueStatus();});

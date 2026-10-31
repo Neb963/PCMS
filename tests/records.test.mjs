@@ -96,6 +96,7 @@ test('search finds matches beyond early pages and cursor cannot cross query/data
 test('packaged RPC exposes no raw record, credential, mutation or module checkpoint access',async t=>{
  const {createCoreService}=await import('../src/host/core-service.mjs');const {core}=await fixture(t);
  const service=createCoreService({open:async()=>core});
+ assert.equal((await service.handle({operation:'module.open',id:'fixture',pageId:'main'})).code,'DOCUMENT_DENIED');
  for(const operation of ['credentials','read','mutate','source','blobs','view.delete'])assert.equal((await service.handle({operation})).code,'OPERATION_DENIED');
  const result=await service.handle({operation:'view.save',requestId:'request',value:{journalFilter:'MATCH',route:'settings',scroll:0}});assert.ok(result.ok);
  assert.equal((await service.handle({operation:'view.get'})).result.journalFilter,'MATCH');

@@ -73,6 +73,8 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const generator=await read(s,r,'generators',job.targetId);check(!generator?.writerHold||generator.writerHold.jobId===jobId,'WRITER_HELD');
     return save(s,r,job,{lease:null},'RELEASE_WRITER','COMPLETE',generator?[change('generators',generator,{...generator,writerHold:null})]:[]);
   }),
+  reconciliation:()=>transact(['jobs','modules'],'readonly',async s=>{const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));const out=[];for(const job of jobs)if(job.state==='HELD'&&['RECONCILE','RECHECK'].includes(job.recovery?.action)){const m=await read(s,r,'modules',job.moduleId);if(m?.enabled&&m.generation===job.generation)out.push(job);}return out;}),
+  reconciliationCheckpoint:(jobId,expectedRev,checkpoint)=>tx(async(s,r)=>{const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');return save(s,r,job,{checkpoint,state:'HELD'},'RECONCILE_CHECKPOINT','UNKNOWN');}),
   next:async()=>tx(async(s,r)=>{
     const jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))),modules=await req(s('modules').index('dataset').getAll(IDBKeyRange.only(r.dataset))),byId=new Map(modules.map(m=>[m.id,m]));
     const ready=jobs.filter(j=>['WAITING','READY'].includes(j.state)&&j.dueAt<=clock()&&byId.get(j.moduleId)?.enabled===true&&(!r.paused||maintenance(j,byId.get(j.moduleId))));
@@ -150,7 +152,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     for(const job of jobs)if(job.batchId===batchId)result[job.state==='COMPLETE'?'completed':job.state==='RUNNING'?'active':job.state==='HELD'||job.state==='FAILED'?'held':'waiting']++;
     return result;
   }),
-  acknowledgeWake:()=>tx(async(s,r)=>{r.lastWake=clock();r.wakeSequence=r.sequence+1;await append(s,r,{step:'QUEUE_WAKE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
+  acknowledgeWake:(cut=null)=>tx(async(s,r)=>{r.lastWake=clock();r.wakeSequence=cut??r.sequence+1;await append(s,r,{step:'QUEUE_WAKE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
   deadline:()=>transact(['jobs','modules'],'readonly',async s=>{
     const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));let next=null;
     for(const job of jobs)if(['WAITING','READY'].includes(job.state)&&(job.dueAt>(r.lastWake??-Infinity)||job.sequence>(r.wakeSequence??0))){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
