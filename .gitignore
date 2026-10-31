@@ -1,0 +1,37 @@
+# Dependencies and local tool environments
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pnpm-store/
+
+# Generated build/test outputs
+build/
+dist/
+coverage/
+test-results/
+playwright-report/
+.nyc_output/
+*.xpi
+
+# Editor / OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local credentials and private runtime data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+private/
+*.pcms.zip
+*.sqlite
+*.sqlite3
