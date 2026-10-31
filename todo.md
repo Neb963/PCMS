@@ -39,3 +39,5 @@ Final review binds every slug result to a fresh authenticated principal in the e
 Safe-stop integration parks the dedicated checking context and disposes its isolated passive manual-use guard after module instances stop; no tab is closed. Saved rows remain and Enable requires explicit Resume of that batch. Focused stop/resume coverage is added. Export preparation errors now retain their typed cause in Work instead of a generic module failure.
 
 CI6e90b719 passed146 T/build; B imported and persisted the batch but Start did not reach RUNNING. Add safe visible module status/button diagnostics to distinguish the actual failure. Imported intake is parked in the future until its row initialization commits, preventing a concurrent queue wake from selecting an incomplete batch; a partial import has an exact recoverable cause. Required final B remains OPEN.
+
+Saved-batch paging now uses Core's existing snapshot cursor instead of a mutable sorted-array offset, retaining the selected batch even when it is outside the loaded page. No fixed batch ceiling is introduced.
