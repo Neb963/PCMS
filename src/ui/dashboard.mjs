@@ -135,7 +135,20 @@ async function renderOther(area){
  const draw=()=>{list.replaceChildren();for(const m of modules.filter(m=>(m.name??m.id).toLowerCase().includes(input.value.toLowerCase()))){const li=node('li'),a=node('a',m.name??m.id);a.href=moduleURL(m);li.append(a);list.append(li);}if(!list.children.length)list.append(node('li','No matching modules.'));};input.addEventListener('input',draw);area.append(label,input,list);draw();
 }
 async function renderModuleSettings(area){
- area.append(node('h2','Modules'));renderInstall(area);const selected=location.hash.split('/')[2];
+ area.append(node('h2','Modules'));renderInstall(area);
+ const status=await core('modules.seed.status');
+ if(!status.ok){area.append(failure(status.code));}
+ else if(!status.result.initialized){
+  const notice=node('p','Built-in module setup is incomplete. Existing work is unchanged.');notice.setAttribute('role','alert');
+  const detail=node('p',status.result.failure??'Bundled packages are not yet registered.');
+  const retry=node('button','Retry bundled setup');retry.type='button';retry.id='retry-module-seed';
+  const outcome=node('p');outcome.id='seed-result';outcome.setAttribute('role','status');
+  retry.addEventListener('click',async()=>{retry.disabled=true;const response=await core('modules.seed.retry');
+   if(response.ok){await updateModuleNavigation();await renderRecords('settings');}
+   else{outcome.replaceChildren(failure(response.code));retry.disabled=false;}});
+  area.append(notice,detail,retry,outcome);
+ }
+ const selected=location.hash.split('/')[2];
  for(const module of await moduleRecords())if(!selected||selected===module.id){const section=node('section'),title=node('h3',module.name??module.id);section.append(title,node('p',(module.version??'Unknown version')+' · '+(module.enabled?'Enabled':'Disabled')));if(module.stagedVersion)section.append(node('p','Update '+module.stagedVersion+' staged.'));
   if(module.enabled&&module.pages.length){const label=node('label'),check=node('input');check.type='checkbox';check.checked=module.pinned;check.className='module-pin';check.dataset.module=module.id;label.append(check,document.createTextNode(' Show in primary navigation'));check.addEventListener('change',async()=>{const result=await core('module.pin',{id:module.id,pinned:check.checked});if(result.ok)await updateModuleNavigation();else{check.checked=!check.checked;section.append(failure(result.code));}});section.append(label);}
   area.append(section);
