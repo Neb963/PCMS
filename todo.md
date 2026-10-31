@@ -16,3 +16,7 @@ P01–P09 are merged. P09 [PR #9](https://github.com/Neb963/PCMS/pull/9) merged 
 ## Holds and next
 
 P10 code and required T/B are NOT TESTED. H P42 later proves the existing real bridge/two accounts before protected-account live acceptance; H P49 covers capacity. No credential entry automation, account registration or live provider/route effects are authorized. Implement/verify P10, then automatically continue to P11 and subsequent dependency-eligible phases.
+
+## Current checkpoint
+
+P10's first bounded slice adds canonical donor route observations and a fixed isolated-world authenticated identity read (secrets remain inside the protected page). Core schema 3 atomically reserves each canonical IPv4/IPv6 member as well as Persona/principal, including archived rows; ownership stays in Core, not a second ledger. 13 local focused observation/records tests pass, covering changed routes/Direct/private or unknown exits, overlapping exit sets, rollback, real response schema, session change and no token return. No donor/native/provider operation was run. Next: finite durable enrollment and the narrow donor adapter, then primary Accounts UI and required installed fixture B. P10 remains incomplete.
