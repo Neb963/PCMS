@@ -41,9 +41,9 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    check(binding.routeObservedAt>=flow.startedAt&&binding.routeObservedAt<=clock(),'ACCOUNT_ROUTE_STALE');
    // A verified existing account never silently acquires a different exit.
    if(a.expectedPrincipal)check(JSON.stringify(binding.exitAddresses)===JSON.stringify(a.exitAddresses),'ACCOUNT_EXIT_CHANGED');
-   Object.assign(patch,binding);flow.stage=flow.purpose==='LOGIN'?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
+   Object.assign(patch,binding);flow.stage=['LOGIN','OPEN'].includes(flow.purpose)?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
   }else if(stage==='OPEN'){
-   check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.stage=flow.purpose==='LOGIN'?'LOGIN_REQUIRED':flow.wasReady?'READY':'LOGIN_REQUIRED';
+   check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.openedAt=clock();flow.stage=flow.purpose==='OPEN'?'IDENTITY':flow.purpose==='LOGIN'?'LOGIN_REQUIRED':flow.wasReady?'READY':'LOGIN_REQUIRED';
   }else check(false,'ACCOUNT_STAGE_INVALID');
   patch.flow=flow;patch.state=a.admission==='ARCHIVED'?'ARCHIVED':END.has(flow.stage)?flow.stage:'PREPARING';await save(a,patch,'ACCOUNT_'+stage);return result(job,END.has(flow.stage)?'COMPLETE':'CONTINUE');
  }
@@ -51,6 +51,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   const operationId=job.id+'-IDENTITY',current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);let value;
   if(reconcile&&!possible&&!observed)return result(job,'READY');await admit();
   const prerequisites=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!prerequisites?.ok)return hold(a,job,prerequisites?.code??'DONOR_UNAVAILABLE');
+  const document=await donor.checkBinding(scope(a),{stage:'DOCUMENT_READY',readOnly:true});if(!document?.ok){if(document?.pending&&clock()-(a.flow.openedAt??a.flow.startedAt)<15000)return result(job,'CONTINUE');return hold(a,job,document?.code??'ACCOUNT_LOGIN_TAB_MISSING');}
   const read=()=>donor.checkBinding(scope(a),{stage:'IDENTITY',operationId,identity:true,readOnly:true});
   if(possible||observed){
    check(!possible||current.effect.operationId===operationId,'ACCOUNT_OPERATION_CHANGED');value=await read();
@@ -67,7 +68,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   const p=value.identity;check(p?.ok===true&&p.source==='PERCHANCE_AUTHENTICATED_IDENTITY'&&/^[a-f0-9]{64}$/.test(p.principalFingerprint??'')&&typeof p.principalLabel==='string','ACCOUNT_IDENTITY_UNKNOWN');
   check(p.observedAt>=a.flow.startedAt&&p.observedAt<=clock()&&a.routeObservedAt>=a.flow.startedAt,'ACCOUNT_CONFIRM_STALE');
   if(a.expectedPrincipal)check(a.expectedPrincipal===p.principalFingerprint,'ACCOUNT_PRINCIPAL_CHANGED');
-  const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');const next=a.flow.purpose==='OPEN'?'OPEN':'READY';
+  const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');const next='READY';
   if(a.admission==='REACTIVATING'){const jobs=await accountRows('jobs',a.id);check(!jobs.some(j=>j.id!==job.id&&j.effect?.boundary==='POSSIBLE'),'ACCOUNT_WORK_UNRESOLVED');}
   await save(a,{admission:null,archive:null,tabId:value.tabId??a.tabId,expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
   if(a.admission==='REACTIVATING'&&next==='READY'){core.queue.unfenceAccount(a.id);await resumeArchivedJobs(a.id,job.id);}

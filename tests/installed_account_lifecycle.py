@@ -42,7 +42,7 @@ def main():
   except Exception as error:
    receipt['error']=str(error)
    if sid:
-    try:dashboard(sid);receipt['state']=inspect(sid);(OUT/'account-lifecycle-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
+    try:dashboard(sid);receipt['state']=inspect(sid);receipt['tabs']=asyncjs(sid,"const rows=[];for(const t of await browser.tabs.query({})){const tag=await browser.sessions.getTabValue(t.id,'pcmsAccountTab');rows.push({id:t.id,container:t.cookieStoreId,protectedPage:t.url?.startsWith('https://perchance.org/'),tag});}return rows;");(OUT/'account-lifecycle-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    receipt['fixture']=fixture.receipt();raise
   finally:
