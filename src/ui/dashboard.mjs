@@ -44,7 +44,7 @@ port.onMessage.addListener(status=>{received=true;clearTimeout(timeout);show(sta
 port.onDisconnect.addListener(()=>{clearTimeout(timeout);if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});});
 
 let view={journalFilter:'',route:'home',scroll:0},pageCursor=null,nextCursor=null;
-const core=(operation,extra={})=>browser.runtime.sendMessage({channel:'pcms-core',operation,...extra});
+const core=async(operation,extra={})=>{try{return await browser.runtime.sendMessage({channel:'pcms-core',operation,...extra});}catch{return {ok:false,code:'CORE_UNAVAILABLE'};}};
 const errors={STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function failure(code){const n=node('p',errors[code]||'Core records are unavailable. Restart Firefox to check again.');n.setAttribute('role','alert');n.dataset.code=code;return n;}

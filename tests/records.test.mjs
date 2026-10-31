@@ -85,3 +85,18 @@ test('cross-realm byte input is copied into local chunks without rejecting valid
  const bytes=runInNewContext('new Uint8Array([0,255,23])');const blob=await core.putBytes(bytes);
  assert.deepEqual([...await core.bytes(blob)],[0,255,23]);
 });
+test('search finds matches beyond early pages and cursor cannot cross query/dataset',async t=>{
+ const {core}=await fixture(t);
+ for(let i=0;i<5;i++)await core.record({step:i<3?'OTHER':'MATCH',result:'COMPLETE'});
+ const first=await core.list({table:'events',limit:1,search:'MATCH'});assert.deepEqual(first.rows.map(x=>x.sequence),[4]);
+ assert.deepEqual((await core.list({table:'events',limit:1,search:'MATCH',cursor:first.cursor})).rows.map(x=>x.sequence),[5]);
+ await assert.rejects(core.list({table:'events',cursor:first.cursor,search:'OTHER'}),/STALE_CURSOR/);
+});
+test('packaged RPC exposes no raw record, credential, mutation or module checkpoint access',async t=>{
+ const {createCoreService}=await import('../src/host/core-service.mjs');const {core}=await fixture(t);
+ const service=createCoreService({open:async()=>core});
+ for(const operation of ['credentials','read','mutate','source','blobs','view.delete'])assert.equal((await service.handle({operation})).code,'OPERATION_DENIED');
+ const result=await service.handle({operation:'view.save',requestId:'request',value:{journalFilter:'MATCH',route:'settings',scroll:0}});assert.ok(result.ok);
+ assert.equal((await service.handle({operation:'view.get'})).result.journalFilter,'MATCH');
+ const denied=await service.handle({operation:'view.save',requestId:'bad',value:{journalFilter:'MATCH',route:'settings',scroll:0,token:'no'}});assert.equal(denied.code,'INVALID_VIEW');
+});

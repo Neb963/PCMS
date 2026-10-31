@@ -182,7 +182,7 @@ function attachBlobs(core,transact,root,checkedRefs,append) {
   core.bytes=blobId=>transact(['blobs','chunks'],'readonly',async s=>{
     requireCore(hash(blobId),'INVALID_REFERENCE');const r=await root(s),row=await req(s('blobs').get([r.dataset,blobId]));requireCore(row,'MISSING_BLOB');
     const out=new Uint8Array(row.bytes);let offset=0;
-    for(let i=0;i<row.chunks;i++){const chunk=await req(s('chunks').get([r.dataset,blobId,i]));requireCore(chunk&&chunk.bytes instanceof Uint8Array,'MISSING_CHUNK');out.set(chunk.bytes,offset);offset+=chunk.bytes.length;}
+    for(let i=0;i<row.chunks;i++){const chunk=await req(s('chunks').get([r.dataset,blobId,i]));requireCore(chunk&&ArrayBuffer.isView(chunk.bytes)&&Object.prototype.toString.call(chunk.bytes)==='[object Uint8Array]','MISSING_CHUNK');out.set(chunk.bytes,offset);offset+=chunk.bytes.length;}
     requireCore(offset===row.bytes,'BLOB_LENGTH_MISMATCH');return out;
   }).then(async bytes=>{requireCore(await sha256(bytes)===blobId,'BLOB_HASH_MISMATCH');return bytes;});
   core.source=async files=>{

@@ -23,3 +23,5 @@ T: 15 focused checks PASS locally, including fake-indexeddb request-level rollba
 Publish the Core/UI/installed-harness checkpoint, then inspect actual CI results. No P03 implementation before P02 required evidence.
 
 - First checkpoint `19eb4aeeacc0c855d97106309fbc8b009596afad`, tree `f1c0fe0c4d72357f049727e3fd3738ed7bc0f73d`, verified against local tree. CI run `41218539727`: focused PASS; installed found a genuine cross-realm typed-array check defect before source setup. Replaced realm-specific `instanceof` on incoming bytes with checked copied byte views; added focused regression. Required B remains open.
+
+- Checkpoint `4ac27bbafa88f59958cfb6c0ff60843e10eaf6c8`, tree `e195bc3dbf9c6f439800af984bae072457d98f58`: focused PASS; B run `41218634832` reached visible counts, saved view and process restart, then exposed the same realm-specific check on *readback*. Applied the same byte-view validation to cold chunks. Added query-scope and RPC-denial tests (18 total focused checks).
