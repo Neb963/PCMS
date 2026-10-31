@@ -49,3 +49,5 @@ Runffb18ea5 still passed focused/build; the new capture listener observed no Sta
 Installed314f004b proved trusted keyboard Start/Pause/Resume and exact protected-tab creation. Its first Available fixture became Unknown because the fixture served UTF8 symbols as text/html without declaring UTF8; Firefox's decoded visible text differed from the accepted literal. The independent fixture now declares UTF8. Product matching remains exact and unchanged. Required final B remains OPEN.
 
 A concrete Disable/recovery review found that an uncertain read could otherwise strand safe stop after the module was fenced. Core can now read back only that already-dispatched observation while disabled, then finish the same lifecycle stop; it cannot navigate or start the next check. A focused fenced-generation regression covers it. Final rebuilt T/B required.
+
+The affected installed journey now also operates actual Discover Disable/Enable on the stopped Unknown batch, checks no hidden navigation, then reopens its preserved results/hold before process restart. This qualifies the new safe-stop wrapper with the real page disposer and registered package.
