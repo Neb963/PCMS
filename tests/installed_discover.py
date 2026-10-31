@@ -46,7 +46,7 @@ def main():
    owner=add(sid,'Discover fixture account');settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'discover@fixture.test');click(sid,'#account-confirm');a=settle(sid,owner,'READY');login_tab=a['tabId']
    settings(sid);wait(lambda:script(sid,"return !!document.querySelector('section[data-module=\"pcms-journal\"] button[data-lifecycle=\"DISABLE\"]')"));click(sid,'section[data-module="pcms-journal"] button[data-lifecycle="DISABLE"]');wait(lambda:script(sid,"return !!document.querySelector('section[data-module=\"pcms-journal\"] button[data-lifecycle=\"ENABLE\"]')"));click(sid,'#pause-core')
    discover(sid);set_input(sid,'#discover-input',ORIGINAL);choose(sid,'#discover-account',owner);click(sid,'#discover-import');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('IMPORTED')"));assert len(script(sid,"return [...document.querySelectorAll('#discover-rows li')].map(e=>e.textContent)"))==7
-   click(sid,'#discover-start');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('RUNNING')"));time.sleep(1);assert fixture.slug_reads==[]
+   wait(lambda:script(sid,"const b=document.getElementById('discover-start');return b&&!b.disabled"));script(sid,"document.addEventListener('click',e=>document.body.dataset.lastClick=e.target.id+':'+e.isTrusted,true);");click(sid,'#discover-start');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('RUNNING')"));time.sleep(1);assert fixture.slug_reads==[]
    click(sid,'#discover-pause');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('PAUSED')"));click(sid,'#discover-resume');top(sid);click(sid,'#pause-core');frame(sid)
    wait(lambda:any(r['path']=='/free-name' for r in fixture.slug_reads));wait(lambda:'Available' in script(sid,"return document.getElementById('discover-rows').textContent"));click(sid,'#discover-pause');wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('PAUSED')"));before=list(fixture.slug_reads);time.sleep(2.2);assert fixture.slug_reads==before
    click(sid,'#discover-rows li button');wait(lambda:script(sid,"return document.getElementById('discover-selected').textContent.includes('Free_Name')"));click(sid,'#discover-resume');top(sid)
@@ -68,7 +68,7 @@ def main():
   except Exception as error:
    receipt['error']=str(error);receipt['slugReads']=fixture.slug_reads
    if sid:
-    try:receipt['page'] = script(sid,"return {text:document.body.innerText,start:document.getElementById('discover-start')?.disabled,feedback:document.getElementById('discover-feedback')?.textContent};")
+    try:receipt['page'] = script(sid,"return {text:document.body.innerText,start:document.getElementById('discover-start')?.disabled,feedback:document.getElementById('discover-feedback')?.textContent,lastClick:document.body.dataset.lastClick};")
     except Exception:pass
     try:top(sid);receipt['state']=inspect(sid)
     except Exception:pass
