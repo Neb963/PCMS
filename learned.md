@@ -28,3 +28,5 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - P01: WebDriver session creation can return while Firefox still reports add-on startup as `starting`. Run `41215955311` recorded a trusted native click but zero product icon events. Wait for Firefox’s native add-on startup state before interacting; permit a dormant event page so the test still exercises a real wake. Do not replace the required click with a handler call or direct navigation.
 
 - P01: the malformed previous-install fixture normalized away the blocked policy and correctly triggered donor rollback (`41216186356`). Profile-preservation checks must start with valid existing donor state and compare its exact pre/post bytes; do not weaken the donor’s storage security fence to retain an invalid fixture.
+
+- P02: realm-specific `instanceof Uint8Array` rejected valid incoming bytes and cold IDB reads in installed Firefox (`41218539727`, `41218634832`). Validate byte-view type across realms and copy inputs into the service's realm. A passing fake-indexeddb test alone cannot establish this browser boundary.

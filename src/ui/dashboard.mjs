@@ -1,6 +1,6 @@
 const titles = {home:'Home',generators:'Generators',accounts:'Accounts',refresher:'Refresher',work:'Work',other:'Other',settings:'Settings'};
 const notes = {
-  home:'This development build contains the protected host. Account and generator operations are not implemented yet.',
+  home:'Account and generator operations are not implemented yet.',
   generators:'Generator management is not implemented yet.', accounts:'Account management is not implemented yet.',
   refresher:'Refresher is not implemented yet.', work:'The work queue is not implemented yet.',
   other:'No module pages are installed.', settings:'Module and connection settings are not implemented yet.'
@@ -21,6 +21,7 @@ function route() {
   const key = location.hash.slice(1) in titles ? location.hash.slice(1) : 'home';
   document.getElementById('heading').textContent = titles[key];
   document.getElementById('page-note').textContent = notes[key];
+  void renderRecords(key);
   for (const link of document.querySelectorAll('nav a')) {
     if (link.hash === '#'+key) link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
@@ -35,9 +36,43 @@ function show(status) {
     dt.textContent=label; dd.textContent=String(value ?? 'Unknown'); list.append(dt,dd);
   }
 }
-window.addEventListener('hashchange',route); route();
+window.addEventListener('hashchange',route);
 let received=false;
 const port=browser.runtime.connect({name:'pcms-host-status'});
 const timeout=setTimeout(()=>{if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});port.disconnect();},12000);
 port.onMessage.addListener(status=>{received=true;clearTimeout(timeout);show(status);port.disconnect();});
 port.onDisconnect.addListener(()=>{clearTimeout(timeout);if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});});
+
+let view={journalFilter:'',route:'home',scroll:0},pageCursor=null,nextCursor=null;
+const core=async(operation,extra={})=>{try{return await browser.runtime.sendMessage({channel:'pcms-core',operation,...extra});}catch{return {ok:false,code:'CORE_UNAVAILABLE'};}};
+const errors={STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
+function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
+function failure(code){const n=node('p',errors[code]||'Core records are unavailable. Restart Firefox to check again.');n.setAttribute('role','alert');n.dataset.code=code;return n;}
+async function persist(){
+  view.route=location.hash.slice(1)||'home';view.scroll=window.scrollY;
+  const result=await core('view.save',{value:view,requestId:crypto.randomUUID()});
+  return result;
+}
+async function renderRecords(key){
+ const area=document.getElementById('records');area.replaceChildren();
+ if(key==='home'){
+   const response=await core('counts');if(location.hash.slice(1)&&location.hash!=='#home')return;
+   if(!response.ok){area.append(failure(response.code));return;}
+   const counts=node('div');counts.className='counts';
+   for(const [label,field,route] of [['Accounts','accounts','accounts'],['Generators','generators','generators'],['Jobs','jobs','work']]){const a=node('a',response.result[field]+' '+label);a.href='#'+route;a.dataset.count=field;counts.append(a);}
+   area.append(counts,node('p','Directory visibility: Not measured'));
+ }else if(key==='settings'){
+   const title=node('h2','Journal'),label=node('label','Filter recorded work'),input=node('input');input.id='journal-filter';input.value=view.journalFilter;label.htmlFor=input.id;
+   const save=node('button','Save view');save.id='save-view';save.type='button';
+   const progress=node('p');progress.id='view-result';progress.setAttribute('role','status');
+   const list=node('ol');list.id='journal-events';const next=node('button','Next');next.id='next-events';next.type='button';
+   const load=async()=>{const response=await core('events',{cursor:pageCursor,search:view.journalFilter});list.replaceChildren();if(!response.ok){list.append(failure(response.code));next.hidden=true;return;}nextCursor=response.result.cursor;next.hidden=!nextCursor;for(const event of response.result.rows){const text=[event.sequence,event.step,event.result,event.code,event.targetId].filter(Boolean).join(' · ');list.append(node('li',text));}};
+   input.addEventListener('input',()=>{view.journalFilter=input.value;pageCursor=null;void load();});
+   save.addEventListener('click',async()=>{save.disabled=true;progress.textContent='Saving…';const response=await persist();progress.replaceChildren(response.ok?node('span','Saved'):failure(response.code));save.disabled=false;if(response.ok)await load();});
+   next.addEventListener('click',()=>{pageCursor=nextCursor;void load();});
+   area.append(title,label,input,save,progress,list,next);await load();
+ }
+}
+const initial=await core('view.get');
+if(initial.ok&&initial.result){view=initial.result;if(!location.hash)location.hash='#'+view.route;}
+route();
