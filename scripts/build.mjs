@@ -70,6 +70,8 @@ export async function build(output=path.join(ROOT,'build')) {
   const packagePath=path.join(stage,'modules/package.mjs');let packageCode=await readFile(packagePath,'utf8');
   for(const name of ['fflate','acorn']){const anchor="from '"+name+"'";if(packageCode.split(anchor).length!==2)throw Error('CODEC_IMPORT_ANCHOR');packageCode=packageCode.replace(anchor,"from '../codecs/"+name+".mjs'");}await writeFile(packagePath,packageCode);
 
+  const journalPath=path.join(stage,'core/journal-archive.mjs');
+  await writeFile(journalPath,(await readFile(journalPath,'utf8')).replace("from 'fflate'","from '../codecs/fflate.mjs'"));
   await cp(path.join(ROOT,'vendor/personamonkey/LICENSE'),path.join(stage,'licenses/PersonaMonkey-MIT.txt'));
   const manifest=JSON.parse(await readFile(path.join(donor,'manifest.json'),'utf8'));
   if(manifest.browser_specific_settings.gecko.id!==ID)throw Error('GECKO_ID_CHANGED');

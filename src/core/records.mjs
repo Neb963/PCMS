@@ -160,13 +160,14 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     // Private packaged service access. This object is never returned by RPC.
     read: (table,recordId)=>transact([table],'readonly',async s=>{requireCore(TABLES.includes(table),'READ_DENIED');const r=await root(s);return req(s(table).get([r.dataset,recordId]));}),
     get:async(table,recordId)=>project(table,await core.read(table,recordId)),
-    list:({table,cursor=null,limit=50,search=''}={})=>transact(['versions','events'],'readonly',async s=>{
+    list:({table,cursor=null,limit=50,search='',filters={}}={})=>transact(['versions','events'],'readonly',async s=>{
       requireCore(TABLES.includes(table)||table==='events','QUERY_DENIED');
       requireCore(Number.isSafeInteger(limit)&&limit>0&&limit<=200,'INVALID_PAGE_SIZE'); // transport page size, never a result ceiling
       requireCore(typeof search==='string','INVALID_QUERY');
+      requireCore(filters&&typeof filters==='object'&&!Array.isArray(filters)&&Object.keys(filters).every(k=>fields[table].includes(k))&&Object.values(filters).every(v=>typeof v==='string'||typeof v==='number'),'INVALID_QUERY');
       const r=await root(s),cut=cursor?.cut??r.sequence,after=cursor?.after??'';
-      const matches=row=>!search||Object.values(project(table,row)).filter(x=>typeof x==='string'||typeof x==='number').join(' ').toLowerCase().includes(search.toLowerCase());
-      requireCore(!cursor||(cursor.dataset===r.dataset&&cursor.table===table&&cursor.search===search&&Number.isSafeInteger(cut)&&cut<=r.sequence&&typeof after==='string'),'STALE_CURSOR');
+      const matches=row=>Object.entries(filters).every(([k,v])=>row[k]===v)&&(!search||Object.values(project(table,row)).filter(x=>typeof x==='string'||typeof x==='number').join(' ').toLowerCase().includes(search.toLowerCase()));
+      requireCore(!cursor||(cursor.dataset===r.dataset&&cursor.table===table&&cursor.search===search&&JSON.stringify(cursor.filters??{})===JSON.stringify(filters)&&Number.isSafeInteger(cut)&&cut<=r.sequence&&typeof after==='string'),'STALE_CURSOR');
       const rows=[];let last=after,more=false;
       if(table==='events') {
         if(Number(after||0)>=cut)return {rows:[],cursor:null,cut};
@@ -186,7 +187,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
         }
         if(!more&&selected&&!selected.deleted&&matches(selected)){if(rows.length===limit)more=true;else{rows.push(project(table,selected));last=selected.id;}}
       }
-      return {rows,cursor:more?{dataset:r.dataset,table,cut,after:last,search}:null,cut};
+      return {rows,cursor:more?{dataset:r.dataset,table,cut,after:last,search,filters}:null,cut};
     }),
     counts:()=>transact(['accounts','generators','jobs'],'readonly',async s=>{const r=await root(s),range=IDBKeyRange.only(r.dataset);return {accounts:await req(s('accounts').index('dataset').count(range)),generators:await req(s('generators').index('dataset').count(range)),jobs:await req(s('jobs').index('dataset').count(range)),visibility:null};}),
     saveView:(name,value,requestId)=>transact(['views','commands','events'],'readwrite',async s=>{
