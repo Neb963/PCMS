@@ -72,6 +72,16 @@ def main():
     await c.mutate([{table:'generators',id:'fixture-generator',value:{slug:'fixture-generator'}}],{step:'FIXTURE_SETUP',result:'COMPLETE'});
     const job=await c.queue.enqueue({requestId:'unfinished',logicalKey:'unfinished',moduleId:m.id,targetId:'fixture-generator',kind:'CHECK',input:{exact:'retained'},dueAt:Date.now()+3600000});c.close();return {job:job.id,tab:tab.id,worldId};
    """);assert setup.get('job'),setup
+   revoked=asyncjs(sid,"""
+    const port=browser.runtime.connect({name:'pcms-core-rpc'}),waiters=new Map();port.onMessage.addListener(m=>{if(m.rpcId&&waiters.has(m.rpcId)){waiters.get(m.rpcId)(m.response);waiters.delete(m.rpcId);}});
+    const send=(operation,extra={})=>new Promise(resolve=>{const rpcId=crypto.randomUUID();waiters.set(rpcId,resolve);port.postMessage({channel:'pcms-core',rpcId,operation,...extra});});
+    const opened=await send('module.open',{id:'fixture-module',pageId:'main'});if(!opened.ok)throw Error(opened.code);
+    const read=await send('module.rpc',{token:opened.result.token,message:{operation:'getView',requestId:crypto.randomUUID()}});
+    const before=await send('counts');await send('module.close',{token:opened.result.token});
+    const denied=await send('module.rpc',{token:opened.result.token,message:{operation:'action',requestId:crypto.randomUUID(),args:{name:'enqueue',targetId:'fixture-generator',kind:'CHECK',logicalKey:'stale-page'}}});
+    const after=await send('counts');port.disconnect();return {draft:read.result?.draft,denied:denied.code,unchanged:before.result.jobs===after.result.jobs};
+   """);assert revoked=={'draft':'saved draft Ω','denied':'DOCUMENT_DENIED','unchanged':True},revoked
+   receipt['checks'].append('real-valid-page-token/packaged-close/revoked-RPC-denied/no-extra-job')
    settings(sid);select(sid,update);click(sid,'#install-module');wait(lambda:script(sid,"return document.querySelector('section[data-module=\"fixture-module\"]')?.textContent.includes('staged')"));manage(sid,'UPDATE')
    wait(lambda:module(sid).get('lifecycle',{}).get('code')=='MODULE_STOP_INCOMPLETE',25);held=module(sid);assert held['version']=='1.0.0' and held['generation']==2 and not held['enabled'],held
    # Old bound sandbox requests cannot enqueue after the durable fence.
@@ -92,7 +102,8 @@ def main():
    settings(sid);manage(sid,'DISABLE');wait(lambda:module(sid).get('state')=='DISABLED');assert not module(sid)['enabled']
    prior=stop(sid,profile);sid=None;sid,_=session(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);assert module(sid)['state']=='DISABLED' and module(sid)['generation']==3
    settings(sid);manage(sid,'ENABLE');wait(lambda:module(sid).get('enabled'));assert module(sid)['generation']==4
-   receipt['checks'].append('actual-Disable/real-browser-restart/disabled-persistence/Enable/same-unfinished-work')
+   cold=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),j=await c.read('jobs',arguments[0]),v=await c.view('module:fixture-module:main');c.close();return {job:j.input,generation:j.generation,draft:v.draft};",[setup['job']]);assert cold=={'job':{'exact':'retained'},'generation':4,'draft':'saved draft Ω'},cold
+   receipt['checks'].append('actual-Disable/real-browser-restart/disabled-persistence/Enable/same-unfinished-work/exact-cold-draft')
    receipt['result']='PASS'
   except Exception as error:
    receipt['error']=str(error)

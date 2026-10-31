@@ -1,49 +1,26 @@
 # Current work
 
-**P07 — Safe module update, disable and cold recovery: IN PROGRESS.**
+**P07 — Safe module update, disable and cold recovery: final verification.**
 
-Starting main: `f4175ddca4355de98bd94efe40772a01bf7fcdbb`. P01–P06 are merged; no open PRs or unfinished remote phase branch. P06 postmerge run [41223585280](https://github.com/Neb963/PCMS/actions/runs/41223585280) passed T/B. Reuse that unchanged seed evidence.
+P01–P06 remain merged. P07 is on `p07-module-lifecycle`, [PR #7](https://github.com/Neb963/PCMS/pull/7). Latest verified code: `d451bf8052ba5710ff18689fe67db623f05e58aa`, tree `9da0371a44f23e6717f934381616d3b82cfdc4bf`. Current user task requires continuous sequential execution after each phase, without interphase confirmation.
 
-## Implementation plan
+## Implemented
 
-- Add a durable, single-generation lifecycle to the existing Core/module host: side-effect-free candidate start/schema check, stop admission, fence requests, drain/reconcile effects, collect exact instance stop receipts, switch package atomically, and rebuild or hold safely.
-- Keep settings, drafts, job input/checkpoints and previous package references. Enable/Disable and compatible explicit rollback use the same lifecycle. Interrupted transitions resume from persisted state, without a second controller or queue.
-- Add website instance registration/disposal and Firefox userscript world/registration reconstruction. Missing permission holds affected registration and exposes the actual browser permission action. Never reload a dirty/AI editor to force teardown.
-- Add Settings → Modules Update/Disable/Enable/rollback and contextual held-state recovery. Remove stale visible module pages after fencing; keep other modules operational.
-- T: lifecycle interruption, schema mismatch, in-flight/unknown effects, missing/forged stop receipts, stale generation, disabled jobs and maintenance separation. B: one targeted persistently installed fixture journey covering update with unfinished work/dirty editor, draft preservation, old request denial, Disable/Enable, permission denial and real restart.
+- Durable per-module stage/fence/STOP/SWITCH/REBUILD lifecycle, candidate start/schema validation, compatible explicit rollback and cold continuation. Requests are durably deduplicated. Incompatible jobs/settings remain intact.
+- Generation gates reject stale requests and new read/write admission. POSSIBLE effects require same-operation readback. Each exact page stop receipt is saved before proceeding; an unresolved page retains its contextual editor action. No forced reload or Direct fallback.
+- Donor URL/world helpers select exact protected documents. Common disposers stop only registered resources, resume partial cleanup once, and preserve editor source/chat. Normal iframe disposal explicitly revokes its Core binding.
+- Settings has operating Update/Disable/Enable/rollback, actual optional userScripts permission request, visible held state and contextual recovery. Navigation, drafts, package provenance and unfinished jobs survive changes/restart. Import refreshes rows without clearing the selected file.
 
-## Evidence and holds
+## Evidence
 
-No P07 tests run yet. Required T and B remain NOT TESTED. Real AI-editor teardown is deferred to authorized P46. No live route, GitHub-provider or Perchance mutation is authorized. Continue sequentially after each completed phase; if a required non-live tier is blocked, preserve it and select safely independent eligible work.
+[Run 41226896469](https://github.com/Neb963/PCMS/actions/runs/41226896469) at `d451bf8`: focused T and targeted installed B PASS, Firefox 155.0 build `20260817142839`, normal OS sandbox 6. It exercised actual native permission deny/checkbox/grant, real ZIP selection/stage/update, the production dirty website disposer, exact editor focus/source/chat preservation, saved draft/job, Disable, genuine process restart and Enable. No provider or route mutations.
 
-## Next action
+The final harness additionally checks an actually valid Core page token before/after explicit close and independently reads the unfinished job/draft after restart/Enable. This closes two specific evidence gaps; no broader historical suite is added. Its final run is pending.
 
-Implement lifecycle and focused tests against current production records/queue/host. Push meaningful code plus this file frequently. Keep accepted specification, design and PHASES unchanged.
+Local installed Firefox is unavailable because normal sandbox content processes fail `uid_map: EPERM`. Sandbox protection was not weakened. Existing CI supplies the required B environment. Diagnostic/source details: [P07 Firefox boundary](docs/diagnostics/P07-Firefox-boundary.md). Earlier failing runs are preserved on PR #7; they exposed native permission controls, startup rendering, stale rows and orphan page bindings and were not marked PASS.
 
-P07 checkpoint: durable lifecycle, sandbox stop receipts, candidate validation, generation-aware admission and shell page teardown are implemented. Five new focused lifecycle tests pass (update/rollback, stop-receipt denial, Unknown readback, post-switch recovery, Disable/Enable); existing 46 T pass. Website injection/disposal, visible lifecycle controls and required installed B remain open. No phase completion claimed.
+## Next action and holds
 
-P07 environment result: local Firefox 155.0b1 could not create a content process with normal sandbox (`/proc/self/uid_map: EPERM`, Marionette startup failure). No installed product assertion ran and no sandbox protection was weakened. Use the existing GitHub Actions runner for the targeted P07 B journey. Website lifecycle uses donor URL/world helpers with exact document injection; normal navigation still requires the donor's current verified protected context. Selected ZIPs do not gain raw Core authority.
+Push final focused harness assertions, verify its CI, merge PR #7, compare postmerge tree and relevant checks. Then write the P08-specific implementation plan here and continue. P08, P10 and P12 depend on completed P07 interfaces/evidence; none has started.
 
-Targeted P07 installed harness now selects real local ZIPs and Modules actions. It uses a controlled editor loaded before the donor is installed; no route override/Direct fallback is introduced. The production generation-world disposer runs against that actual document. CI replaces its previous phase-specific seed journey with this lifecycle journey; trigger frequency, job count and compute remain unchanged. Local normal-sandbox Firefox is unavailable, so CI is necessary for this required evidence.
-
-P07 run [41225264911](https://github.com/Neb963/PCMS/actions/runs/41225264911): focused 51 T PASS. Installed Firefox reached the real permission prompt, then the harness selected a hidden native notification template and could not click it. This is not a product PASS. Harness now selects the visible native shadow button. Eight focused lifecycle/website tests pass, including exact-world selection, dirty-stop denial and missing-document/receipt handling. Remaining installed journey is still open.
-
-P07 run [41225401216](https://github.com/Neb963/PCMS/actions/runs/41225401216) passed T (54) but B exposed a dashboard render race: an earlier asynchronous render could remove a newly visible control. Each render now owns a separate mount, and initial view restoration avoids duplicate hash navigation. Also tightened failed-fence cleanup and explicit compatible rollback after activation failure; nine focused lifecycle/website tests pass. B remains unpassed; no phase completion or later phase admission yet.
-
-P07 run [41225525584](https://github.com/Neb963/PCMS/actions/runs/41225525584) passed T, then Firefox's native permission popup button remained outside Marionette's scrollable viewport. The fixture now activates that real native button through the privileged browser driver; the product permission request/decision is unchanged. No mock permission or sandbox bypass is used. Added durable action-request deduplication and an IDB switch-transaction rollback test; 11 focused lifecycle/website tests pass. Installed evidence is still open.
-
-P07 run [41225714661](https://github.com/Neb963/PCMS/actions/runs/41225714661) passed 57 T and real permission denial. B then timed out after the native grant click. The harness now waits for Firefox's security-delayed primary button to be enabled before activating it. Added a final instance-roster check after fencing and permitted only bound draft saves during STOP; effect requests stay revoked. Required installed B remains open.
-
-P07 run [41225858415](https://github.com/Neb963/PCMS/actions/runs/41225858415) passed focused tests but again lost the permission control before the click. Root cause: the early hash listener could render navigation while the module script's initial top-level awaits were still running; its final startup render then replaced that view. Registering hash navigation after initial Core/view setup eliminates that overlapping startup path. The test retains the required actual control and now captures safe fixture UI diagnostics on failure.
-
-P07 run [41225955123](https://github.com/Neb963/PCMS/actions/runs/41225955123) again passed T and permission denial; grant stayed disabled. Inspection of the exact downloaded Firefox 155 `browser-addons.js` established the cause: userScripts permission requires an unchecked native `moz-checkbox` before Allow can enable (the prior delay theory was incorrect). The harness now clicks that native checkbox and then Allow, preserving Firefox's actual permission workflow. No permission state is injected.
-
-P07 run [41226174244](https://github.com/Neb963/PCMS/actions/runs/41226174244) passed T and both actual native permission decisions, installed the fixture and injected its real website disposer. B then found that a successful ZIP stage did not refresh the Modules rows, so Update was unavailable until navigation. The list now refreshes in place after import, preserving the selected file and form. Stop receipts are also persisted per instance before proceeding; recovery now opens the exact page whose stop failed. Twelve focused lifecycle/website tests pass, including partial-stop receipt recovery.
-
-P07 run [41226306414](https://github.com/Neb963/PCMS/actions/runs/41226306414) passed 58 T, permission decisions, staging, lifecycle fencing and the actual dirty-disposer hold. B read the durable hold before the asynchronous settings response had rendered its recovery button. It now waits for that real control, and checks Firefox's actual selected browser tab rather than assuming WebDriver automatically changes its current context. Product callbacks now refresh Modules only while that route is still open, so a completed operation cannot replace a page the user navigated to meanwhile. Required B remains open.
-
-P07 run [41226483658](https://github.com/Neb963/PCMS/actions/runs/41226483658) passed T and reached contextual editor focus/source preservation, but Continue remained held after the fixture cleared its dirty flag. The next B diagnostic reads only the exact old world/document's instance and current dirty value before Continue, and records the full fixture lifecycle state on failure. Stop retries now dispose each successful resource once; volatile fences also reject new ordinary read effects and new jobs. Fourteen focused lifecycle/website checks pass. Required B remains unpassed.
-
-Source tracing found the remaining stop hold: normal dashboard navigation removed the module iframe but left its Core page binding registered until the whole dashboard disconnected. Update then waited for a STOP receipt from that already-destroyed iframe. Added a sender-bound page-close action called by the packaged iframe disposer; a concurrent stop waiter receives local teardown, while old RPC tokens are revoked. The website receipt remains independently required. This corrects the lifecycle rather than bypassing the held update.
-
-P07 run [41226731908](https://github.com/Neb963/PCMS/actions/runs/41226731908) independently confirmed the original website instance was present, its dirty flag was `no`, and its owned UI was still present before Continue. It remained held, consistent with the stale closed-dashboard-page binding found in source. The explicit page-close fix is pending installed verification.
+Actual retained native AI-editor teardown remains NOT TESTED until authorized P46. Later G/H/P1–P5 still require named disposable targets/effects. This is a development XPI, not a complete product or production acceptance.
