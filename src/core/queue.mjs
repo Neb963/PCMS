@@ -1,7 +1,7 @@
 // Finite queue primitives. Modules own their steps; Core owns admission/effects.
 export function createQueue({transact,root,writeRows,append,req,check,clock}) {
  const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set();let blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
- const tables=['jobs','generators','modules','versions','events','blobs','chunks','commands'];
+ const tables=['accounts','jobs','generators','modules','versions','events','blobs','chunks','commands'];
  const tx=work=>transact(tables,'readwrite',async s=>work(s,await root(s)));
  const read=(s,r,table,id)=>req(s(table).get([r.dataset,id]));
  const valid=v=>typeof v==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,199}$/.test(v);
@@ -99,6 +99,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const admitted=await serial(async()=>{
       const job=await tx(async(s,r)=>{
         const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
+        if(evidence.accountRevision!=null){const account=await read(s,r,'accounts',job.accountId);check(account?.rev===evidence.accountRevision,'STALE_ACCOUNT');}
         const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
         check(job.state!=='COMPLETE'&&job.state!=='FAILED','JOB_FINISHED');check(job.dueAt<=clock(),'NOT_DUE');
         check(job.effect?.boundary!=='POSSIBLE','RECONCILE_REQUIRED');
