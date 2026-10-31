@@ -1,26 +1,33 @@
 # Current work
 
-**State:** Corrected planning complete. No PCMS implementation phase has started. No application test, CI run, XPI build or live provider action was performed for this planning task.
+**Active phase:** P01 — Protected packaged host. No other phase is in scope.
 
-**Next eligible phase:** [P01 — Protected packaged host](PHASES.md#p01--protected-packaged-host).
+## Repository baseline
 
-## P01 checklist
+- Inspected GitHub on 31 October 2026: `main` is `c3a066a60813e6b83e63978b79181593a6a76234`; only `main` exists; no PRs or Actions runs. Local checkout matches. No unfinished phase exists.
+- Read accepted v42, design revision 2, AGENTS, phase contracts and CI guidance. Authority files stay unchanged.
+- Reuse Alpha `c5b23b77f50db7ffe50e2ef705a8bf0b5879e36e` and its pinned donor `9995f6eadfa54be6cc0001f4e04f2a2d9b9401bf`. Read only relevant bootstrap/build sources. Do not rerun the historical audit or 41-test baseline.
 
-- [ ] Inspect the actual destination checkout and remote; resume any real P01 checkpoint before new work. Destination repository: [Neb963/PCMS](https://github.com/Neb963/PCMS), branch `main`. Bootstrap does not begin P01.
-- [ ] Read accepted [v42](spec/PCMS-Working-Draft-v42.md), [design revision 2](architecture/design.md), [AGENTS.md](AGENTS.md) and [CI guidance](CI-GUIDELINES.md).
-- [ ] Integrate pinned donor-first bootstrap, preserved Gecko ID/native protocol and attribution. Keep admission blocked before readiness.
-- [ ] Build the development XPI with the 154.0 API floor, normal sandbox/CSP and one dashboard opened by the icon. No legacy popup or placeholder operations.
-- [ ] Add the initial fast changed-code/package checks and source-commit/XPI identity. Do not import the historical full CI program.
-- [ ] Run required P01 T/B checks on an actual qualifying Firefox build in a dedicated clean profile. Record exact results and failures here.
-- [ ] Push meaningful code plus this file to the actual GitHub remote; record the real commit and next unresolved action.
+## Implementation plan
+
+- [x] Inspect repository/checkpoints and select dependency-ready P01.
+- [ ] Vendor the exact pinned donor with MIT attribution and reproducible hashes. Extract the proven Alpha bootstrap repairs as small, checked build transformations. Preserve native protocol, permissions and `persona-route-manager@local`; exclude legacy UI/controllers from the operating host.
+- [ ] Add one packaged MV3 event page. Import fail-closed protection before PCMS initialization; register shell/wake listeners synchronously. Keep admission blocked for missing permission/bridge or bootstrap failure. No provider actions exist in P01.
+- [ ] Add the toolbar handler and one dashboard, with Home · Generators · Accounts · Refresher · Work · Other · Settings. Serialize rapid icon clicks; focus the existing dashboard. Show honest startup diagnostics and unfinished areas without fake operations.
+- [ ] Build a deterministic development XPI with `strict_min_version: 154.0`, separate privileged/sandbox CSP, no popup and source/XPI identity receipt. Add a short clean-profile installation guide.
+- [ ] Add focused T checks for bootstrap ordering/failure, duplicate icon clicks, package identity, attribution, permissions and transformations; add fast CI and only the required installed P01 journey.
+- [ ] B: persistently install the built XPI in a dedicated clean profile on a qualifying Firefox build with normal sandbox. Click the real toolbar icon twice; independently count/focus dashboard tabs. Verify blocked cold startup without a bridge. Record browser/build, source commit and XPI SHA-256. Unsupported browser or environmental failure remains an explicit hold.
+- [ ] Push meaningful checkpoints with this file; verify remote commit/tree, PR checks and resulting main after merge when required evidence passes.
 
 ## Evidence and holds
 
-- Planning checks completed: package SHA-256 manifest; full v42/revision-2 read; corrected 49-phase dependency graph, coverage and evidence placement; cross-file rules/links/terminology. These are document checks only.
-- P01 T/B: **NOT TESTED**. G/H/P1–P5 and capacity acceptance: **NOT TESTED**, scheduled in PHASES.md. Prior research/probes remain accepted within their original limits.
-- No implementation blocker was found in the supplied architecture. Publishing needs the actual destination GitHub remote. Installed verification needs a browser build satisfying `strict_min_version: 154.0`; the 154.0b10 proof alone is not that evidence.
-- Future live acceptance needs explicit authorization and disposable targets. This does not block safe coding or installed fixture tests.
+- T and B: **NOT TESTED** for the new host.
+- Connected Firefox information request returned MCP internal error before any browser operation. Use a clean local/CI Firefox environment if available; do not modify an existing user profile.
+- H: **NOT TESTED**, deferred to P42 for working bridge/protected contexts. No live provider or native route mutation is in scope.
+- This is an incomplete development checkpoint. Module seed/workflows and durable Core records belong to later phases.
 
-**Remote checkpoint:** Initial documentation bootstrap on `Neb963/PCMS` `main`. No P01 branch, PR, implementation test or CI result is claimed.
+**Remote checkpoint:** None for P01 yet; baseline main is recorded above.
 
-**Next unresolved action:** Start P01 on a new implementation branch, after verifying the remote `main` baseline. During implementation, replace this checklist with only the active phase and its next eligible work; keep real evidence/deferred checks concise.
+**Next unresolved action:** Inspect pinned donor and Alpha bootstrap/build sources, then publish this plan before implementation.
+
+**Next eligible phase after verified P01:** P02 — Durable records and continuous Core recording. Do not start it in this chat.
