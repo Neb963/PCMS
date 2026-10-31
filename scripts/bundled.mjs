@@ -5,6 +5,7 @@ import {zipSync,strToU8} from 'fflate';
 import {createHash} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
 import path from 'node:path';
+import {readFileSync} from 'node:fs';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 export const FIRST_PARTY=[
  ['pcms-accounts','Accounts'],['pcms-discover','Discover'],
@@ -34,15 +35,29 @@ const accounts=`PCMS.defineModule({
  outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{accountId:result.accountId}};if(['READY','CONTINUE'].includes(result.state))return {kind:'checkpoint',checkpoint:{accountId:result.accountId}};return {kind:'hold',reason:result.code||'ACCOUNT_OUTCOME_UNKNOWN',recovery:{action:'RECHECK'},checkpoint:{accountId:result.accountId}};},
  stop(){}
 });\n`;
+const discover=`PCMS.defineModule({
+ start(){},
+ async runStep(job,api){return this.outcome(await api.action({name:'discover.step'}));},
+ async reconcile(job,api){return this.outcome(await api.query({name:'discover.status'}));},
+ outcome(result){if(result.state==='COMPLETE')return {kind:'complete'};if(['READY','WAITING'].includes(result.state))return {kind:'wait',dueAt:result.dueAt||Date.now()};return {kind:'hold',reason:result.code||'DISCOVER_NEEDS_ATTENTION',recovery:{action:'OPEN_DISCOVER'}};},
+ stop(){}
+});\n`;
 const stamp=new Date('1980-01-01T00:00:00.000Z');
 export function bundledPackage(id,name){
- const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:pending);
+ const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:pending);
  const manifest={format:1,id,name,version:definition.version,coreApi:1,jobSchema:1,
   readsJobSchemas:[1],capabilities:[...definition.capabilities],entries:{background:'background.js'},
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};
+ const payload={'background.js':[background,{mtime:stamp}]};
+ if(id==='pcms-discover'){
+  for(const [file,source]of [['page.html','discover-page.html'],['page.js','discover-page.js'],['page.css','discover-page.css']]){
+   const bytes=new Uint8Array(readFileSync(new URL('../src/modules/'+source,import.meta.url)));payload[file]=[bytes,{mtime:stamp}];manifest.files.push({path:file,bytes:bytes.length,sha256:sha(bytes)});
+  }
+  manifest.pages=[{id:'check-slugs',title:'Check slugs',html:'page.html',script:'page.js',style:'page.css'}];
+ }
  const manifestBytes=strToU8(JSON.stringify(manifest));
  const zip=zipSync({'module.json':[manifestBytes,{mtime:stamp}],
-  'background.js':[background,{mtime:stamp}]},{level:6});
+  ...payload},{level:6});
  return {id,name,manifest,zip,manifestHash:sha(manifestBytes),packageHash:sha(zip)};
 }
 export async function writeBundledPackages(stage){

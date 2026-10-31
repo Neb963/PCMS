@@ -1,6 +1,7 @@
 // Narrow donor adapter adapted from the pinned Alpha enrollment primitives.
 // All routing/native authority stays in the original donor services. Core
 // supplies only an account binding and one finite operation, never raw URLs.
+import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
 const PERCHANCE='https://perchance.org/';
@@ -267,5 +268,73 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   const p=found.profile;if(!(await observeClosedTabs(scope)).ok)return fail('ACCOUNT_TABS_STILL_OPEN');
   try{await localMutationFence(p.containerId,async()=>{const fresh=await removalState(scope);if(fresh.code||fresh.profile?.personaUid!==p.personaUid)throw Error('ACCOUNT_CONTEXT_CHANGED');await personaPlatform.remove(p.containerId,{expectedRevision:fresh.state.__stateMeta?.revision,expectedBootId:fresh.state.__stateMeta?.bootId});});return observeRemoval(scope);}catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}
  }
- return Object.freeze({closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ // One dedicated read-only checking tab. It never borrows an account login,
+ // editor or user tab. Uncertain/manual documents are preserved and parked.
+ async function observeSlug(scope,{slug,operationId,tab:prior,readOnly=false,fresh=false,admit,saveTab}){
+  if(nativeSlug(slug)!==slug)return fail('SLUG_INVALID');
+  const url=PERCHANCE+slug,ready=await prerequisites();if(!ready.ok)return {...ready,noObservation:true};
+  let found=await protectedProfile(scope);if(found.code)return fail(found.code,{noObservation:true});
+  const run=async(tabId,options={},frameId=0)=>{const rows=await api.scripting.executeScript({target:{tabId,frameIds:[frameId]},world:'ISOLATED',func:captureSlugDocument,args:[options]});if(rows?.length!==1||rows[0].frameId!==frameId||rows[0].error)throw Error('SLUG_DOCUMENT_CHANGED');return rows[0].result;};
+  let tab=null,snapshot=null,state=prior;
+  try{
+   if(prior?.tabId!=null){
+    try{
+     const candidate=await api.tabs.get(prior.tabId),tag=await api.sessions.getTabValue(candidate.id,'pcmsDiscoverTab');
+     if(candidate.cookieStoreId===scope.containerId&&prior.accountId===scope.accountId&&tag?.accountId===scope.accountId&&tag.personaUid===scope.personaUid&&tag.role==='checking'){
+      snapshot=await run(candidate.id);
+      if(snapshot?.witness===prior.witness&&!snapshot.manual&&candidate.url===prior.url&&snapshot.url===prior.url)tab=candidate;
+     }
+    }catch{}
+    if(!tab){
+     if(readOnly||!fresh)return fail('DISCOVER_TAB_NEEDS_INSPECTION',{noObservation:true});
+     // Explicit Resume permits a fresh checking context; the old document
+     // remains open, with its manual content intact and no automation owner.
+     try{await run(prior.tabId,{dispose:true});const tag=await api.sessions.getTabValue(prior.tabId,'pcmsDiscoverTab');if(tag?.accountId===prior.accountId)await api.sessions.setTabValue(prior.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});}catch{}
+    }
+   }
+   if(readOnly&&(!tab||tab.url!==url||prior.operationId!==operationId))return fail('SLUG_OBSERVATION_UNATTRIBUTED');
+   if(!tab||tab.url!==url){
+    if(readOnly)return fail('SLUG_DOCUMENT_CHANGED');
+    await admit();found=await protectedProfile(scope);if(found.code)return fail(found.code);
+    // Intent lives in Core before the local navigation. A lost acknowledgement
+    // is inspectable; it cannot authorize navigating an unrelated tab.
+    await saveTab({schema:1,accountId:scope.accountId,operationId,slug,url,tabId:tab?.id??null,witness:tab?snapshot.witness:null,state:'NAVIGATING'});
+    await admit();
+    if(tab){const proof=await run(tab.id);if(proof.witness!==snapshot.witness||proof.manual||proof.url!==prior.url)return fail('DISCOVER_TAB_NEEDS_INSPECTION');tab=await api.tabs.update(tab.id,{url,active:false});}
+    else tab=await personaPlatform.open(scope.containerId,url,false);
+    await api.sessions.setTabValue(tab.id,'pcmsDiscoverTab',{accountId:scope.accountId,personaUid:scope.personaUid,operationId,role:'checking'});
+    await saveTab({schema:1,accountId:scope.accountId,operationId,slug,url,tabId:tab.id,witness:null,state:'NAVIGATING'});
+    const until=Date.now()+15000;
+    while(Date.now()<until){await admit();const current=await api.tabs.get(tab.id);if(current.cookieStoreId!==scope.containerId)return fail('SLUG_DOCUMENT_CHANGED');if(current.status==='complete'&&current.url===url)break;await new Promise(resolve=>setTimeout(resolve,200));}
+    snapshot=await run(tab.id,{install:true});if(snapshot.url!==url||snapshot.manual)return fail('SLUG_DOCUMENT_CHANGED');
+    state={schema:1,accountId:scope.accountId,operationId,slug,url,tabId:tab.id,witness:snapshot.witness,state:'OBSERVING'};await saveTab(state);
+   }else{snapshot=await run(tab.id);if(snapshot.witness!==state.witness||snapshot.manual)return fail('DISCOVER_TAB_NEEDS_INSPECTION');}
+   if(!snapshot.complete)return fail('SLUG_DOCUMENT_LOADING');
+   const frames=[];
+   let all=[];try{all=await api.webNavigation.getAllFrames({tabId:tab.id});}catch{}
+   for(const required of snapshot.frames){
+    const matches=all.filter(frame=>frame.parentFrameId===0&&required.url&&frame.url===required.url);
+    if(matches.length!==1){frames.push({accessible:false});continue;}
+    try{const observed=await run(tab.id,{},matches[0].frameId);frames.push({accessible:true,complete:observed.complete,content:observed.bodyContent,challenge:observed.challenge});}catch{frames.push({accessible:false});}
+   }
+   // Fresh authenticated identity belongs to this protected container/document;
+   // a previously Ready row cannot authorize a silently changed page session.
+   const identityRows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:accountDocumentWitness,args:[]});
+   const identityWitness=identityRows?.[0]?.result;
+   const identity=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:observePerchanceIdentity,args:[identityWitness]});
+   if(identity?.length!==1||identity[0].frameId!==0||identity[0].result?.ok!==true||identity[0].result.principalFingerprint!==scope.expectedPrincipal)return fail('ACCOUNT_PRINCIPAL_UNVERIFIED');
+   const after=await run(tab.id),final=await protectedProfile(scope),current=await api.tabs.get(tab.id);
+   if(final.code)return fail(final.code);
+   if(after.witness!==snapshot.witness||after.url!==url||after.manual||current.cookieStoreId!==scope.containerId||current.url!==url)return fail('SLUG_DOCUMENT_CHANGED');
+   return {ok:true,page:{complete:snapshot.complete,text:snapshot.text,challenge:snapshot.challenge,rootOutput:snapshot.rootOutput,requiredFrames:frames}};
+  }catch(error){return fail(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'SLUG_TRANSPORT_ERROR');}
+ }
+ async function releaseSlugObservation(tab){
+  if(tab?.tabId==null)return;
+  try{const tag=await api.sessions.getTabValue(tab.tabId,'pcmsDiscoverTab');if(tag?.accountId!==tab.accountId||tag.role!=='checking')return;
+   await api.scripting.executeScript({target:{tabId:tab.tabId,frameIds:[0]},world:'ISOLATED',func:captureSlugDocument,args:[{dispose:true}]});
+   await api.sessions.setTabValue(tab.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});
+  }catch{}
+ }
+ return Object.freeze({releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

@@ -25,7 +25,7 @@ export async function seedBundled(core,{read=async path=>{
   const candidate=await validatePackage(await read(bundledUrl(entry.id)));
   if(candidate.manifest.id!==entry.id||candidate.packageHash!==entry.packageHash||
    candidate.manifestHash!==entry.manifestHash||candidate.manifest.version!==bundledContract[entry.id].version||
-   JSON.stringify(candidate.manifest.capabilities)!==JSON.stringify(bundledContract[entry.id].capabilities)||candidate.manifest.pages.length||
+   JSON.stringify(candidate.manifest.capabilities)!==JSON.stringify(bundledContract[entry.id].capabilities)||JSON.stringify(candidate.manifest.pages)!==JSON.stringify(bundledContract[entry.id].pages??[])||
    candidate.manifest.entries.background!=='background.js')throw Error('BUNDLED_PACKAGE_MISMATCH');
   candidates.push(candidate);
  }
