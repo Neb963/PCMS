@@ -1,5 +1,6 @@
 // Deterministic, locally packaged first-party module baselines. No provider
 // workflow or deceptive UI is activated before its implementing phase.
+import {bundledContract} from '../src/modules/bundled-contract.mjs';
 import {zipSync,strToU8} from 'fflate';
 import {createHash} from 'node:crypto';
 import {mkdir,writeFile} from 'node:fs/promises';
@@ -26,11 +27,18 @@ const journal=`PCMS.defineModule({
  outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{fileId:result.fileId}};if(result.state==='WAITING')return {kind:'wait',dueAt:result.dueAt,checkpoint:{fileId:result.fileId}};return {kind:'hold',reason:result.code||'DOWNLOAD_PENDING',recovery:{action:'RECHECK'},checkpoint:{fileId:result.fileId}};},
  stop(){}
 });\n`;
+const accounts=`PCMS.defineModule({
+ start(){},
+ async runStep(job,api){return this.outcome(await api.action({name:'accounts.step'}));},
+ async reconcile(job,api){return this.outcome(await api.query({name:'accounts.status'}));},
+ outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{accountId:result.accountId}};if(['READY','CONTINUE'].includes(result.state))return {kind:'checkpoint',checkpoint:{accountId:result.accountId}};return {kind:'hold',reason:result.code||'ACCOUNT_OUTCOME_UNKNOWN',recovery:{action:'RECHECK'},checkpoint:{accountId:result.accountId}};},
+ stop(){}
+});\n`;
 const stamp=new Date('1980-01-01T00:00:00.000Z');
 export function bundledPackage(id,name){
- const isJournal=id==='pcms-journal',background=strToU8(isJournal?journal:pending);
- const manifest={format:1,id,name,version:isJournal?'0.3.0':'0.1.0',coreApi:1,jobSchema:1,
-  readsJobSchemas:[1],capabilities:isJournal?['journal.query','journal.export','journal.cleanup']:[],entries:{background:'background.js'},
+ const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:pending);
+ const manifest={format:1,id,name,version:definition.version,coreApi:1,jobSchema:1,
+  readsJobSchemas:[1],capabilities:[...definition.capabilities],entries:{background:'background.js'},
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};
  const manifestBytes=strToU8(JSON.stringify(manifest));
  const zip=zipSync({'module.json':[manifestBytes,{mtime:stamp}],
