@@ -18,6 +18,6 @@ P01–P12 are merged. P12 [PR #12](https://github.com/Neb963/PCMS/pull/12), main
 
 The workspace became unavailable after P12 completed. One shell probe returned “No usable execution environment is available”; GitHub API and CI remain available. All P12 code/evidence is on verified main. Continue via exact remote file/tree/commit checkpoints and existing CI, verifying returned files/trees and leased branch updates. Do not claim a local command ran or defer required T/B as PASS.
 
-Next implement/test the bounded Git planner, durable per-call effect state and repository serialization, then scoped caller/Work integration and independent installed lost-ACK recovery. P13 is planned, not implemented or verified.
+Next implement/test the bounded Git planner, durable per-call effect state and repository serialization, then scoped caller/Work integration and independent installed lost-ACK recovery. P13's pure scoped planner and independent object tests are now drafted. It admits only PREPARE/SOURCE/DONE, checks exact pinned maps, preserves protected/unrelated modes and bytes, handles Unicode/binary source and explicit owned deletions, and pins deterministic commit identity before effects. Durable queue dispatch, caller/Work integration and required T/B are still OPEN. Local commands remain unavailable; no new tests are claimed passed until existing CI runs this source.
 
 G/H/P1–P5 remain NOT TESTED and unauthorized. P43 needs explicit disposable Git targets/permissions before real writes. No live Git/provider/native operation is authorized by fixture success.
