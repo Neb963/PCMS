@@ -24,3 +24,5 @@ P03 T: 10 queue checks PASS locally (28 focused total); B: NOT TESTED. P02 18 fo
 Publish Core/queue/UI checkpoint, then complete installed P03 journey. P04 waits for required P03 evidence.
 
 The queue uses the existing records/events transaction. Work uses an indexed retained-version order. Due alarms are acknowledged once and do not poll when no module runner exists. Finite module execution is P04; no product/provider workflow is claimed.
+
+Queue/UI checkpoint `f9fcc927f777effe788566a7c82b9b3fde0801ba` is pushed in draft PR #3. Installed harness now drives a real packaged dispatch, independently counts its synthetic effect in a separate fixture boundary, clicks Pause/Resume, closes the dashboard, calls Firefox's actual event-page termination and performs a new-process restart. Required B remains NOT TESTED until its run passes.
