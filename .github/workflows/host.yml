@@ -52,12 +52,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Targeted Journal exports and independent disk bytes (normal sandbox)
-        run: python3 tests/installed_journal.py build/pcms-dev.xpi
+      - name: Targeted owned retention and independent disk preservation (normal sandbox)
+        run: python3 tests/installed_retention.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-journal-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-retention-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json

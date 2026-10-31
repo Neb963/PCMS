@@ -8,9 +8,9 @@ export function createRetention({core,api,profileId,clock=Date.now}){
  async function rows(){const out=[];let cursor=null;do{const p=await core.list({table:'files',cursor,limit:200});for(const r of p.rows)out.push(await core.read('files',r.id));cursor=p.cursor;}while(cursor);return out;}
  const owner=(r,type)=>r&&r.type===type&&r.moduleId==='pcms-'+type&&r.profileId===profileId&&r.automatic===true&&r.state==='COMPLETE';
  const allowed=async type=>{const m=await core.read('modules','pcms-'+type);return m?.enabled&&!m.lifecycle&&m.hostClass===type;};
- async function item(r){let items;try{items=await api.downloads.search({id:r.downloadId});}catch{return {code:'CLEANUP_STATUS_UNAVAILABLE'};}
+ async function item(r,removed=false){let items;try{items=await api.downloads.search({id:r.downloadId});}catch{return {code:'CLEANUP_STATUS_UNAVAILABLE'};}
   if(items.length!==1)return {code:items.length?'CLEANUP_ID_AMBIGUOUS':'CLEANUP_HISTORY_MISSING'};
-  if(!matchesDownload(r,items[0],api.runtime.id)||items[0].fileSize!==r.bytes||items[0].bytesReceived!==r.bytes||items[0].state!=='complete')return {code:'CLEANUP_IDENTITY_CHANGED'};
+  if(!matchesDownload(r,items[0],api.runtime.id)||items[0].state!=='complete'||(!(removed&&items[0].exists===false)&&(items[0].fileSize!==r.bytes||items[0].bytesReceived!==r.bytes)))return {code:'CLEANUP_IDENTITY_CHANGED'};
   return {value:items[0]};
  }
  const result=async(job,r,state,code=null,dueAt=null)=>({value:{state,code,fileId:r.id,...dueAt?{dueAt}:{}},jobRevision:(await core.read('jobs',job.id)).rev});
@@ -29,11 +29,11 @@ export function createRetention({core,api,profileId,clock=Date.now}){
    if(r.cleanup?.phase==='COMPLETE')return result(job,r,'COMPLETE');
    const current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',ack=r.cleanup?.removedAckAt!=null;
    if(!possible&&!ack){
-    const after=await core.read('files',afterId);if(after?.state!=='COMPLETE'||after.profileId!==profileId||after.type!==type||after.completedAt<=r.completedAt)return held(job,r,'CLEANUP_NEW_EXPORT_REQUIRED');
+    const m=await core.read('modules',job.moduleId),after=await core.read('files',afterId);if(m?.[type]?.lastExport?.state==='FAILED'||after?.state!=='COMPLETE'||after.profileId!==profileId||after.type!==type||after.completedAt<=r.completedAt)return held(job,r,'CLEANUP_NEW_EXPORT_REQUIRED');
     if(r.completedAt>=clock()-retentionDays*DAY)return result(job,r,'WAITING',null,r.completedAt+retentionDays*DAY+1);
     if(!await allowed(type))return result(job,r,'HELD','MODULE_DISABLED');
    }
-   const observed=await item(r);if(observed.code)return held(job,r,observed.code);
+   const observed=await item(r,possible||ack);if(observed.code)return held(job,r,observed.code);
    if(observed.value.exists===false){
     if(!possible&&!ack)return held(job,r,'CLEANUP_FILE_MOVED_OR_MISSING');
     if(possible)await core.queue.reconcile(job.id,current.rev,current.effect.operationId,{matched:true,operationId:current.effect.operationId});
@@ -47,7 +47,7 @@ export function createRetention({core,api,profileId,clock=Date.now}){
    if(reconcile)return result(job,r,'READY');
    r=await save(r,{...r.cleanup,phase:'REMOVE_POSSIBLE',code:null},'POSSIBLE');
    try{
-    await core.queue.dispatch(job.id,current.rev,{operationId:job.id+'-remove',kind:'REMOVE_EXPORT',write:false,preflight:async()=>{const m=await core.read('modules',job.moduleId),days=m?.[type]?.retentionDays??retentionDays,after=await core.read('files',m?.[type]?.lastComplete?.id??afterId);return {ok:await allowed(type)&&Number.isSafeInteger(days)&&days>0&&r.completedAt<clock()-days*DAY&&after?.state==='COMPLETE'&&after.profileId===profileId&&after.type===type&&after.completedAt>r.completedAt&&(await item(r)).value?.exists===true};},call:async()=>{await api.downloads.removeFile(r.downloadId);const latest=await core.read('files',r.id);await save(latest,{...latest.cleanup,phase:'ACKNOWLEDGED',removedAckAt:clock(),code:null},'ACKNOWLEDGED');},observe:async()=>{const latest=await core.read('files',r.id);return {matched:latest.cleanup.removedAckAt!=null,operationId:job.id+'-remove'};}});
+    await core.queue.dispatch(job.id,current.rev,{operationId:job.id+'-remove',kind:'REMOVE_EXPORT',write:false,preflight:async()=>{const m=await core.read('modules',job.moduleId),days=m?.[type]?.retentionDays??retentionDays,after=await core.read('files',m?.[type]?.lastComplete?.id??afterId);return {ok:await allowed(type)&&m?.[type]?.lastExport?.state!=='FAILED'&&Number.isSafeInteger(days)&&days>0&&r.completedAt<clock()-days*DAY&&after?.state==='COMPLETE'&&after.profileId===profileId&&after.type===type&&after.completedAt>r.completedAt&&(await item(r)).value?.exists===true};},call:async()=>{await api.downloads.removeFile(r.downloadId);const latest=await core.read('files',r.id);await save(latest,{...latest.cleanup,phase:'ACKNOWLEDGED',removedAckAt:clock(),code:null},'ACKNOWLEDGED');},observe:async()=>{const latest=await core.read('files',r.id);return {matched:latest.cleanup.removedAckAt!=null,operationId:job.id+'-remove'};}});
    }catch(error){const latest=await core.read('jobs',job.id);if(latest.effect?.boundary!=='POSSIBLE'){const f=await core.read('files',r.id);await save(f,{...f.cleanup,phase:'QUEUED',code:'CLEANUP_ADMISSION_HELD'},'HELD');return result(job,f,'HELD','CLEANUP_ADMISSION_HELD');}throw error;}
    return service.effect(await core.read('jobs',job.id),{type,afterId,retentionDays},true);
   },
