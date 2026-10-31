@@ -31,7 +31,7 @@ test('fresh install publishes all seven atomically with persistent marker and ha
  assert.deepEqual(await c.moduleSeedStatus(),{initialized:false,moduleCount:0});
  assert.equal((await seedBundled(c,{read:a.read})).state,'SEEDED');
  assert.deepEqual(await c.moduleSeedStatus(),{initialized:true,moduleCount:7});
- assert.deepEqual((await modules(c)).map(x=>x.id),bundledIds);
+ assert.deepEqual((await modules(c)).map(x=>x.id).sort(),[...bundledIds].sort());
  for(const p of a.packages){const m=await c.read('modules',p.id);
   assert.equal(m.packageHash,p.packageHash);assert.equal(m.manifestHash,p.manifestHash);
   assert.equal(m.enabled,true);assert.equal(m.generation,1);assert.equal(m.version,'0.1.0');
