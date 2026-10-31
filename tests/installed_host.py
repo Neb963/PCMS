@@ -61,6 +61,8 @@ def toolbar(session):
       CustomizableUI.addWidgetToArea(id,CustomizableUI.AREA_NAVBAR);
       const node=document.getElementById(id);
       if(!node)throw Error('REAL_TOOLBAR_ACTION_NOT_FOUND');
+      window.pcmsToolbarEvents=[];
+      for(const type of ['mousedown','mouseup','click','command'])node.addEventListener(type,e=>window.pcmsToolbarEvents.push({type:e.type,trusted:e.isTrusted,target:e.target.id,button:e.button}),{once:true});
       return id;
     """)
     element=call('POST',f'/session/{session}/element',{'using':'css selector','value':'#'+widget})
@@ -146,6 +148,10 @@ def main():
                       const ext=ExtensionParent.GlobalManager.getExtension(arguments[0]);
                       return {backgroundState:ext?.backgroundState,errors:ext?.errors,
                         background:ext?.manifest?.background,
+                        listeners:[...ext?.persistentListeners?.keys()||[]],
+                        views:[...ext?.views||[]].map(v=>({type:v.viewType,url:v.uri?.spec,window:typeof v.contentWindow,html:v.contentWindow?.document?.documentElement?.outerHTML})),
+                        toolbar:document.getElementById('persona-route-manager_local-browser-action')?.outerHTML,
+                        toolbarEvents:window.pcmsToolbarEvents,
                         console:Services.console.getMessageArray().map(m=>m.message).filter(m=>/moz-extension|PCMS|PersonaMonkey|SyntaxError|background|module/i.test(m)).slice(-25),
                         tabs:[...gBrowser.tabs].map(t=>t.linkedBrowser.currentURI.spec)};""",[ID])
                     (OUT/'failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
