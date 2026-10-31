@@ -6,7 +6,7 @@ import {createLifecycle} from '../modules/lifecycle.mjs';
 import {createWebsiteScripts} from './website-scripts.mjs';
 import {createAccounts} from '../modules/accounts.mjs';
 import {refreshAccountPins} from './account-pins.mjs';
-import {websiteContext,accountAdapter} from './bootstrap.mjs';
+import {websiteContext,accountAdapter,hostStatus} from './bootstrap.mjs';
 import {createRetention} from '../core/retention.mjs';
 import {createDownloads} from '../core/downloads.mjs';
 import {createJournal} from '../modules/journal.mjs';
@@ -48,6 +48,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       const value=await core();let result;
       switch(message?.operation) {
         case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await journal.tick();await accounts.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'host.status':result=await hostStatus(api);break;
         case 'accounts.status':result=await accounts.status();break;
         case 'accounts.list':result=await accounts.list(message);break;
         case 'accounts.get':result=await accounts.get(message.id);break;

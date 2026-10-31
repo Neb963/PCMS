@@ -151,9 +151,10 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       await req(s('meta').put(r));return {state:'SEEDED',...receipt};
     }),
     command:name=>transact(['commands'],'readonly',async s=>{requireCore(id(name),'INVALID_REQUEST');const r=await root(s);return req(s('commands').get([r.dataset,name]));}),
-    mutate:(changes,event,command=null)=>transact([...TABLES,'events','versions','blobs','chunks','commands'],'readwrite',async s=>{
+    mutate:(changes,event,command=null,guard=null)=>transact([...TABLES,'events','versions','blobs','chunks','commands'],'readwrite',async s=>{
       const r=await root(s);
       if(command){requireCore(id(command.id)&&typeof command.signature==='string','INVALID_REQUEST');const previous=await req(s('commands').get([r.dataset,command.id]));if(previous){requireCore(previous.signature===command.signature,'REQUEST_CONFLICT');return previous.result;}}
+      if(guard){requireCore(id(guard.moduleId)&&Number.isSafeInteger(guard.generation)&&id(guard.jobId)&&Number.isSafeInteger(guard.jobRevision),'INVALID_GUARD');const m=await req(s('modules').get([r.dataset,guard.moduleId])),job=await req(s('jobs').get([r.dataset,guard.jobId]));requireCore(m?.enabled&&!m.lifecycle&&m.generation===guard.generation,'STALE_GENERATION');requireCore(job?.rev===guard.jobRevision&&job.moduleId===guard.moduleId&&job.generation===guard.generation,'STALE_REVISION');}
       const result=await writeRows(s,r,changes,event);
       if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result}));return result;
     }),

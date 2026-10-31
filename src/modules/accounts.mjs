@@ -8,10 +8,10 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
  const turns=new Map();
  const serial=(id,fn)=>{const result=(turns.get(id)??Promise.resolve()).catch(()=>{}).then(fn);turns.set(id,result);return result.finally(()=>{if(turns.get(id)===result)turns.delete(id);});};
  const module=()=>core.read('modules',MODULE);
- const available=m=>m?.packageClass==='bundled-accounts'&&m.manifest?.capabilities?.includes('persona.prepare');
+ const available=m=>m?.packageClass==='bundled-accounts'&&['persona.prepare','persona.check','persona.open','persona.repair'].every(c=>m.manifest?.capabilities?.includes(c));
  async function admit(){const m=await module();check(available(m),'ACCOUNTS_UPDATE_REQUIRED');check(m.enabled&&!m.lifecycle,'ACCOUNTS_DISABLED');return m;}
- async function save(a,patch,step,result='COMPLETE',command=null){
-  try{await core.mutate([{table:'accounts',id:a.id,expectedRev:a.rev??0,refs:a.refs??[],value:{...a,...patch}}],{moduleId:MODULE,targetId:a.id,step,result},command);}
+ async function save(a,patch,step,result='COMPLETE',command=null,guard=null){
+  try{await core.mutate([{table:'accounts',id:a.id,expectedRev:a.rev??0,refs:a.refs??[],value:{...a,...patch}}],{moduleId:MODULE,targetId:a.id,step,result},command,guard);}
   catch(error){if(error.name==='ConstraintError')throw Object.assign(Error('ACCOUNT_BINDING_RESERVED'),{code:'ACCOUNT_BINDING_RESERVED'});throw error;}
   await pins(core);return core.read('accounts',a.id);
  }
@@ -44,17 +44,27 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   }else check(false,'ACCOUNT_STAGE_INVALID');
   patch.flow=flow;patch.state=END.has(flow.stage)?flow.stage:'PREPARING';await save(a,patch,'ACCOUNT_'+stage);return result(job,END.has(flow.stage)?'COMPLETE':'CONTINUE');
  }
- async function identity(a,job){
-  const value=await donor.checkBinding(scope(a),{stage:'IDENTITY',operationId:job.id+'-IDENTITY',identity:true});
+ async function identity(a,job,reconcile){
+  const operationId=job.id+'-IDENTITY',current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);let value;
+  if(reconcile&&!possible&&!observed)return result(job,'READY');await admit();
+  const prerequisites=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!prerequisites?.ok)return hold(a,job,prerequisites?.code??'DONOR_UNAVAILABLE');
+  const read=()=>donor.checkBinding(scope(a),{stage:'IDENTITY',operationId,identity:true,readOnly:true});
+  if(possible||observed){
+   check(!possible||current.effect.operationId===operationId,'ACCOUNT_OPERATION_CHANGED');value=await read();
+   if(possible)await core.queue.reconcile(job.id,current.rev,operationId,value?.ok?{matched:true,operationId}:{resolved:true,outcome:'FAILED',code:value?.code??'ACCOUNT_IDENTITY_UNKNOWN',operationId});
+  }else{
+   await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_IDENTITY',write:false,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {ok:latest.rev===a.rev,accountRevision:latest.rev};},call:async()=>{value=await read();},observe:async()=>value?.ok?{matched:true,operationId}:{resolved:true,outcome:'FAILED',code:value?.code??'ACCOUNT_IDENTITY_UNKNOWN',operationId}});
+  }
+  const finalJob=await core.read('jobs',job.id);if(finalJob.effect?.boundary==='POSSIBLE')return hold(a,job,'ACCOUNT_IDENTITY_UNKNOWN');
   if(!value?.ok)return hold(a,job,value?.code??'ACCOUNT_IDENTITY_UNKNOWN');
+  const m=await admit(),after=await donor.checkBinding(scope(a),{stage:'PREREQUISITES',readOnly:true});if(!after?.ok)return hold(a,job,after?.code??'DONOR_UNAVAILABLE');check(m.generation===job.generation,'STALE_GENERATION');
   check(value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');
   if(!a.flow.wasReady)check(Number.isFinite(a.flow.confirmationAt),'ACCOUNT_CONFIRM_REQUIRED');
   const p=value.identity;check(p?.ok===true&&p.source==='PERCHANCE_AUTHENTICATED_IDENTITY'&&/^[a-f0-9]{64}$/.test(p.principalFingerprint??'')&&typeof p.principalLabel==='string','ACCOUNT_IDENTITY_UNKNOWN');
   check(p.observedAt>=a.flow.startedAt&&p.observedAt<=clock()&&a.routeObservedAt>=a.flow.startedAt,'ACCOUNT_CONFIRM_STALE');
   if(a.expectedPrincipal)check(a.expectedPrincipal===p.principalFingerprint,'ACCOUNT_PRINCIPAL_CHANGED');
-  const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');
-  const next=a.flow.purpose==='OPEN'?'OPEN':'READY';
-  await save(a,{expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY');
+  const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');const next=a.flow.purpose==='OPEN'?'OPEN':'READY';
+  await save(a,{expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
   return result(job,next==='READY'?'COMPLETE':'CONTINUE');
  }
  async function effect(job,reconcile=false){
@@ -63,7 +73,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   if(END.has(a.flow.stage))return result(job,'COMPLETE');
   const stage=a.flow.stage,operationId=job.id+'-'+stage,current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);
   try{
-   if(stage==='IDENTITY'){if(reconcile)return result(job,'READY');await admit();return await identity(a,job);}
+   if(stage==='IDENTITY')return await identity(a,job,reconcile);
    check(['CREATE','SELECT','CREATE_ROUTE','ASSIGN','VERIFY','OPEN'].includes(stage),'ACCOUNT_STAGE_INVALID');
    if(possible||observed){
     check(!possible||current.effect.operationId===operationId,'ACCOUNT_OPERATION_CHANGED');const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});

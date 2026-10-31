@@ -1,7 +1,7 @@
 """Disposable native-protocol/SOCKS/HTTPS fixture. Never forwards a socket to
 an external host and never invokes an installed native service. Not packaged.
 """
-import base64,http.server,json,pathlib,socket,socketserver,ssl,struct,subprocess,sys,threading,time,types,zipfile
+import base64,http.server,json,pathlib,socket,socketserver,ssl,struct,subprocess,sys,threading,time,types,uuid,select
 from urllib.request import Request,urlopen
 HOST='com.persona.mullvad_router'
 ID='persona-route-manager@local'
@@ -18,8 +18,9 @@ class Fixture:
  def __init__(self,root):
   self.lock=threading.RLock();self.tokens={};self.exits={};self.calls=[];self.logins={};self.reads=[];self.probes=[];self.unexpected=[];self.delay_next=False;self.duplicate_exit=False
   ca=root/'ca.pem';key=root/'server.key';csr=root/'server.csr';cert=root/'server.pem';ext=root/'extensions.cnf'
-  ext.write_text('subjectAltName=DNS:perchance.org,DNS:am.i.mullvad.net,DNS:*.am.i.mullvad.net,DNS:*.dnsleak.am.i.mullvad.net\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
+  ext.write_text('subjectAltName=DNS:perchance.org,DNS:api.mullvad.net,DNS:am.i.mullvad.net,DNS:*.am.i.mullvad.net,DNS:*.dnsleak.am.i.mullvad.net\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
   for args in [['req','-x509','-newkey','rsa:2048','-nodes','-days','2','-subj','/CN=PCMS disposable fixture CA','-keyout',str(root/'ca.key'),'-out',str(ca)],['req','-newkey','rsa:2048','-nodes','-subj','/CN=perchance.org','-keyout',str(key),'-out',str(csr)],['x509','-req','-days','2','-in',str(csr),'-CA',str(ca),'-CAkey',str(root/'ca.key'),'-CAcreateserial','-extfile',str(ext),'-out',str(cert)]]:subprocess.run(['openssl',*args],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+  self.root=root;self.catalog=None;self.catalog_log=root/'catalog-requests.jsonl'
   self.ca=ssl.PEM_cert_to_DER_cert(ca.read_text());self.tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);self.tls.load_cert_chain(str(cert),str(key));self.tls.set_alpn_protocols(['http/1.1'])
   class Socks(socketserver.BaseRequestHandler):
    def handle(inner):
@@ -42,7 +43,26 @@ class Fixture:
   class Server(socketserver.ThreadingTCPServer):allow_reuse_address=True;daemon_threads=True
   self.proxy=Server(('127.0.0.1',0),Socks);self.port=self.proxy.server_address[1];self.control=http.server.ThreadingHTTPServer(('127.0.0.1',0),Control);self.control.fixture=self
   for server in [self.proxy,self.control]:threading.Thread(target=server.serve_forever,daemon=True).start()
+ def start_catalog(self,port=443):
+  # The browser resolves only this fixed fixture hostname to loopback. Use
+  # real HTTPS/trust, since Firefox isolates other extensions' requests from
+  # a fixture add-on's webRequest listener.
+  self.catalog_port=port;probe=socket.socket();prefix=[]
+  try:probe.bind(('127.0.0.1',port))
+  except PermissionError:prefix=['sudo','-n']
+  finally:probe.close()
+  self.catalog_nonce=uuid.uuid4().hex
+  command=[*prefix,sys.executable,str(pathlib.Path(__file__).resolve()),'catalog',str(self.root/'server.pem'),str(self.root/'server.key'),self.catalog_nonce,str(self.catalog_log),str(port)]
+  self.catalog=subprocess.Popen(command,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+  ready=select.select([self.catalog.stdout],[],[],10)[0]
+  if not ready or self.catalog.stdout.readline().strip()!='CATALOG_READY':raise RuntimeError('FIXTURE_CATALOG_START_FAILED: '+(self.catalog.stderr.read() if self.catalog.poll() is not None else 'no readiness'))
  def close(self):
+  if self.catalog and self.catalog.poll() is None:
+   context=ssl.create_default_context(cadata=ssl.DER_cert_to_PEM_cert(self.ca))
+   try:
+    with context.wrap_socket(socket.create_connection(('127.0.0.1',self.catalog_port),timeout=10),server_hostname='api.mullvad.net') as sock:sock.sendall(('GET /__pcms_shutdown/'+self.catalog_nonce+' HTTP/1.1\r\nHost: api.mullvad.net\r\nConnection: close\r\n\r\n').encode());sock.recv(4096)
+    self.catalog.wait(timeout=10)
+   except (OSError,subprocess.TimeoutExpired):pass
   for server in [self.proxy,self.control]:server.shutdown();server.server_close()
  def native(self,message):
   command=message.get('command');delay=False
@@ -57,14 +77,10 @@ class Fixture:
   if delay:time.sleep(70)
   return value
  def receipt(self):
-  with self.lock:return {'nativeCalls':list(self.calls),'reads':list(self.reads),'probes':list(self.probes),'sessions':{k:v['email'] for k,v in self.logins.items()},'unexpected':list(self.unexpected)}
+  with self.lock:return {'nativeCalls':list(self.calls),'reads':list(self.reads),'probes':list(self.probes),'sessions':{k:v['email'] for k,v in self.logins.items()},'unexpected':list(self.unexpected),'catalogRequests':self.catalog_log.read_text().splitlines() if self.catalog_log.exists() else []}
  def install_bridge(self,home,root):
   wrapper=root/'native-host.py';wrapper.write_text('#!/usr/bin/env python3\nimport sys\nsys.path.insert(0,'+repr(str(pathlib.Path(__file__).parent))+')\nfrom account_fixture import native_main\nnative_main('+str(self.control.server_port)+')\n');wrapper.chmod(0o755)
   folder=home/'.mozilla/native-messaging-hosts';folder.mkdir(parents=True,exist_ok=True);(folder/(HOST+'.json')).write_text(json.dumps({'name':HOST,'description':'Disposable PCMS protocol fixture','path':str(wrapper),'type':'stdio','allowed_extensions':[ID]}))
- def catalog_addon(self,root):
-  target='http://127.0.0.1:'+str(self.control.server_port)+'/catalog';p=root/'network-fixture.xpi';manifest={'manifest_version':2,'name':'PCMS disposable catalog fixture','version':'1.0','browser_specific_settings':{'gecko':{'id':'pcms-catalog-fixture@local'}},'permissions':['webRequest','webRequestBlocking','https://api.mullvad.net/*','http://127.0.0.1/*'],'background':{'scripts':['redirect.js']}}
-  with zipfile.ZipFile(p,'w') as z:z.writestr('manifest.json',json.dumps(manifest));z.writestr('redirect.js','browser.webRequest.onBeforeRequest.addListener(()=>({redirectUrl:'+json.dumps(target)+'}),{urls:["https://api.mullvad.net/network/v1-beta1/socks-proxies"]},["blocking"]);')
-  return p
 
 class Base(http.server.BaseHTTPRequestHandler):
  protocol_version='HTTP/1.1'
@@ -114,3 +130,16 @@ def native_main(port):
    body=json.dumps({'id':message.get('id'),'ok':False,'error':'FIXTURE_NATIVE_FAILURE'}).encode()
    try:sys.stdout.buffer.write(struct.pack('<I',len(body))+body);sys.stdout.buffer.flush()
    except BrokenPipeError:return
+
+def catalog_main(cert,key,nonce,log,port):
+ class Catalog(Base):
+  def do_GET(self):
+   if self.path=='/__pcms_shutdown/'+nonce:
+    threading.Thread(target=self.server.shutdown,daemon=True).start();return self.send({'stopped':True})
+   if self.headers.get('Host')!='api.mullvad.net' or self.path!='/network/v1-beta1/socks-proxies':return self.send({},status=404)
+   with open(log,'a') as target:target.write('GET fixed SOCKS catalog\n')
+   self.send([{'online':True,'hostname':'fixture-'+str(i),'ipv4_address':'10.124.0.'+str(i),'port':1080,'location':{'country':'Fixture','city':'Local'}} for i in range(1,9)])
+ context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(cert,key);context.set_alpn_protocols(['http/1.1'])
+ with http.server.ThreadingHTTPServer(('127.0.0.1',int(port)),Catalog) as server:
+  server.socket=context.wrap_socket(server.socket,server_side=True);print('CATALOG_READY',flush=True);server.serve_forever()
+if __name__=='__main__' and sys.argv[1]=='catalog':catalog_main(*sys.argv[2:])
