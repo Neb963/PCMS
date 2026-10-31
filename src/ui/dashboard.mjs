@@ -63,7 +63,7 @@ async function persist(){
 }
 async function renderRecords(key){
  void queueStatus();
- const area=document.getElementById('records');if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
+ const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
  if(key==='module'){await renderModule(area);return;}
  if(key==='other'){await renderOther(area);return;}
  if(key==='home'){
@@ -88,7 +88,7 @@ async function renderRecords(key){
  }
 }
 const initial=await core('view.get');
-if(initial.ok&&initial.result){view=initial.result;if(!location.hash)location.hash='#'+view.route;}
+if(initial.ok&&initial.result){view=initial.result;if(!location.hash)history.replaceState(null,'','#'+view.route);}
 await updateModuleNavigation();route();
 
 async function queueStatus(){
@@ -156,7 +156,7 @@ async function renderModuleSettings(area){
   section.dataset.module=module.id;
   const outcome=node('p');outcome.setAttribute('role','status');outcome.className='lifecycle-result';
   if(module.lifecycle)outcome.textContent=(module.lifecycle.kind==='DISABLE'?'Disabling':'Updating')+' — '+(module.lifecycle.code||'Stopping safely');
-  for(const [kind,label] of module.lifecycle?[['CONTINUE','Check safe stop']]:[...module.stagedVersion?[['UPDATE','Update to '+module.stagedVersion]]:[],[module.enabled?'DISABLE':'ENABLE',module.enabled?'Disable':'Enable'],...module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]){
+  for(const [kind,label] of module.lifecycle?[['CONTINUE','Check safe stop'],...module.lifecycle.code==='MODULE_REBUILD_FAILED'&&module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]:[...module.stagedVersion?[['UPDATE','Update to '+module.stagedVersion]]:[],[module.enabled?'DISABLE':'ENABLE',module.enabled?'Disable':'Enable'],...module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]){
    const button=node('button',label);button.type='button';button.dataset.lifecycle=kind;button.addEventListener('click',async()=>{button.disabled=true;outcome.textContent='In progress';const response=await core('module.lifecycle',{id:module.id,kind,requestId:crypto.randomUUID()});if(response.ok){await updateModuleNavigation();await renderRecords('settings');}else{outcome.replaceChildren(failure(response.code));button.disabled=false;}});section.append(button);
   }
   if(module.lifecycle?.code==='MODULE_STOP_INCOMPLETE'){const open=node('button','Open affected editor');open.type='button';open.addEventListener('click',async()=>{const result=await core('module.editor',{id:module.id});if(!result.ok)outcome.replaceChildren(failure(result.code));});section.append(open);}

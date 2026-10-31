@@ -47,7 +47,7 @@ export function createLifecycle({core,host,clock=Date.now}) {
     if(m.lifecycle.desiredEnabled)await host.rebuild({...m,enabled:true,lifecycle:null});
     m=await core.read('modules',id);
     const done=await save(m,{enabled:m.lifecycle.desiredEnabled,state:m.lifecycle.desiredEnabled?'READY':'DISABLED',lastLifecycle:{id:m.lifecycle.id,kind:m.lifecycle.kind,completedAt:clock()},lifecycle:null},'COMPLETE');core.queue.unfence(id);return done;
-   }catch{return hold(m,'MODULE_REBUILD_FAILED');}
+   }catch(error){return hold(m,error.message==='MODULE_PERMISSION_REQUIRED'?'MODULE_PERMISSION_REQUIRED':'MODULE_REBUILD_FAILED');}
   }
   return m;
  }
@@ -55,14 +55,21 @@ export function createLifecycle({core,host,clock=Date.now}) {
   request:(id,kind,requestId)=>serial(id,async()=>{
    check(['UPDATE','DISABLE','ENABLE','ROLLBACK','CONTINUE'].includes(kind)&&typeof requestId==='string','MODULE_INVALID_ACTION');
    let m=await core.read('modules',id);check(m,'MODULE_MISSING');
-   if(m.lifecycle)return advance(id);
+   if(m.lifecycle){
+    if(kind==='ROLLBACK'&&m.lifecycle.phase==='REBUILD'){
+     await compatible(m,m.previous);
+     m=await save(m,{generation:m.generation+1,lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances:await host.instances(m),startedAt:clock(),code:null}},'FENCED');
+    }
+    return advance(id);
+   }
    if(m.lastLifecycle?.id===requestId)return m;
    if(kind==='CONTINUE'||kind==='ENABLE'&&m.enabled||kind==='DISABLE'&&!m.enabled)return m;
    const candidate=kind==='UPDATE'?m.staged:kind==='ROLLBACK'?m.previous:m;
    if(kind!=='DISABLE')await compatible(m,candidate);
    const instances=await host.instances(m);
    core.queue.fence(id);
-   m=await save(m,{enabled:false,generation:m.generation+1,state:'STOPPING',lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances,startedAt:clock(),code:null}},'FENCED');
+   try{m=await save(m,{enabled:false,generation:m.generation+1,state:'STOPPING',lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances,startedAt:clock(),code:null}},'FENCED');}
+   catch(error){if(!(await core.read('modules',id))?.lifecycle)core.queue.unfence(id);throw error;}
    await host.fence(m);
    return advance(id);
   }),

@@ -44,3 +44,9 @@ test('Disable preserves records and recording, Enable reconstructs same jobs; in
  const enabled=await s.life().request(disabled.id,'ENABLE','enable');assert.equal(enabled.enabled,true);assert.equal(enabled.generation,3);assert.equal((await s.core.read('jobs',s.job.id)).state,'WAITING');
  await s.install('1.1.0');const before=await s.core.read('modules',disabled.id);s.host.checkCandidate=async()=>{throw Error('MODULE_START_FAILED');};await assert.rejects(s.life().request(disabled.id,'UPDATE','bad'),/MODULE_START_FAILED/);assert.deepEqual(await s.core.read('modules',disabled.id),before);
 });
+test('failed fence transaction releases only the volatile fence and preserves durable state; post-activation rollback is explicit',async t=>{
+ const s=await setup(t);await s.install('1.1.0');const mutate=s.core.mutate;s.core.mutate=async(changes,event)=>{if(event.result==='FENCED')throw Error('FIXTURE_QUOTA');return mutate(changes,event);};await assert.rejects(s.life().request('fixture-module','UPDATE','failed-fence'),/FIXTURE_QUOTA/);s.core.mutate=mutate;
+ assert.equal((await s.core.read('modules','fixture-module')).enabled,true);assert.equal((await s.core.read('modules','fixture-module')).lifecycle,undefined);
+ s.host.rebuild=async()=>{throw Error('fixture');};await s.life().request('fixture-module','UPDATE','update');assert.equal((await s.core.read('modules','fixture-module')).version,'1.1.0');s.host.rebuild=async()=>{};
+ const rolled=await s.life().request('fixture-module','ROLLBACK','explicit-rollback');assert.equal(rolled.version,'1.0.0');assert.equal(rolled.enabled,true);assert.equal(rolled.generation,3);assert.deepEqual((await s.core.read('jobs',s.job.id)).input,{original:'keep'});
+});
