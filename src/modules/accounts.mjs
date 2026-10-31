@@ -135,8 +135,10 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   check(a.admission==='REMOVING'&&a.flow.jobId===job.id&&a.flow.requestId===job.input.requestId,'ACCOUNT_REMOVAL_SCOPE_DENIED');
   if(core.queue.accountActive(a.id))return hold(a,job,'ACCOUNT_EFFECT_DRAINING');
   if(a.flow.stage==='REMOVE_DATA'){
-   await admit();const m=await module();check(m.generation===job.generation,'STALE_GENERATION');
-   await core.removeAccountData({accountId:a.id,jobId:job.id,expectedRev:a.rev});await pins(core);return result(job,'COMPLETE');
+   if(reconcile)return result(job,'READY');
+   try{await admit();const m=await module();check(m.generation===job.generation,'STALE_GENERATION');
+    await core.removeAccountData({accountId:a.id,jobId:job.id,expectedRev:a.rev});await pins(core);return result(job,'COMPLETE');
+   }catch(error){return hold(a,job,error.code??publicError(error));}
   }
   const operationId=job.id+'-REMOVE_PERSONA',current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);
   try{
@@ -156,7 +158,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   effect:(job,reconcile=false)=>serial(job.accountId,()=>effect(job,reconcile)),
   async check(id){return serial(id,async()=>{const a=await core.read('accounts',id);check(a,'ACCOUNT_MISSING');if(a.flow?.jobId){const job=await core.read('jobs',a.flow.jobId);if(job&&!['COMPLETE','FAILED'].includes(job.state)){const outcome=await effect(job,true),latest=await core.read('jobs',job.id);if(['READY','CONTINUE','COMPLETE'].includes(outcome.value.state)&&latest.effect?.boundary!=='POSSIBLE'&&latest.state==='HELD')await core.queue.transition(job.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});}}return project('accounts',await core.read('accounts',id));});},
   async status(){const m=await module();return {enabled:m?.enabled===true&&!m.lifecycle,available:available(m)};},
-  async list(args={}){return core.list({table:'accounts',cursor:args.cursor,search:args.search??'',filters:args.state?{state:args.state}:{},limit:50});},
+  async list(args={}){const page=await core.list({table:'accounts',cursor:args.cursor,search:args.search??'',filters:args.state?{state:args.state}:{},limit:50});return {...page,rows:await Promise.all(page.rows.map(async p=>{const a=await core.read('accounts',p.id);return {...p,generatorCount:(await accountRows('generators',p.id)).length,loginStatus:a.state==='READY'?'Login checked':a.admission==='ARCHIVED'?'Archived':'Login: Unknown',routeStatus:a.state==='READY'?'Route checked':a.admission==='ARCHIVED'?'Archived':'Route: Unknown'};}))};},
   async related(id,table,cursor=null){check(['jobs','generators'].includes(table),'QUERY_DENIED');return core.list({table,filters:{accountId:id},cursor,limit:50});},
   async get(id){const a=await core.read('accounts',id);if(!a)return null;const jobs=await accountRows('jobs',id),generators=await accountRows('generators',id);return {...project('accounts',a),admission:a.admission??null,generatorCount:generators.length,unfinishedJobs:jobs.filter(j=>!['COMPLETE','FAILED'].includes(j.state)).map(j=>project('jobs',j)),containerId:a.containerId??null,routeId:a.routeId??null,exitAddresses:a.exitAddresses??[],routeObservedAt:a.routeObservedAt??null,identityObservedAt:a.identityObservedAt??null,confirmedAt:a.confirmedAt??null,stage:a.flow?.stage??null,jobId:a.flow?.jobId??null,work:a.flow?.jobId?project('jobs',await core.read('jobs',a.flow.jobId)):null};}
  };

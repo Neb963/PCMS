@@ -160,7 +160,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }),
     // Account-only cleanup. Source/history references and unrelated secrets
     // remain in the one dataset; no module or generic RPC receives this API.
-    removeAccountData:({accountId,jobId,expectedRev})=>transact(['accounts','jobs','generators','modules','credentials','versions','events','blobs','chunks'],'readwrite',async s=>{
+    removeAccountData:({accountId,jobId,expectedRev})=>transact(['accounts','jobs','generators','modules','credentials','commands','versions','events','blobs','chunks'],'readwrite',async s=>{
       const r=await root(s),a=await req(s('accounts').get([r.dataset,accountId]));
       requireCore(a?.rev===expectedRev&&a.admission==='REMOVING'&&a.flow?.jobId===jobId&&a.flow.stage==='REMOVE_DATA','ACCOUNT_REMOVAL_NOT_READY');
       const job=await req(s('jobs').get([r.dataset,jobId])),m=await req(s('modules').get([r.dataset,'pcms-accounts']));requireCore(m?.enabled&&!m.lifecycle&&m.generation===job?.generation&&!r.paused,'ACCOUNT_REMOVAL_HELD');
@@ -169,6 +169,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       for(const g of await req(s('generators').index('accountId').getAll(IDBKeyRange.only([r.dataset,accountId]))))changes.push({table:'generators',id:g.id,expectedRev:g.rev,value:{...g,ownerMissing:true,ownerLabel:a.label,state:'HELD',holdCode:'OWNER_MISSING'},refs:g.refs??[]});
       await writeRows(s,r,changes,{moduleId:'pcms-accounts',targetId:accountId,jobId,step:'REMOVE_ACCOUNT_DATA',result:'COMPLETE'});
       let c=await req(s('credentials').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(c){if(c.value.accountId===accountId)await req(c.delete());c=await req(c.continue()||c.request);}
+      const removedJobs=new Set(jobs.filter(j=>j.id!==jobId).map(j=>j.id));let command=await req(s('commands').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(command){if(removedJobs.has(command.value.jobId))await req(command.delete());command=await req(command.continue()||command.request);}
       // Old account snapshots and old job inputs must not resurrect removed
       // local data through paging or a later backup. Events are secret-safe.
       for(const [table,recordId]of [['accounts',accountId],...jobs.filter(j=>j.id!==jobId).map(j=>['jobs',j.id])]){let v=await req(s('versions').openCursor(IDBKeyRange.bound([r.dataset,table,recordId,0],[r.dataset,table,recordId,Number.MAX_SAFE_INTEGER])));while(v){if(table==='accounts'||v.value.sequence<r.sequence)await req(v.delete());v=await req(v.continue()||v.request);}}

@@ -16,7 +16,7 @@ def exact(sock,n):
 
 class Fixture:
  def __init__(self,root):
-  self.lock=threading.RLock();self.tokens={};self.exits={};self.calls=[];self.logins={};self.reads=[];self.probes=[];self.unexpected=[];self.delay_next=False;self.duplicate_exit=False
+  self.lock=threading.RLock();self.tokens={};self.exits={};self.calls=[];self.logins={};self.reads=[];self.probes=[];self.unexpected=[];self.delay_next=False;self.duplicate_exit=False;self.inventory={'remote-sentinel':{'isPrivate':True,'files':{'main.pjs':'protected remote source\n','index.html':'<p>Remote sentinel</p>','src/data.bin':'AAH/'}}}
   ca=root/'ca.pem';key=root/'server.key';csr=root/'server.csr';cert=root/'server.pem';ext=root/'extensions.cnf'
   ext.write_text('subjectAltName=DNS:perchance.org,DNS:api.mullvad.net,DNS:am.i.mullvad.net,DNS:*.am.i.mullvad.net,DNS:*.dnsleak.am.i.mullvad.net\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
   for args in [['req','-x509','-newkey','rsa:2048','-nodes','-days','2','-subj','/CN=PCMS disposable fixture CA','-keyout',str(root/'ca.key'),'-out',str(ca)],['req','-newkey','rsa:2048','-nodes','-subj','/CN=perchance.org','-keyout',str(key),'-out',str(csr)],['x509','-req','-days','2','-in',str(csr),'-CA',str(ca),'-CAkey',str(root/'ca.key'),'-CAcreateserial','-extfile',str(ext),'-out',str(cert)]]:subprocess.run(['openssl',*args],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -77,7 +77,7 @@ class Fixture:
   if delay:time.sleep(70)
   return value
  def receipt(self):
-  with self.lock:return {'nativeCalls':list(self.calls),'reads':list(self.reads),'probes':list(self.probes),'sessions':{k:v['email'] for k,v in self.logins.items()},'unexpected':list(self.unexpected),'catalogRequests':self.catalog_log.read_text().splitlines() if self.catalog_log.exists() else []}
+  with self.lock:return {'nativeCalls':list(self.calls),'reads':list(self.reads),'probes':list(self.probes),'sessions':{k:v['email'] for k,v in self.logins.items()},'unexpected':list(self.unexpected),'remoteInventory':json.loads(json.dumps(self.inventory)),'catalogRequests':self.catalog_log.read_text().splitlines() if self.catalog_log.exists() else []}
  def install_bridge(self,home,root):
   wrapper=root/'native-host.py';wrapper.write_text('#!/usr/bin/env python3\nimport sys\nsys.path.insert(0,'+repr(str(pathlib.Path(__file__).parent))+')\nfrom account_fixture import native_main\nnative_main('+str(self.control.server_port)+')\n');wrapper.chmod(0o755)
   folder=home/'.mozilla/native-messaging-hosts';folder.mkdir(parents=True,exist_ok=True);(folder/(HOST+'.json')).write_text(json.dumps({'name':HOST,'description':'Disposable PCMS protocol fixture','path':str(wrapper),'type':'stdio','allowed_extensions':[ID]}))
