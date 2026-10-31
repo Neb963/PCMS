@@ -5,10 +5,11 @@ export function createJournal({core,downloads,clock=Date.now}){
  const id='pcms-journal',active=new Set();let serial=Promise.resolve();
  const run=fn=>{const result=serial.then(fn,fn);serial=result.catch(()=>{});return result;};
  const module=()=>core.read('modules',id);
- const enabled=m=>m?.enabled&&!m.lifecycle&&m.packageClass==='bundled-journal';
+ const capable=m=>m?.packageClass==='bundled-journal'&&m.manifest?.capabilities?.includes('journal.export');
+ const enabled=m=>m?.enabled&&!m.lifecycle&&capable(m);
  async function save(m,patch,step){await core.mutate([{table:'modules',id,expectedRev:m.rev,refs:m.refs,value:{...m,...patch}}],{step,result:'COMPLETE',moduleId:id});return module();}
  async function setup(){let m=await module();if(!m||m.packageClass!=='bundled-journal')return m;if(!m.journal)m=await save(m,{hostClass:'journal',journal:{intervalMinutes:30,folder:'PCMS/Journal',nextDue:clock()+30*60000,watermark:0,lastExport:null,lastComplete:null,gaps:[]}},'JOURNAL_INITIALIZE');return m;}
- const admit=async()=>{const m=await setup();check(enabled(m),'JOURNAL_DISABLED');return m;};
+ const admit=async()=>{const m=await setup();check(capable(m),'JOURNAL_UPDATE_REQUIRED');check(enabled(m),'JOURNAL_DISABLED');return m;};
  async function pendingJobs(){let cursor=null;const rows=[];do{const page=await core.list({table:'jobs',cursor});for(const j of page.rows)if(j.moduleId===id&&!['COMPLETE','FAILED'].includes(j.state))rows.push(await core.read('jobs',j.id));cursor=page.cursor;}while(cursor);return rows;}
  async function enqueue({requestId,first,last,automatic=false}){
   let m=await admit();const cut=(await core.status()).sequence;
@@ -41,7 +42,7 @@ export function createJournal({core,downloads,clock=Date.now}){
   tick:()=>run(tick),
   async deadline(){const m=await setup();return enabled(m)&&!(await pendingJobs()).length?m.journal.nextDue:null;},
   settings:values=>run(async()=>{let m=await admit();check(Number.isSafeInteger(values.intervalMinutes)&&values.intervalMinutes>0,'JOURNAL_INTERVAL_INVALID');exportFolder(values.folder);m=await save(m,{journal:{...m.journal,intervalMinutes:values.intervalMinutes,folder:values.folder,nextDue:clock()+values.intervalMinutes*60000}},'JOURNAL_SETTINGS');return m.journal;}),
-  async status(){const m=await setup(),jobs=await pendingJobs();return {enabled:enabled(m),settings:m?.journal??null,jobs:jobs.map(j=>project('jobs',j))};},
+  async status(){const m=await setup(),jobs=await pendingJobs();return {enabled:m?.enabled===true&&!m.lifecycle,available:capable(m),settings:m?.journal??null,jobs:jobs.map(j=>project('jobs',j))};},
   async events(args){await admit();return core.list({table:'events',cursor:args.cursor,search:args.search??'',filters:args.filters??{},limit:50});},
   effect:(job,reconcile=false)=>run(async()=>{
    check(job.moduleId===id&&job.kind==='EXPORT','EXPORT_SCOPE_DENIED');active.add(job.id);

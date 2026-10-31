@@ -23,8 +23,8 @@ export async function seedBundled(core,{read=async path=>{
  for(const entry of index.packages){
   const candidate=await validatePackage(await read(bundledUrl(entry.id)));
   if(candidate.manifest.id!==entry.id||candidate.packageHash!==entry.packageHash||
-   candidate.manifestHash!==entry.manifestHash||candidate.manifest.version!=='0.1.0'||
-   candidate.manifest.capabilities.length||candidate.manifest.pages.length||
+   candidate.manifestHash!==entry.manifestHash||candidate.manifest.version!==(entry.id==='pcms-journal'?'0.2.0':'0.1.0')||
+   JSON.stringify(candidate.manifest.capabilities)!==JSON.stringify(entry.id==='pcms-journal'?['journal.query','journal.export']:[])||candidate.manifest.pages.length||
    candidate.manifest.entries.background!=='background.js')throw Error('BUNDLED_PACKAGE_MISMATCH');
   candidates.push(candidate);
  }
