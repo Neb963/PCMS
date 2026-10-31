@@ -37,8 +37,9 @@ const accounts=`PCMS.defineModule({
 });\n`;
 const discover=`PCMS.defineModule({
  start(){},
- async runStep(job,api){return this.outcome(await api.action({name:'discover.step'}));},
- async reconcile(job,api){return this.outcome(await api.query({name:'discover.status'}));},
+ async runStep(job,api){return job.kind==='GIT_PREPARE'?this.gitOutcome(await api.action({name:'github.prepareFolder'})):this.outcome(await api.action({name:'discover.step'}));},
+ async reconcile(job,api){return job.kind==='GIT_PREPARE'?this.gitOutcome(await api.query({name:'github.prepareFolderStatus'})):this.outcome(await api.query({name:'discover.status'}));},
+ gitOutcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{commit:result.receipt.commit}};if(['READY','CONTINUE'].includes(result.state))return {kind:'checkpoint'};return {kind:'hold',reason:result.code||'GIT_WRITE_OUTCOME_UNKNOWN',recovery:{action:result.code==='DISCOVER_BATCH_PAUSED'?'OPEN_DISCOVER':'CHECK_GIT'}};},
  outcome(result){if(result.state==='COMPLETE')return {kind:'complete'};if(['READY','WAITING'].includes(result.state))return {kind:'wait',dueAt:result.dueAt||Date.now()};return {kind:'hold',reason:result.code||'DISCOVER_NEEDS_ATTENTION',recovery:{action:'OPEN_DISCOVER'}};},
  stop(){}
 });\n`;

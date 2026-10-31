@@ -22,3 +22,5 @@ P15 code is not yet written. Next add the Core-owned Available→preparation lin
 The local execution environment remains unavailable. Continue exact remote GitHub checkpoints and existing CI; do not claim unavailable local commands or deferred tests as PASS.
 
 G/H/P1–P5 remain NOT TESTED and unauthorized. P43 requires explicit disposable real Git target/effects before real Git acceptance; P44 later qualifies the live classifier/Creator. Fixture success authorizes no live provider/Git operation.
+
+Core linkage checkpoint: Discover0.3 now stages one positively scoped preparation job per dated observation/repository, atomically links its Core-owned proof, and reuses the existing PREPARE writer. Same-operation readback, batch Pause/Resume, exact pinned repository, known-safe failed-attempt retry and catalog observation are connected. Available/date remain separate from Git. Per-row UI, reconnect lifecycle integration and required T/B remain OPEN.
