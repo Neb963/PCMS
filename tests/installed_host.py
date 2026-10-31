@@ -83,7 +83,12 @@ def dashboard(session):
     return wait(locate)
 
 def status(session, expected):
-    return wait(lambda:script(session,"return document.body.dataset.startup") == expected,25)
+    end=time.monotonic()+25;actual=None
+    while time.monotonic()<end:
+        actual=script(session,"return {code:document.body.dataset.startup,text:document.getElementById('status')?.textContent,details:document.getElementById('details')?.textContent}")
+        if actual.get('code')==expected:return actual
+        time.sleep(.15)
+    raise AssertionError(('STARTUP_STATUS_MISMATCH',expected,actual))
 
 def main():
     binary=pathlib.Path(os.environ['FIREFOX_BINARY']); driver=pathlib.Path(os.environ['GECKODRIVER_BINARY'])
