@@ -30,6 +30,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
   const capability=operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
   if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability}))throw Error('CAPABILITY_DENIED');
+  if(operation==='pageReady'||operation==='pageFailed')return core.record({step:'OPEN_MODULE_PAGE',result:operation==='pageReady'?'COMPLETE':'FAILED',moduleId:binding.moduleId});
   if(operation==='saveView')return core.saveView('module:'+binding.moduleId+':'+binding.pageId,args.value,m.requestId);
   if(operation==='getView')return core.view('module:'+binding.moduleId+':'+binding.pageId);
   if(operation==='query'){
@@ -82,7 +83,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   catch(error){frames.delete(binding);iframe.remove();throw error;}finally{clearTimeout(timer);}
  }
  async function start(){
-  let cursor=null;do{const page=await core.list({table:'modules',cursor});for(const projection of page.rows){const module=await core.read('modules',projection.id);if(module.enabled&&module.manifest?.entries?.background&&!backgrounds.has(module.id))try{backgrounds.set(module.id,await frame(module,'background'));}catch{await core.record({step:'START_MODULE',result:'FAILED',moduleId:module.id,code:'MODULE_START_FAILED'});}}cursor=page.cursor;}while(cursor);
+  let cursor=null;do{const page=await core.list({table:'modules',cursor});for(const projection of page.rows){const module=await core.read('modules',projection.id);if(module.enabled&&module.manifest?.entries?.background&&!backgrounds.has(module.id))try{backgrounds.set(module.id,await frame(module,'background'));await core.record({step:'START_MODULE',result:'COMPLETE',moduleId:module.id});}catch{await core.record({step:'START_MODULE',result:'FAILED',moduleId:module.id,code:'MODULE_START_FAILED'});}}cursor=page.cursor;}while(cursor);
  }
  async function turn(){
   if(running)return running;
@@ -100,7 +101,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   })().finally(()=>{running=null;});return running;
  }
  async function openPage(moduleId,pageId,container){const module=await core.read('modules',moduleId);return frame(module,'page',pageId,container);}
- async function stop(binding){const receipt=await request(binding,'STOP',{generation:binding.generation});frames.delete(binding);binding.iframe.remove();if(backgrounds.get(binding.moduleId)===binding)backgrounds.delete(binding.moduleId);return receipt;}
+ async function stop(binding){const receipt=await request(binding,'STOP',{generation:binding.generation});frames.delete(binding);binding.iframe.remove();if(backgrounds.get(binding.moduleId)===binding)backgrounds.delete(binding.moduleId);await core.record({step:'STOP_MODULE',result:'COMPLETE',moduleId:binding.moduleId});return receipt;}
  async function preparePage(moduleId,pageId,sender){
   const module=await core.read('modules',moduleId);if(!module?.enabled||!module.manifest)throw Error('MODULE_DISABLED');if(!/^[a-f0-9]{64}$/.test(module.packageHash)||!Number.isSafeInteger(module.generation)||module.manifest.coreApi!==1||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
   const page=module.manifest.pages.find(p=>p.id===pageId);if(!page)throw Error('PAGE_MISSING');

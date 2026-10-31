@@ -16,7 +16,7 @@ P03 COMPLETE in PR #3, merge `9a4f69fb1d96eda29c20f2c624ca5f94bf779608`, tree `7
 
 ## Evidence / holds
 
-P04 T/B: NOT TESTED. P01–P03 accepted non-live evidence is reused where unchanged. No live route/provider operation is authorized here. The XPI is incomplete until the later module/workflow slices.
+P04 T/B: PASS on checkpoint `414cd634cc50971b746b7dda043a9a766bfa123d`, run `41220951380`; final status/navigation/recording corrections require current-candidate checks. P01–P03 accepted non-live evidence is reused where unchanged. No live route/provider operation is authorized here. The XPI is incomplete until the later module/workflow slices.
 
 ## Next action
 
@@ -27,3 +27,5 @@ Initial P04 source and four focused binding/step/CSS tests are implemented; T pa
 Checkpoint `076131eccff09ea7e571fefca9b5404e51faede7` is pushed in draft PR #4. The installed module journey is now implemented. It uses a real test-only ZIP payload registry, clicks the sandbox page, checks denied credentials/browser/network, persists a draft and observes exact finite-job output timestamped before dashboard reopen after native termination/alarm wake. Document authority now uses an actual per-document runtime Port nonce and is revoked on disconnect; it does not infer identity from null origin or absent sender fields. B remains open until CI passes.
 
 First P04 installed run `41220808549` passed sandbox restrictions, saved draft and exact finite background completion after dashboard closure/termination. It failed when the harness immediately clicked Other's asynchronously loaded link without waiting for its render. Added that specific render wait; retained the same completion/time/hash oracles. Added actual keyboard Tab/Enter draft save. Final CSP also restricts privileged child frames to packaged self URLs, preventing module self-navigation to remote pages.
+
+The installed module journey now passes all its oracles, including keyboard Tab/Enter, closed-dashboard completion, real background stop/wake, draft restore, page error recovery and same-page pinning. Final compatible corrections refresh only visible dashboard status and record module page/start/stop results; module navigation shows the actual selected primary entry.

@@ -4,7 +4,7 @@ const notes = {
   home:'Account and generator operations are not implemented yet.',
   generators:'Generator management is not implemented yet.', accounts:'Account management is not implemented yet.',
   refresher:'Refresher is not implemented yet.', work:'Work is kept when this dashboard closes.',
-  other:'No module pages are installed.', settings:'Module and connection settings are not implemented yet.'
+  other:'', settings:'Connections and module ZIP installation are not implemented yet.'
 };
 const messages = {
   DONOR_STARTING:'PersonaMonkey is starting. Protected work stays blocked.',
@@ -25,7 +25,8 @@ function route() {
   document.getElementById('page-note').textContent = notes[key]??'';
   void renderRecords(key);
   for (const link of document.querySelectorAll('nav a')) {
-    if (link.hash === '#'+key) link.setAttribute('aria-current','page');
+    const selected=key==='module'?(link.dataset.pinnedModule===location.hash.split('/')[1]||link.hash==='#other'&&![...document.querySelectorAll('[data-pinned-module]')].some(a=>a.dataset.pinnedModule===location.hash.split('/')[1])):link.hash==='#'+key;
+    if (selected) link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
   }
 }
@@ -149,3 +150,7 @@ async function renderModule(area){
  const container=node('div');area.append(container);
  try{disposeModule=await openModulePage({core,moduleId,pageId,container,onError:error});}catch{error();}
 }
+
+// Refresh only the visible dashboard status; no background keepalive.
+setInterval(()=>{if(document.visibilityState==='visible')void queueStatus();},2000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void queueStatus();});

@@ -6,8 +6,8 @@ export async function openModulePage({core,moduleId,pageId,container,onError}) {
  const listener=async event=>{
   if(disposed||event.source!==iframe.contentWindow||event.data?.channel!==channel)return;
   const m=event.data;
-  if(m.type==='READY'){ready=true;return;}
-  if(m.type==='FAILED'){onError('MODULE_START_FAILED');return;}
+  if(m.type==='READY'){ready=true;void core('module.rpc',{token:descriptor.token,message:{operation:'pageReady',requestId:crypto.randomUUID()}});return;}
+  if(m.type==='FAILED'){void core('module.rpc',{token:descriptor.token,message:{operation:'pageFailed',requestId:crypto.randomUUID()}});onError('MODULE_START_FAILED');return;}
   if(m.type==='RPC'){
    const response=await core('module.rpc',{token:descriptor.token,message:{operation:m.operation,args:m.args,requestId:m.requestId}});
    if(!disposed)iframe.contentWindow.postMessage({channel,type:'RPC_RESULT',requestId:m.requestId,...response},'*');
