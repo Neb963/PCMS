@@ -74,7 +74,7 @@ test('built artifact keeps identity, permissions, attribution, gate order, stric
     assert.equal(manifest.browser_specific_settings.gecko.id,'persona-route-manager@local');
     assert.equal(manifest.browser_specific_settings.gecko.strict_min_version,'154.0');
     assert.deepEqual(manifest.permissions,original.permissions);assert.deepEqual(manifest.optional_permissions,original.optional_permissions);assert.deepEqual(manifest.host_permissions,original.host_permissions);
-    assert.equal(manifest.background.persistent,false);assert.equal(manifest.action.default_popup,undefined);
+    assert.deepEqual(manifest.background,{scripts:['host/entry.mjs'],type:'module'});assert.equal(manifest.action.default_popup,undefined);
     assert.ok(!manifest.content_security_policy.extension_pages.includes('unsafe-eval'));
     assert.ok(!manifest.content_security_policy.sandbox.includes('allow-same-origin'));
     assert.ok(manifest.content_security_policy.sandbox.includes("connect-src 'none'"));

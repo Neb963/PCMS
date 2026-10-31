@@ -63,7 +63,7 @@ export async function build(output=path.join(ROOT,'build')) {
   manifest.name='PCMS';manifest.version='0.1.0';
   manifest.description='Perchance account and generator management with integrated PersonaMonkey protection.';
   manifest.browser_specific_settings.gecko.strict_min_version='154.0';
-  manifest.background={page:'host/background.html',persistent:false};
+  manifest.background={scripts:['host/entry.mjs'],type:'module'};
   manifest.action={...manifest.action,default_title:'Open PCMS dashboard'};
   delete manifest.action.default_popup;
   manifest.options_ui={page:'ui/index.html',open_in_tab:true};
