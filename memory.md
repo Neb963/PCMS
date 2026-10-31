@@ -14,4 +14,3 @@
 - Defaults: Journal 30m, Backup 6h, retention 90d, Refresher 24h Active/72h wall Sleep. Backup P28–P34 precedes Refresher P35–P38. P20 WAIT_CREATOR takes no Deployer writer claim. No second workflow/controller or extra approval program.
 - P42–P49 require explicit disposable external targets/effects. No live provider/route/Git mutations performed or authorized. Synthetic scale does not prove real 50-account routing/login portability. General distribution/signing remains unestablished. Completed donor/CSP/lifecycle/userScripts/Downloads/small archive/remap feasibility and user-run DEVELOP transport probes are research evidence; do not repeat them or claim full product acceptance from them.
 - Shell push has no credentials. Publish Git trees/commits with connected GitHub tools, lease branch updates, fetch and verify actual remote commit/tree before continuing edits. Keep frequent meaningful code+todo checkpoints. No extra branch protection/review program.
-
