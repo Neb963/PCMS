@@ -27,3 +27,6 @@ test('disabled Journal rejects search/export while Core records; terminal downlo
 test('event filters keep stable paging and cannot cross a different filter/cut',async t=>{
  const f=await setup(t);for(let i=0;i<5;i++)await f.core.record({step:'FILTER',result:'COMPLETE',moduleId:i%2?'other':'pcms-journal'});const page=await f.core.list({table:'events',limit:1,filters:{moduleId:'pcms-journal'}});assert.ok(page.cursor);assert.equal(page.rows[0].moduleId,'pcms-journal');await assert.rejects(f.core.list({table:'events',cursor:page.cursor,filters:{moduleId:'other'}}),/STALE_CURSOR/);
 });
+test('pre-dispatch storage exhaustion fails only that export and permits later due work without losing the watermark',async t=>{
+ const f=await setup(t);await f.journal.enqueue({requestId:'quota'});const job=await f.core.queue.next(),put=f.core.putBytes;f.core.putBytes=async()=>{throw new DOMException('fixture quota','QuotaExceededError');};const result=await f.journal.effect(job);assert.equal(result.value.state,'FAILED');assert.equal(result.value.code,'STORAGE_FULL');assert.equal((await f.core.read('jobs',job.id)).state,'FAILED');assert.equal(f.calls(),0);assert.equal((await f.journal.status()).settings.watermark,0);f.core.putBytes=put;f.advance(3600000);await f.journal.tick();assert.equal((await f.journal.status()).jobs.length,1);
+});

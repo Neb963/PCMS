@@ -1,4 +1,4 @@
-import {requireCore as check,project} from '../core/records.mjs';
+import {requireCore as check,project,publicError} from '../core/records.mjs';
 import {exportFolder} from '../core/downloads.mjs';
 import {journalArchive} from '../core/journal-archive.mjs';
 export function createJournal({core,downloads,clock=Date.now}){
@@ -54,6 +54,13 @@ export function createJournal({core,downloads,clock=Date.now}){
     else{const archive=await journalArchive(core,job.input);prepared=await downloads.prepare({id:job.id,jobId:job.id,moduleId:id,type:'journal',automatic:job.input.automatic,folder:job.input.folder,bytes:archive.bytes,metadata:archive.manifest});}
     await core.queue.dispatch(job.id,job.rev,{operationId:job.id+'-download',kind:'DOWNLOAD',write:false,inputHash:prepared.receipt.sha256,preflight:async()=>({ok:enabled(await module())}),call:()=>downloads.start(prepared),observe:async()=>{const f=await downloads.reconcile(job.id);return {matched:f.state==='COMPLETE',operationId:job.id+'-download'};}});
     const latest=await core.read('jobs',job.id);return await statusEffect(latest);
+   }catch(error){
+    const latest=await core.read('jobs',job.id),m=await module();
+    if(!enabled(m))return {value:{state:'DEFERRED',code:'JOURNAL_DISABLED'},jobRevision:latest.rev};
+    if(latest.effect?.boundary==='POSSIBLE')throw error;
+    const code=publicError(error);await core.queue.transition(job.id,latest.rev,{state:'FAILED',recovery:{action:'OPEN_JOURNAL',code}});
+    const current=await module();await save(current,{journal:{...current.journal,lastExport:{id:job.id,state:'FAILED',code,completedAt:clock()}}},'JOURNAL_EXPORT_FAILED');
+    return {value:{state:'FAILED',code},jobRevision:(await core.read('jobs',job.id)).rev};
    }finally{active.delete(job.id);}
   }),
   changed:()=>run(async()=>{for(const job of await pendingJobs())if(job.effect?.boundary==='POSSIBLE'&&!active.has(job.id))await statusEffect(job);}),

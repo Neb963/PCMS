@@ -37,7 +37,7 @@ export function createDownloads({core,api,profileId,clock=Date.now,urls=URL}){
   },
   reconcile:id=>serial(id,async()=>{
    let r=await core.read('files',id);check(r&&r.profileId===profileId,'EXPORT_PROFILE_MISMATCH');if(r.state==='COMPLETE'||r.state==='FAILED')return r;
-   const candidates=await api.downloads.search(r.downloadId!=null?{id:r.downloadId}:{filenameRegex:r.filename.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$',limit:0});
+   let candidates;try{candidates=await api.downloads.search(r.downloadId!=null?{id:r.downloadId}:{filenameRegex:r.filename.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$',limit:0});}catch{return save(r,{state:'UNKNOWN',code:'DOWNLOAD_LOOKUP_FAILED'},'UNKNOWN');}
    const matches=candidates.filter(item=>matchesDownload(r,item,api.runtime.id));
    if(matches.length!==1)return save(r,{state:'UNKNOWN',code:matches.length?'DOWNLOAD_AMBIGUOUS':'DOWNLOAD_NOT_FOUND'},'UNKNOWN');
    const item=matches[0],identity={downloadId:item.id,absolutePath:item.filename.replaceAll('\\','/'),startedAt:Date.parse(item.startTime)};
