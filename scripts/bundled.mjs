@@ -50,10 +50,10 @@ export function bundledPackage(id,name){
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};
  const payload={'background.js':[background,{mtime:stamp}]};
  if(id==='pcms-discover'){
-  for(const [file,source]of [['page.html','discover-page.html'],['page.js','discover-page.js']]){
+  for(const [file,source]of [['page.html','discover-page.html'],['page.js','discover-page.js'],['page.css','discover-page.css']]){
    const bytes=new Uint8Array(readFileSync(new URL('../src/modules/'+source,import.meta.url)));payload[file]=[bytes,{mtime:stamp}];manifest.files.push({path:file,bytes:bytes.length,sha256:sha(bytes)});
   }
-  manifest.pages=[{id:'check-slugs',title:'Check slugs',html:'page.html',script:'page.js'}];
+  manifest.pages=[{id:'check-slugs',title:'Check slugs',html:'page.html',script:'page.js',style:'page.css'}];
  }
  const manifestBytes=strToU8(JSON.stringify(manifest));
  const zip=zipSync({'module.json':[manifestBytes,{mtime:stamp}],

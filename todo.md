@@ -43,3 +43,5 @@ CI6e90b719 passed146 T/build; B imported and persisted the batch but Start did n
 Saved-batch paging now uses Core's existing snapshot cursor instead of a mutable sorted-array offset, retaining the selected batch even when it is outside the loaded page. No fixed batch ceiling is introduced.
 
 Run15da45c7 passed147 T/build; B's safe diagnostics show a still-Imported batch, an enabled Start and no action error. The journey now waits explicitly for the enabled Start and observes its trusted click; visible actions show Working while awaiting Core. This distinguishes a real control event/readiness issue from policy rejection without calling handlers directly or weakening assertions.
+
+Runffb18ea5 still passed focused/build; the new capture listener observed no Start click event despite an enabled button, so no command was issued. The installed journey now uses trusted WebDriver Enter activation on actual Discover buttons (including keyboard coverage), never a handler/DOM click call. The registered page gains responsive spacing/width/focus styling under its exact hashed manifest contract. Required final B remains OPEN.
