@@ -24,3 +24,5 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - P01: a dashboard can connect before asynchronous donor attachment. Wait for that finite startup result; otherwise a one-shot status response can leave it showing stale Starting. The focused cold-request test checks attachment and failed-bootstrap settlement.
 
 - P01: a clean Firefox profile includes default containers. Their existence is not evidence of an old PersonaMonkey installation. Run `41215468856` exposed the overly strict profile guard. Reject existing donor authority and let the donor quarantine unmapped containers; never clear user data to pass startup.
+
+- P01: WebDriver session creation can return while Firefox still reports add-on startup as `starting`. Run `41215955311` recorded a trusted native click but zero product icon events. Wait for Firefox’s native add-on startup state before interacting; permit a dormant event page so the test still exercises a real wake. Do not replace the required click with a handler call or direct navigation.

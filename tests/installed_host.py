@@ -55,6 +55,12 @@ def stop(sid, profile):
 
 def toolbar(session):
     context(session,'chrome')
+    # WebDriver's new-session response can precede Firefox add-on startup.
+    # Observe native lifecycle only; do not wake the background or call the
+    # product handler. A stopped event page is also eligible for a real click.
+    wait(lambda:script(session,"""const {ExtensionParent}=ChromeUtils.importESModule('resource://gre/modules/ExtensionParent.sys.mjs');
+      const e=ExtensionParent.GlobalManager.getExtension(arguments[0]);
+      return ['running','stopped'].includes(e?.backgroundState);""",[ID]),20)
     widget=script(session,"""
       const {CustomizableUI}=ChromeUtils.importESModule('moz-src:///browser/components/customizableui/CustomizableUI.sys.mjs');
       const id='persona-route-manager_local-browser-action';
