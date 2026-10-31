@@ -106,7 +106,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
    return hold(job,code(error));
   }
  }
- const status=job=>job?.git?{repository:job.git.repository,repositoryId:job.git.repositoryId,phase:job.git.active?.phase??null,code:job.git.code??null,candidate:job.git.active?.plan?.candidate??null,receipt:job.git.active?.receipt??null,unknown:job.effect?.boundary==='POSSIBLE'}:null;
+ const status=job=>job?.git?{folder:job.git.active?.request?.folder??null,kind:job.git.active?.request?.kind??null,repository:job.git.repository,repositoryId:job.git.repositoryId,phase:job.git.active?.phase??null,code:job.git.code??null,candidate:job.git.active?.plan?.candidate??null,receipt:job.git.active?.receipt??null,unknown:job.effect?.boundary==='POSSIBLE'}:null;
  return {step:(job,request,reconcile=false)=>serial('git',()=>step(job,request,reconcile).catch(error=>hold(job,code(error)))),check:id=>serial('git',async()=>{const job=await core.read('jobs',id);check(job?.git?.active,'GIT_OPERATION_MISSING');return step(job,job.git.active.request,true);}),status};
 }
 function base64(bytes){let text='';for(let i=0;i<bytes.length;i+=32768)text+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(text);}

@@ -86,7 +86,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'queue.pause':result=await value.queue.pause(message.requestId);break;
         case 'queue.resume':result=await value.queue.resume(message.requestId);await schedule(value);break;
         case 'queue.list':{const page=await value.queue.list({cursor:message.cursor,search:message.search??'',state:message.state??''});result={...page,rows:page.rows.map(j=>project('jobs',j))};break;}
-        case 'queue.get':{const job=await value.read('jobs',message.id);result=job?{...project('jobs',job),git:gitWriter.status(job)}:null;break;}
+        case 'queue.get':{const job=await value.read('jobs',message.id);result=job?{...project('jobs',job),git:gitWriter.status(job),target:await value.get('generators',job.targetId)}:null;break;}
         case 'queue.batch':result=await value.queue.batch(message.id);break;
         case 'counts':result=await value.counts();break;
         case 'events':result=await journal.events(message);break;
