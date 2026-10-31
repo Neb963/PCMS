@@ -19,3 +19,5 @@ No P07 tests run yet. Required T and B remain NOT TESTED. Real AI-editor teardow
 ## Next action
 
 Implement lifecycle and focused tests against current production records/queue/host. Push meaningful code plus this file frequently. Keep accepted specification, design and PHASES unchanged.
+
+P07 checkpoint: durable lifecycle, sandbox stop receipts, candidate validation, generation-aware admission and shell page teardown are implemented. Five new focused lifecycle tests pass (update/rollback, stop-receipt denial, Unknown readback, post-switch recovery, Disable/Enable); existing 46 T pass. Website injection/disposal, visible lifecycle controls and required installed B remain open. No phase completion claimed.

@@ -5,6 +5,7 @@ export function createInstaller(core){
   const candidate=await validatePackage(bytes,{budget}),m=candidate.manifest;
   const current=await core.read('modules',m.id);
   if(current){
+   if(current.lifecycle)throw new PackageError('MODULE_LIFECYCLE_BUSY');
    if(current.packageHash===candidate.packageHash){await core.record({step:'IMPORT_MODULE',result:'EXISTING',moduleId:m.id});return {state:'UNCHANGED',id:m.id};}
    const order=compareVersions(m.version,current.version);
    if(order===0)throw new PackageError('SAME_VERSION_CHANGED');if(order<0)throw new PackageError('DOWNGRADE_REJECTED');

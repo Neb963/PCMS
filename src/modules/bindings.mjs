@@ -1,6 +1,6 @@
 export const CAPABILITIES=new Set(['records.accounts','jobs.accounts','persona.prepare','persona.check','persona.open','persona.repair','records.discover','jobs.discover','perchance.classify','github.prepareFolder','records.creator','jobs.creator','records.deployer','jobs.deployer','records.refresher','jobs.refresher','journal.query','journal.export','backup.capture','backup.restore']);
 export function bindingAllows(binding,{source,channel,current,targetId,operation}) {
- if(source!==binding.window||channel!==binding.channel||!current?.enabled||current.id!==binding.moduleId||current.packageHash!==binding.hash||current.generation!==binding.generation)return false;
+ if(source!==binding.window||channel!==binding.channel||!current?.enabled||current.lifecycle||current.id!==binding.moduleId||current.packageHash!==binding.hash||current.generation!==binding.generation)return false;
  if(targetId&&binding.targetId&&targetId!==binding.targetId)return false;
  return binding.capabilities.has(operation);
 }

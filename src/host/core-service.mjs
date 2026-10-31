@@ -2,11 +2,12 @@ import {createInstaller} from '../modules/install.mjs';
 import {seedBundled} from '../modules/seed.mjs';
 import {PackageError} from '../modules/package.mjs';
 import {createModuleHost} from './module-host.mjs';
+import {createLifecycle} from '../modules/lifecycle.mjs';
 import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
-export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser}={}) {
-  let pending,modules,seedFailure=null;
+export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
+  let pending,modules,lifecycle,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -17,7 +18,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     await value.queue.boot();
     await value.record({step:'CORE_START',result:'COMPLETE'});
     await seed(value);
-    if(globalThis.document&&api){modules=createModuleHost({core:value,api,onDue:()=>schedule(value)});await modules.start();await modules.turn();}
+    if(globalThis.document&&api){modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value)});lifecycle=createLifecycle({core:value,host:modules.lifecycle});await lifecycle.recover();await modules.start();await modules.turn();}
     const due=await value.queue.deadline();if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}
     return value;
   })().catch(error=>{pending=null;throw error;});
@@ -25,10 +26,12 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     try {
       const value=await core();let result;
       switch(message?.operation) {
+        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};const m=await lifecycle.request(message.id,message.kind,message.requestId);await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'modules.permission':result={granted:await api.permissions.contains({permissions:['userScripts']})};break;
         case 'module.install':{result=await createInstaller(value).install(message.bytes,{budget:message.budget});if(modules)await modules.start();break;}
         case 'modules.seed.status':result={...await value.moduleSeedStatus(),failure:seedFailure};break;
         case 'modules.seed.retry':{result=await seed(value);if(result.state==='FAILED')return {ok:false,code:result.code};if(modules)await modules.start();break;}
-        case 'modules.list':{const rows=[];let cursor=null;do{const page=await value.list({table:'modules',limit:200,cursor});rows.push(...page.rows);cursor=page.cursor;}while(cursor);result=await Promise.all(rows.map(async p=>{const m=await value.read('modules',p.id);return {...p,pinned:m.pinned===true,stagedVersion:m.staged?.manifest?.version??null,pages:m.manifest?.pages??[]};}));break;}
+        case 'modules.list':{const rows=[];let cursor=null;do{const page=await value.list({table:'modules',limit:200,cursor});rows.push(...page.rows);cursor=page.cursor;}while(cursor);result=await Promise.all(rows.map(async p=>{const m=await value.read('modules',p.id);return {...p,pinned:m.pinned===true,stagedVersion:m.staged?.manifest?.version??null,previousVersion:m.previous?.manifest?.version??null,lifecycle:m.lifecycle?{kind:m.lifecycle.kind,code:m.lifecycle.code}:null,pages:m.manifest?.pages??[]};}));break;}
         case 'module.open':if(!sender.coreDocument)return {ok:false,code:'DOCUMENT_DENIED'};if(!modules)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};result=await modules.preparePage(message.id,message.pageId,sender);break;
         case 'module.rpc':if(!modules)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};result=await modules.pageRPC(message.token,message.message,sender);break;
         case 'module.pin':{const m=await value.read('modules',message.id);if(!m||!m.enabled)return {ok:false,code:'MODULE_DISABLED'};await value.mutate([{table:'modules',id:m.id,value:{...m,pinned:message.pinned===true},expectedRev:m.rev,refs:m.refs}],{step:'PIN_MODULE',result:'COMPLETE',moduleId:m.id});result={pinned:message.pinned===true};break;}
