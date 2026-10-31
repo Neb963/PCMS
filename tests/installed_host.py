@@ -152,7 +152,7 @@ def main():
               .then(()=>browser.storage.local.remove('pcmsHostProfile'))
               .then(()=>browser.storage.local.get(['state','p01-existing-donor-fixture'])).then(done);""",asynchronous=True)
             assert expected.get('state',{}).get('global'), 'VALID_EXISTING_DONOR_FIXTURE_REQUIRED'
-            assert expected['p01-existing-donor-fixture']=='preserve-existing-donor-data' 
+            assert expected['p01-existing-donor-fixture']=='preserve-existing-donor-data'
             stop(sid,profile);sid=None
             sid,_=session(binary,profile);toolbar(sid);dashboard(sid);status(sid,'CLEAN_PROFILE_REQUIRED')
             stored=script(sid,"const done=arguments[arguments.length-1];browser.storage.local.get(['state','p01-existing-donor-fixture']).then(done);",asynchronous=True)

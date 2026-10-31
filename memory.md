@@ -2,7 +2,7 @@
 
 **Non-authoritative.** Requirements are [v42](spec/PCMS-Working-Draft-v42.md); engineering contracts are [design revision 2](architecture/design.md). Use [PHASES.md](PHASES.md) and [todo.md](todo.md) for work. Baseline: 31 October 2026.
 
-- New repository: `Neb963/PCMS`. P01 is active in [PR #1](https://github.com/Neb963/PCMS/pull/1), branch `p01-protected-host`; resume it until required B passes. P02 has not started. This is not a continuation of Alpha phase IDs.
+- New repository: `Neb963/PCMS`. P01 implementation and required T/B pass in [PR #1](https://github.com/Neb963/PCMS/pull/1), branch `p01-protected-host`; merge/main verification remains. P02 has not started. This is not a continuation of Alpha phase IDs.
 - Initial main contained accepted `spec/` and `architecture/` plus planning files, without research/evidence trees. Authorities stay unchanged. P01 vendors the exact donor extension/LICENSE subset with original blob hashes in `vendor/provenance.json`; no broad historical test suite is run.
 - Design's reuse baseline is Alpha `c5b23b77f50db7ffe50e2ef705a8bf0b5879e36e`, donor `9995f6eadfa54be6cc0001f4e04f2a2d9b9401bf`. Read-only reuse directions are in design §12.1; no broad re-audit is needed.
 - Existing bridge/Gecko ID decision: `persona-route-manager@local`, dedicated clean Firefox profile, unchanged working native protocol/allowlist. Separate profiles share the native daemon. Preserve Alpha installations and avoid competing route mutations.
@@ -17,3 +17,5 @@
 
 - P01 build uses Firefox’s generated MV3 module background document and synchronous donor-first imports. The legacy popup/options, public donor dispatch and workflow startup are excluded by explicit build-copy transformations. Original vendor bytes and native host/allowlist are unchanged. No account/provider path or Core queue exists yet; P01 admission stays blocked.
 - `npm test` covers 8 focused host/package checks; `npm run build` emits `build/pcms-p01.xpi` and a source/SHA-256 receipt. CI’s installed test uses a disposable home/profile, persistent installation, Firefox 155.0b1, normal sandbox preferences and actual toolbar actions. Exact current outcome is in todo.md.
+
+- P01 installed acceptance: run `41216380417`, source `05d00f4afa6835302b35a0e96c0a7b4ca92782d5`, Firefox Developer Edition 155.0b1 / build 20260817142839, normal sandbox level 6. Persistent XPI, real icon twice, one dashboard, Settings navigation, new-process restart and exact existing-donor preservation all pass. Hash/receipt links are in todo.md. Do not rerun historical feasibility tests.

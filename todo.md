@@ -1,6 +1,6 @@
 # Current work
 
-**Active phase:** P01 — Protected packaged host. Implementation exists; required installed verification is still open. P02 has not started.
+**Active phase:** P01 — Protected packaged host. Implementation and required T/B are verified. Merge/main verification is next. P02 has not started.
 
 ## Baseline and plan
 
@@ -11,12 +11,17 @@ GitHub main was `c3a066a60813e6b83e63978b79181593a6a76234`, with no other branch
 - [x] Add one dashboard, serialized icon open/focus, the seven ordered navigation entries and bounded startup diagnostics. Unfinished features have no fake operations.
 - [x] Add deterministic XPI/source identity, separate privileged/sandbox CSP, the 154.0 minimum, clean-profile installation guide and focused CI.
 - [x] T: 8 focused tests pass, including cold status, profile preservation, bootstrap failures, rapid icon clicks and package/import integrity.
-- [ ] B: finish the persistently installed Firefox journey below.
+- [x] B: complete the persistently installed Firefox journey below.
 - [ ] Verify remote candidate/tree, checks, lightweight PR merge and resulting main.
 
 ## Evidence and recovery
 
-T passes locally and on GitHub through `f2eb993257e0edb9c7ca7b1737303f782512ff5a`. Required B remains **NOT PASSED**; do not replace it with source checks.
+T and B **PASS** in [run 41216380417](https://github.com/Neb963/PCMS/actions/runs/41216380417), source `05d00f4afa6835302b35a0e96c0a7b4ca92782d5`, clean build. All 8 focused tests pass. The downloaded installed receipt and UI screenshot were independently inspected.
+
+- Browser: Developer Edition **155.0b1** (WebDriver version `155.0`), build **20260817142839**. Normal security configuration; sandbox level **6**, remote content enabled; no sandbox-disable environment.
+- Persistent XPI: **209300 bytes**, SHA-256 `0cf0583f83d73afdba68c9d41ee13614b6df71b6bd429da07605bfc9cf40f65d`. The build identity and installed receipt match.
+- Real toolbar button twice: one dashboard, preserved focus/route. Packaged Settings click: correct heading/current navigation. Real process exit/restart: persistent package and missing-bridge hold. Existing valid donor state and sentinel: exact pre/post equality under refused adoption.
+- [Installed receipts/screenshot](https://github.com/Neb963/PCMS/actions/runs/41216380417/artifacts/13048351243); [tested XPI](https://github.com/Neb963/PCMS/actions/runs/41216380417/artifacts/13047762126). These are development artifacts, not a complete product.
 
 | Observed failure | Recovery / evidence |
 |---|---|
@@ -29,9 +34,9 @@ The generated module-entry package omits the unsupported MV3 `persistent` field.
 
 **Required B oracle:** Firefox version satisfies 154.0; persistent add-on is active and not temporary; normal sandbox preferences/environment; real toolbar button twice opens/focuses one dashboard; actual Settings navigation works; real process restart keeps the XPI and blocked missing-bridge startup; simulated existing donor bytes are rejected and preserved. Record browser/build, source and XPI SHA-256.
 
-**Remote checkpoint:** [PR #1](https://github.com/Neb963/PCMS/pull/1). Git shell push has no credentials; use the connected GitHub integration. Earlier published code trees matched local staged trees.
+**Remote checkpoint:** [PR #1](https://github.com/Neb963/PCMS/pull/1). Git shell push has no credentials; use the connected GitHub integration. Passing source/tree `05d00f4afa6835302b35a0e96c0a7b4ca92782d5` / `bdd220c353fa660f412f94e8247c2a3a80beee71` matched the local checkout.
 
-**Next unresolved action:** Run `41215687178` passed first startup, both real icon clicks and Settings navigation after the default-container correction. Its real-process restart then observed no dashboard after the icon click. Run `41215955311` showed Firefox still reported the add-on background as `starting` when WebDriver clicked; the product icon listener received zero events. Wait for native add-on startup (`running` or dormant `stopped`) before the real click, without forcing background wake, calling the product handler or waiting for a route. Keep real restart, both clicks, exact tab count and blocked-start oracles. Run `41216186356` then passed real restart and both icon/startup checks. Its final fixture replaced valid blocked donor state with malformed data; normalization attempted a security delta, so the donor correctly restored its authorized state. Use the existing valid donor state plus a separate sentinel, remove only the PCMS initialization marker, then compare the exact pre/post state and sentinel across the blocked restart. Merge only after the journey passes.
+**Next unresolved action:** Verify the final documentation/whitespace checkpoint, merge PR #1, then check the resulting main commit/tree and its focused/installed run. No product behavior changed after the passing receipt above.
 
 **Deferred:** H at P42 is **NOT TESTED** for the real native bridge, protected contexts and route capacity. No live Perchance/Git-provider or native route mutations occurred. This is an incomplete development XPI; module seed/workflows and durable Core records belong to later phases.
 
