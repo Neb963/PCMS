@@ -159,7 +159,9 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   acknowledgeWake:(cut=null)=>tx(async(s,r)=>{r.lastWake=clock();r.wakeSequence=cut??r.sequence+1;await append(s,r,{step:'QUEUE_WAKE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
   deadline:()=>transact(['jobs','modules'],'readonly',async s=>{
     const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));let next=null;
-    for(const job of jobs)if(['WAITING','READY'].includes(job.state)&&(job.dueAt>(r.lastWake??-Infinity)||job.sequence>(r.wakeSequence??0))){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&!module.lifecycle&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
+    // A wake runs one finite turn. Its acknowledgement cannot consume other
+    // due jobs; real WAITING work keeps its deadline until handled or held.
+    for(const job of jobs)if(['WAITING','READY'].includes(job.state)){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&!module.lifecycle&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
     return next;
   })
  };
