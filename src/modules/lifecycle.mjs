@@ -72,6 +72,8 @@ export function createLifecycle({core,host,clock=Date.now}) {
    core.queue.fence(id);
    try{m=await save(m,{enabled:false,generation:m.generation+1,state:'STOPPING',lifecycle:{id:requestId,kind,phase:'STOP',oldGeneration:m.generation,oldHash:m.packageHash,instances,startedAt:clock(),code:null}},'FENCED',command);}
    catch(error){if(!(await core.read('modules',id))?.lifecycle)core.queue.unfence(id);throw error;}
+   const late=await host.instances(m),known=new Set(m.lifecycle.instances.map(i=>i.instance));
+   if(late.some(i=>!known.has(i.instance)))m=await save(m,{lifecycle:{...m.lifecycle,instances:[...m.lifecycle.instances,...late.filter(i=>!known.has(i.instance))]}},'FENCED');
    await host.fence(m);
    return advance(id);
   }),

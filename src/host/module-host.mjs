@@ -30,7 +30,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   const active=await current(binding),operation=m.operation,args=m.args??{};
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
   const capability=operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
-  if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability}))throw Error('CAPABILITY_DENIED');
+  if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
   if(operation==='pageReady'||operation==='pageFailed')return core.record({step:'OPEN_MODULE_PAGE',result:operation==='pageReady'?'COMPLETE':'FAILED',moduleId:binding.moduleId});
   if(operation==='saveView')return core.saveView('module:'+binding.moduleId+':'+binding.pageId,args.value,m.requestId);
   if(operation==='getView')return core.view('module:'+binding.moduleId+':'+binding.pageId);
@@ -103,7 +103,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
  }
  async function openPage(moduleId,pageId,container){const module=await core.read('modules',moduleId);return frame(module,'page',pageId,container);}
  function remove(binding){frames.delete(binding);binding.iframe.remove();if(backgrounds.get(binding.moduleId)===binding)backgrounds.delete(binding.moduleId);}
- async function stop(binding){const receipt=await request(binding,'STOP',{generation:binding.generation});if(receipt?.instance!==binding.channel||receipt.generation!==binding.generation||receipt.document!==bootId||receipt.unresolvedEffectIds?.length)throw Error('MODULE_STOP_INCOMPLETE');remove(binding);await core.record({step:'STOP_MODULE',result:'COMPLETE',moduleId:binding.moduleId});return receipt;}
+ async function stop(binding){binding.stopping=true;const receipt=await request(binding,'STOP',{generation:binding.generation});if(receipt?.instance!==binding.channel||receipt.generation!==binding.generation||receipt.document!==bootId||receipt.unresolvedEffectIds?.length)throw Error('MODULE_STOP_INCOMPLETE');remove(binding);await core.record({step:'STOP_MODULE',result:'COMPLETE',moduleId:binding.moduleId});return receipt;}
  async function preparePage(moduleId,pageId,sender){
   const module=await core.read('modules',moduleId);if(!module?.enabled||module.lifecycle||!module.manifest)throw Error('MODULE_DISABLED');if(!/^[a-f0-9]{64}$/.test(module.packageHash)||!Number.isSafeInteger(module.generation)||module.manifest.coreApi!==1||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
   const page=module.manifest.pages.find(p=>p.id===pageId);if(!page)throw Error('PAGE_MISSING');
