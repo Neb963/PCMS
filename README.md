@@ -1,6 +1,6 @@
 # PCMS
 
-PCMS is a planned Firefox extension for managing accounts, generators, development/deployment, refreshing, and portable records. It integrates the established PersonaMonkey routing implementation. **Implementation has not started.**
+PCMS is a Firefox extension in development for managing accounts, generators, development/deployment, refreshing, and portable records. It integrates the established PersonaMonkey routing implementation.
 
 ## Project authority
 
@@ -14,6 +14,8 @@ The accepted specification controls product behavior; the design supplies implem
 
 ## Development status
 
-Repository bootstrapped with planning documents only. **P01 — Protected packaged host** is the next eligible phase. No extension code, installation package, CI workflow, or live provider test is included in this bootstrap.
+**P01 — Protected packaged host** is implemented with focused and persistently installed Firefox verification. It includes the integrated donor, a dashboard shell, deterministic XPI build and focused/installed checks. It is an incomplete development checkpoint; provider workflows are not implemented. See [current work](todo.md) for exact evidence and holds.
+
+Build and installation: [Development guide](docs/DEVELOPMENT.md). Use `npm test` and `npm run build`.
 
 Do not commit credentials, account sessions/cookies, native bridge configuration, or credential-inclusive backups. Live provider mutations require explicit authorization and disposable test targets.

@@ -1,0 +1,61 @@
+name: Protected host
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md"]
+  pull_request:
+    paths-ignore: ["**/*.md"]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: host-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pcms-p01-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            build/pcms-p01.xpi
+            build/identity.json
+  installed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pcms-firefox
+          key: firefox-devedition-155.0b1-gecko-0.36.0-v1
+      - name: Prepare qualifying Firefox
+        run: |
+          if [ -x "$RUNNER_TEMP/pcms-firefox/firefox/firefox" ] && [ -x "$RUNNER_TEMP/pcms-firefox/geckodriver" ]; then
+            printf 'FIREFOX_BINARY=%s\nGECKODRIVER_BINARY=%s\n' "$RUNNER_TEMP/pcms-firefox/firefox/firefox" "$RUNNER_TEMP/pcms-firefox/geckodriver" >> "$GITHUB_ENV"
+          else
+            bash scripts/setup-firefox.sh
+          fi
+      - run: npm run build
+      - name: Persistent host journey (normal sandbox)
+        run: python3 tests/installed_host.py build/pcms-p01.xpi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installed-p01-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            test-results/
+            build/identity.json

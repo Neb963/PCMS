@@ -1,6 +1,6 @@
 # Evidence-grounded lessons
 
-No new implementation incident occurred in this planning task. These are historical lessons, not findings that every old defect still exists. Apply the accepted v42/revision-2 resolution where older evidence proposed broader work.
+The table records historical lessons, not findings that every old defect still exists. Apply the accepted v42/revision-2 resolution where older evidence proposed broader work. Later entries record observed implementation issues.
 
 | Historical observation | Reusable lesson | Source |
 |---|---|---|
@@ -18,3 +18,13 @@ No new implementation incident occurred in this planning task. These are histori
 Add entries only for a real mistake, unexpected behavior or useful improvement with its evidence. At project completion, extract reusable lessons for the knowledge base without copying project-specific requirements as universal rules.
 
 - Planning review (2026-10-31): a READY dependency must not hold the writer resource needed by its prerequisite Creator; split long lifecycle/archive tasks by independent evidence; do not make a shared Downloads service depend on a disableable module. These were planning risks corrected before implementation, not production defects.
+
+- P01 (2026-10-31): the Mozilla checksum manifest contained rows that broke two-field unpacking. Match the exact archive path and digest field, then verify the bytes; do not skip integrity checking. Runs `41214431538` and `41214513710` show the failure and repaired download.
+- P01: Firefox’s outer extension toolbar item can receive trusted mouse/command events without invoking its action button. Target its `.webextension-browser-action` child and verify the resulting tab. Run `41215127877` exposed the wrapper mistake; run `41215249127` opened the real dashboard. A click receipt alone was insufficient.
+- P01: a dashboard can connect before asynchronous donor attachment. Wait for that finite startup result; otherwise a one-shot status response can leave it showing stale Starting. The focused cold-request test checks attachment and failed-bootstrap settlement.
+
+- P01: a clean Firefox profile includes default containers. Their existence is not evidence of an old PersonaMonkey installation. Run `41215468856` exposed the overly strict profile guard. Reject existing donor authority and let the donor quarantine unmapped containers; never clear user data to pass startup.
+
+- P01: WebDriver session creation can return while Firefox still reports add-on startup as `starting`. Run `41215955311` recorded a trusted native click but zero product icon events. Wait for Firefox’s native add-on startup state before interacting; permit a dormant event page so the test still exercises a real wake. Do not replace the required click with a handler call or direct navigation.
+
+- P01: the malformed previous-install fixture normalized away the blocked policy and correctly triggered donor rollback (`41216186356`). Profile-preservation checks must start with valid existing donor state and compare its exact pre/post bytes; do not weaken the donor’s storage security fence to retain an invalid fixture.
