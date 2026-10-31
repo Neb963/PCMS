@@ -37,6 +37,6 @@ export function transformDonor(relative, source) {
   const idleEnd=source.lastIndexOf(boot);
   if(idleStart<0||idleEnd<idleStart)throw Error('DONOR_IDLE_ANCHOR');
   source=source.slice(0,idleStart)+source.slice(idleEnd);
-  source += '\nattachDonor({initialize, security: () => securityState, nativeStatus: () => mullvadRuntime.refreshStatus()});\n';
+  source += '\nattachDonor({initialize, security: () => securityState, nativeStatus: () => mullvadRuntime.refreshStatus(), websiteContext: async (tab) => { const state = await getState(); const profile = state.profiles[tab.cookieStoreId]; const verified = currentTest(state, tab.cookieStoreId); return profile?.managed && verified?.ok === true && state.global.strictProxyVerification === true ? {personaUid:profile.personaUid,containerId:tab.cookieStoreId,protected:true} : null; }});\n';
   return source;
 }

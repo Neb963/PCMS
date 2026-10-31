@@ -52,12 +52,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Persistent bundled seed, restart and in-place update (normal sandbox)
-        run: python3 tests/installed_seed.py build/pcms-dev.xpi
+      - name: Targeted module lifecycle and editor preservation (normal sandbox)
+        run: python3 tests/installed_lifecycle.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-seed-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-lifecycle-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json

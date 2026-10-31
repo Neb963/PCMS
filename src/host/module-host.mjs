@@ -16,7 +16,7 @@ export function sanitizeMarkup(html,document) {
  return parsed.body.innerHTML;
 }
 export function sanitizeStyle(css){return /@import|url\s*\(|expression\s*\(|-moz-binding|\\/i.test(css)?'':css;}
-export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{}}) {
+export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{}}) {
  const frames=new Set(),backgrounds=new Map(),pageBindings=new Map(),bootId=crypto.randomUUID();let running=null;const reconciled=new Set();
  const manifestCap=(m,group)=>m.manifest?.capabilities?.find(c=>c.startsWith(group+'.'));
  async function current(binding){return core.read('modules',binding.moduleId);}
@@ -26,10 +26,11 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   const bytes=await core.bytes(blobId);if(bytes.length!==descriptor.bytes)throw Error('MODULE_PAYLOAD_MISSING');return new TextDecoder('utf-8',{fatal:true}).decode(bytes);
  }
  async function rpc(binding,m){
+  if(binding.mode==='validate')throw Error('VALIDATION_READ_ONLY');
   const active=await current(binding),operation=m.operation,args=m.args??{};
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
   const capability=operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
-  if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability}))throw Error('CAPABILITY_DENIED');
+  if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
   if(operation==='pageReady'||operation==='pageFailed')return core.record({step:'OPEN_MODULE_PAGE',result:operation==='pageReady'?'COMPLETE':'FAILED',moduleId:binding.moduleId});
   if(operation==='saveView')return core.saveView('module:'+binding.moduleId+':'+binding.pageId,args.value,m.requestId);
   if(operation==='getView')return core.view('module:'+binding.moduleId+':'+binding.pageId);
@@ -73,13 +74,13 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
  async function frame(module,mode,pageId='background',container=document.body){
   if(!module||!/^[a-f0-9]{64}$/.test(module.packageHash)||!Number.isSafeInteger(module.generation)||!module.enabled||!module.manifest||module.manifest.coreApi!==1||!Array.isArray(module.manifest.capabilities)||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
   const page=mode==='page'?module.manifest.pages.find(p=>p.id===pageId):null;if(mode==='page'&&!page)throw Error('PAGE_MISSING');
-  const script=await load(module,mode==='background'?module.manifest.entries.background:page.script);
+  const script=await load(module,mode!=='page'?module.manifest.entries.background:page.script);
   const html=page?sanitizeMarkup(await load(module,page.html),document):'',css=page?.style?sanitizeStyle(await load(module,page.style)):'';
   const iframe=document.createElement('iframe');iframe.src=api.runtime.getURL('host/module-runner.html');iframe.setAttribute('sandbox','allow-scripts');iframe.title=page?.title??module.manifest.name;iframe.className='module-frame';iframe.hidden=mode==='background';
   const binding={moduleId:module.id,hash:module.packageHash,generation:module.generation,bootId,capabilities:new Set([...module.manifest.capabilities,'ui.view']),channel:crypto.randomUUID(),mode,pageId,iframe,pending:new Map(),targetId:null};
   const ready=new Promise((resolve,reject)=>binding.ready={resolve,reject});let timer;
   const loaded=new Promise((resolve,reject)=>{iframe.onload=resolve;iframe.onerror=()=>reject(Error('PAGE_LOAD_FAILED'));});container.append(iframe);binding.window=iframe.contentWindow;frames.add(binding);
-  try{await loaded;binding.window.postMessage({type:'INIT',channel:binding.channel,mode,script,html,css,settings:module.settings??{}},'*');await Promise.race([ready,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('MODULE_START_TIMEOUT')),10000);})]);return binding;}
+  try{await loaded;binding.window.postMessage({type:'INIT',channel:binding.channel,document:bootId,mode:mode==='validate'?'background':mode,script,html,css,settings:module.settings??{},jobs:module.validationJobs??[]},'*');await Promise.race([ready,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('MODULE_START_TIMEOUT')),10000);})]);if(mode!=='validate'){const latest=await current(binding);if(!bindingAllows(binding,{source:binding.window,channel:binding.channel,current:latest,operation:'ui.view'}))throw Error('STALE_GENERATION');}return binding;}
   catch(error){frames.delete(binding);iframe.remove();throw error;}finally{clearTimeout(timer);}
  }
  async function start(){
@@ -101,19 +102,50 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   })().finally(()=>{running=null;});return running;
  }
  async function openPage(moduleId,pageId,container){const module=await core.read('modules',moduleId);return frame(module,'page',pageId,container);}
- async function stop(binding){const receipt=await request(binding,'STOP',{generation:binding.generation});frames.delete(binding);binding.iframe.remove();if(backgrounds.get(binding.moduleId)===binding)backgrounds.delete(binding.moduleId);await core.record({step:'STOP_MODULE',result:'COMPLETE',moduleId:binding.moduleId});return receipt;}
+ function remove(binding){frames.delete(binding);binding.iframe.remove();if(backgrounds.get(binding.moduleId)===binding)backgrounds.delete(binding.moduleId);}
+ async function stop(binding){binding.stopping=true;const receipt=await request(binding,'STOP',{generation:binding.generation});if(receipt?.instance!==binding.channel||receipt.generation!==binding.generation||receipt.document!==bootId||receipt.unresolvedEffectIds?.length)throw Error('MODULE_STOP_INCOMPLETE');remove(binding);await core.record({step:'STOP_MODULE',result:'COMPLETE',moduleId:binding.moduleId});return receipt;}
  async function preparePage(moduleId,pageId,sender){
-  const module=await core.read('modules',moduleId);if(!module?.enabled||!module.manifest)throw Error('MODULE_DISABLED');if(!/^[a-f0-9]{64}$/.test(module.packageHash)||!Number.isSafeInteger(module.generation)||module.manifest.coreApi!==1||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
+  const module=await core.read('modules',moduleId);if(!module?.enabled||module.lifecycle||!module.manifest)throw Error('MODULE_DISABLED');if(!/^[a-f0-9]{64}$/.test(module.packageHash)||!Number.isSafeInteger(module.generation)||module.manifest.coreApi!==1||module.manifest.capabilities.some(c=>!CAPABILITIES.has(c)))throw Error('MODULE_INCOMPATIBLE');
   const page=module.manifest.pages.find(p=>p.id===pageId);if(!page)throw Error('PAGE_MISSING');
   const token=crypto.randomUUID(),senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.coreDocument,sender.url]);
   const binding={moduleId,hash:module.packageHash,generation:module.generation,bootId,mode:'page',pageId,channel:token,window:null,capabilities:new Set([...module.manifest.capabilities,'ui.view']),targetId:null,senderKey};
   pageBindings.set(token,binding);
-  return {token,moduleId,pageId,generation:module.generation,hash:module.packageHash,title:page.title,html:sanitizeMarkup(await load(module,page.html),document),css:page.style?sanitizeStyle(await load(module,page.style)):'',script:await load(module,page.script)};
+  const descriptor={token,moduleId,pageId,generation:module.generation,document:bootId,hash:module.packageHash,title:page.title,html:sanitizeMarkup(await load(module,page.html),document),css:page.style?sanitizeStyle(await load(module,page.style)):'',script:await load(module,page.script)};
+  if((await current(binding))?.rev!==module.rev){pageBindings.delete(token);throw Error('STALE_GENERATION');}return descriptor;
  }
  async function pageRPC(token,message,sender){
   const binding=pageBindings.get(token),senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.coreDocument,sender.url]);
   if(!binding||binding.senderKey!==senderKey)throw Error('DOCUMENT_DENIED');
+  if(message.operation==='pageStopped'){
+   const receipt=message.args?.receipt;if(!binding.stopping||receipt?.instance!==token||receipt.document!==bootId||receipt.generation!==binding.generation||receipt.unresolvedEffectIds?.length)throw Error('MODULE_STOP_INCOMPLETE');
+   binding.receipt=receipt;binding.stopping.resolve(receipt);return {state:'STOPPED'};
+  }
   return rpc(binding,{...message,channel:binding.channel});
  }
- return {start,turn,openPage,stop,preparePage,pageRPC,closeDocument:id=>{for(const [token,b] of pageBindings)if(JSON.parse(b.senderKey)[3]===id)pageBindings.delete(token);},close(){window.removeEventListener('message',message);for(const b of frames){b.iframe.remove();for(const p of b.pending.values()){clearTimeout(p.timer);p.reject(Error('MODULE_STOPPED'));}}frames.clear();backgrounds.clear();}};
+ function closePage(token,sender){
+  const b=pageBindings.get(token);if(!b)return {state:'CLOSED'};
+  const senderKey=JSON.stringify([sender.id,sender.tab?.id,sender.frameId,sender.coreDocument,sender.url]);
+  if(b.senderKey!==senderKey)throw Error('DOCUMENT_DENIED');
+  b.stopping?.resolve({instance:token,document:bootId,generation:b.generation,disposedResources:0,unresolvedEffectIds:[]});pageBindings.delete(token);return {state:'CLOSED'};
+ }
+ const lifecycle={
+  async checkCandidate(m,jobs){const b=await frame({...m,validationJobs:jobs},'validate');remove(b);},
+  async instances(m){return [...frames,...pageBindings.values()].filter(b=>b.moduleId===m.id).map(b=>({instance:b.channel,document:bootId,type:'sandbox'}));},
+  async fence(m){notify({type:'moduleFenced',moduleId:m.id});},
+  async stopModule(m,l,recordReceipt=async()=>{}){
+   if(running)await running;
+   const receipts=[];
+   for(const expected of l.instances){
+    const previous=l.receipts?.find(r=>r.instance===expected.instance);if(previous){receipts.push(previous);continue;}
+    const accept=async receipt=>{await recordReceipt(receipt);receipts.push(receipt);};
+    const b=[...frames,...pageBindings.values()].find(b=>b.channel===expected.instance);
+    if(!b){await accept({...expected,generation:l.oldGeneration,disposedResources:0,unresolvedEffectIds:[]});continue;}
+    if(frames.has(b)){await accept(await stop(b));continue;}
+    if(b.receipt){await accept(b.receipt);continue;}
+    let timer;try{const receipt=await new Promise((resolve,reject)=>{b.stopping={resolve};notify({type:'stopModulePage',token:b.channel,generation:b.generation});timer=setTimeout(()=>reject(Error('MODULE_STOP_INCOMPLETE')),10000);});await accept(receipt);}finally{clearTimeout(timer);}
+   }return receipts;
+  },
+  async rebuild(m){await lifecycle.checkCandidate(m,[]);}
+ };
+ return {start,turn,openPage,stop,preparePage,pageRPC,closePage,lifecycle,load,closeDocument:id=>{for(const [token,b] of pageBindings)if(JSON.parse(b.senderKey)[3]===id){b.stopping?.resolve({instance:token,document:bootId,generation:b.generation,disposedResources:0,unresolvedEffectIds:[]});pageBindings.delete(token);}},close(){window.removeEventListener('message',message);for(const b of frames){b.iframe.remove();for(const p of b.pending.values()){clearTimeout(p.timer);p.reject(Error('MODULE_STOPPED'));}}frames.clear();backgrounds.clear();}};
 }

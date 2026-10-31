@@ -39,7 +39,6 @@ function show(status) {
     dt.textContent=label; dd.textContent=String(value ?? 'Unknown'); list.append(dt,dd);
   }
 }
-window.addEventListener('hashchange',route);
 let received=false;
 const port=browser.runtime.connect({name:'pcms-host-status'});
 const timeout=setTimeout(()=>{if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});port.disconnect();},12000);
@@ -50,10 +49,10 @@ let disposeModule=null;
 let view={journalFilter:'',route:'home',scroll:0,workSearch:'',workState:''},pageCursor=null,nextCursor=null;
 let corePort=null;const requests=new Map();
 function connection(){if(corePort)return corePort;const port=browser.runtime.connect({name:'pcms-core-rpc'});corePort=port;
- port.onMessage.addListener(({rpcId,response})=>{const request=requests.get(rpcId);if(request){requests.delete(rpcId);request(response);}});
- port.onDisconnect.addListener(()=>{if(corePort===port)corePort=null;for(const resolve of requests.values())resolve({ok:false,code:'CORE_UNAVAILABLE'});requests.clear();});return port;}
+ port.onMessage.addListener(({rpcId,response,event})=>{if(event?.type==='stopModulePage')window.dispatchEvent(new CustomEvent('pcms-module-stop',{detail:event}));if(event?.type==='moduleChanged')void updateModuleNavigation();const request=requests.get(rpcId);if(request){requests.delete(rpcId);request(response);}});
+ port.onDisconnect.addListener(()=>{if(corePort===port)corePort=null;if(disposeModule){disposeModule();disposeModule=null;}for(const resolve of requests.values())resolve({ok:false,code:'CORE_UNAVAILABLE'});requests.clear();});return port;}
 const core=(operation,extra={})=>new Promise(resolve=>{const rpcId=crypto.randomUUID();requests.set(rpcId,resolve);try{connection().postMessage({channel:'pcms-core',rpcId,operation,...extra});}catch{requests.delete(rpcId);resolve({ok:false,code:'CORE_UNAVAILABLE'});}});
-const errors={STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
+const errors={MODULE_STOP_INCOMPLETE:'An old page has not stopped safely. Continue review in the affected editor, then check safe stop.',MODULE_EFFECT_UNKNOWN:'An external result is unknown. It must be read back before the module can change.',MODULE_PERMISSION_REQUIRED:'Allow website scripts, then check safe stop.',MODULE_JOB_INCOMPATIBLE:'This version cannot read the saved job. Select a compatible package. Work is kept.',MODULE_SETTINGS_INCOMPATIBLE:'This version cannot read the saved settings. Select a compatible package.',MODULE_EDITOR_MISSING:'The affected editor is no longer open. Work stays held for inspection.',MODULE_START_FAILED:'The selected module could not start. The previous version and work are kept.',STORAGE_FULL:'Storage is full. Free space, then save again. Earlier data is kept.',STORAGE_UNAVAILABLE:'Storage is unavailable. Restart Firefox and check available space. Earlier data is kept.',TRANSACTION_ABORTED:'The save did not complete. Try again. Earlier data is kept.'};
 function node(tag,text){const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n;}
 function failure(code){const n=node('p',errors[code]||'Core records are unavailable. Restart Firefox to check again.');n.setAttribute('role','alert');n.dataset.code=code;return n;}
 async function persist(){
@@ -63,7 +62,7 @@ async function persist(){
 }
 async function renderRecords(key){
  void queueStatus();
- const area=document.getElementById('records');if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
+ const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
  if(key==='module'){await renderModule(area);return;}
  if(key==='other'){await renderOther(area);return;}
  if(key==='home'){
@@ -88,8 +87,8 @@ async function renderRecords(key){
  }
 }
 const initial=await core('view.get');
-if(initial.ok&&initial.result){view=initial.result;if(!location.hash)location.hash='#'+view.route;}
-await updateModuleNavigation();route();
+if(initial.ok&&initial.result){view=initial.result;if(!location.hash)history.replaceState(null,'','#'+view.route);}
+await updateModuleNavigation();window.addEventListener('hashchange',route);route();
 
 async function queueStatus(){
  const response=await core('queue.status'),status=document.getElementById('queue-status'),button=document.getElementById('pause-core');
@@ -135,7 +134,10 @@ async function renderOther(area){
  const draw=()=>{list.replaceChildren();for(const m of modules.filter(m=>(m.name??m.id).toLowerCase().includes(input.value.toLowerCase()))){const li=node('li'),a=node('a',m.name??m.id);a.href=moduleURL(m);li.append(a);list.append(li);}if(!list.children.length)list.append(node('li','No matching modules.'));};input.addEventListener('input',draw);area.append(label,input,list);draw();
 }
 async function renderModuleSettings(area){
- area.append(node('h2','Modules'));renderInstall(area);
+ area.append(node('h2','Modules'));const rows=node('div');renderInstall(area,()=>renderModuleRows(rows));
+ const permission=await core('modules.permission');
+ if(permission.ok&&!permission.result.granted){const button=node('button','Allow website scripts');button.id='allow-userscripts';button.type='button';const result=node('p');result.setAttribute('role','status');button.addEventListener('click',async()=>{try{const granted=await browser.permissions.request({permissions:['userScripts']});result.textContent=granted?'Website scripts allowed.':'Website scripts are still blocked. You can allow them here later.';if(granted){await core('modules.rebuild');if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}}catch{result.textContent='Firefox could not grant website scripts. Check this extension’s permissions.';}});area.append(button,result);}
+
  const status=await core('modules.seed.status');
  if(!status.ok){area.append(failure(status.code));}
  else if(!status.result.initialized){
@@ -144,12 +146,24 @@ async function renderModuleSettings(area){
   const retry=node('button','Retry bundled setup');retry.type='button';retry.id='retry-module-seed';
   const outcome=node('p');outcome.id='seed-result';outcome.setAttribute('role','status');
   retry.addEventListener('click',async()=>{retry.disabled=true;const response=await core('modules.seed.retry');
-   if(response.ok){await updateModuleNavigation();await renderRecords('settings');}
+   if(response.ok){await updateModuleNavigation();if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}
    else{outcome.replaceChildren(failure(response.code));retry.disabled=false;}});
   area.append(notice,detail,retry,outcome);
  }
+ area.append(rows);await renderModuleRows(rows);
+}
+async function renderModuleRows(area){
+ area.replaceChildren();
  const selected=location.hash.split('/')[2];
  for(const module of await moduleRecords())if(!selected||selected===module.id){const section=node('section'),title=node('h3',module.name??module.id);section.append(title,node('p',(module.version??'Unknown version')+' · '+(module.enabled?'Enabled':'Disabled')));if(module.stagedVersion)section.append(node('p','Update '+module.stagedVersion+' staged.'));
+  section.dataset.module=module.id;
+  const outcome=node('p');outcome.setAttribute('role','status');outcome.className='lifecycle-result';
+  if(module.lifecycle)outcome.textContent=(module.lifecycle.kind==='DISABLE'?'Disabling':'Updating')+' — '+(module.lifecycle.code||'Stopping safely');
+  for(const [kind,label] of module.lifecycle?[['CONTINUE','Check safe stop'],...module.lifecycle.code==='MODULE_REBUILD_FAILED'&&module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]:[...module.stagedVersion?[['UPDATE','Update to '+module.stagedVersion]]:[],[module.enabled?'DISABLE':'ENABLE',module.enabled?'Disable':'Enable'],...module.previousVersion?[['ROLLBACK','Use previous '+module.previousVersion]]:[]]){
+   const button=node('button',label);button.type='button';button.dataset.lifecycle=kind;button.addEventListener('click',async()=>{button.disabled=true;outcome.textContent='In progress';const response=await core('module.lifecycle',{id:module.id,kind,requestId:crypto.randomUUID()});if(response.ok){await updateModuleNavigation();if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}else{outcome.replaceChildren(failure(response.code));button.disabled=false;}});section.append(button);
+  }
+  if(module.lifecycle?.code==='MODULE_STOP_INCOMPLETE'){const open=node('button','Open affected editor');open.type='button';open.addEventListener('click',async()=>{const result=await core('module.editor',{id:module.id});if(!result.ok)outcome.replaceChildren(failure(result.code));});section.append(open);}
+  section.append(outcome);
   if(module.enabled&&module.pages.length){const label=node('label'),check=node('input');check.type='checkbox';check.checked=module.pinned;check.className='module-pin';check.dataset.module=module.id;label.append(check,document.createTextNode(' Show in primary navigation'));check.addEventListener('change',async()=>{const result=await core('module.pin',{id:module.id,pinned:check.checked});if(result.ok)await updateModuleNavigation();else{check.checked=!check.checked;section.append(failure(result.code));}});section.append(label);}
   area.append(section);
  }
@@ -169,7 +183,7 @@ setInterval(()=>{if(document.visibilityState==='visible')void queueStatus();},20
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void queueStatus();});
 
 const importMessages={IMPORT_BUDGET_EXCEEDED:'This ZIP needs more import space. Increase the import budget or select a smaller package.',INVALID_IMPORT_BUDGET:'Enter a positive import budget.',DUPLICATE_JSON_KEY:'module.json has a repeated field.',INVALID_JSON:'module.json is not valid JSON.',INVALID_MANIFEST_FIELDS:'The module manifest has missing or unknown fields.',INCOMPATIBLE_CORE_API:'This module needs a different Core API.',UNKNOWN_CAPABILITY:'This module requests an unsupported capability.',INVALID_RELEASE_VERSION:'Use a release version in major.minor.patch format.',INCOMPATIBLE_SCHEMA:'The module job or settings schema is incompatible.',INCOMPATIBLE_SETTINGS_SCHEMA:'This update cannot read the current settings.',INCOMPATIBLE_JOB_SCHEMA:'This update cannot read an unfinished job. Existing work is kept.',SAME_VERSION_CHANGED:'These bytes differ from the installed release. Use a higher version.',DOWNGRADE_REJECTED:'This is an older release. The active package is kept.',UNSAFE_PATH:'The ZIP contains an unsafe file path.',PATH_COLLISION:'The ZIP contains duplicate or conflicting paths.',ENCRYPTED_ZIP:'Encrypted module ZIPs are not supported.',NON_REGULAR_ZIP_ENTRY:'The ZIP contains a link or special file.',PAYLOAD_LIST_MISMATCH:'The ZIP files do not match the manifest.',PAYLOAD_HASH_MISMATCH:'A file does not match its manifest hash.',PAYLOAD_SIZE_MISMATCH:'A file does not match its declared size.',ZIP_CRC_MISMATCH:'A ZIP file failed its CRC check.',UNSUPPORTED_EXECUTABLE_DEPENDENCY:'Bundle module code locally without imports.',INVALID_EXECUTABLE:'A module script is invalid or uses an unsupported import.'};
-function renderInstall(area){
+function renderInstall(area,onInstalled=async()=>{}){
  const form=node('div'),label=node('label','Module ZIP'),file=node('input');file.type='file';file.accept='.zip,application/zip';file.id='module-zip';label.htmlFor=file.id;
  const budgetLabel=node('label','Import budget (MiB)'),budget=node('input');budget.type='number';budget.min='1';budget.step='1';budget.value='64';budget.id='module-budget';budgetLabel.htmlFor=budget.id;
  const install=node('button','Install');install.type='button';install.id='install-module';const status=node('p');status.id='import-result';status.setAttribute('role','status');
@@ -183,6 +197,7 @@ function renderInstall(area){
   status.removeAttribute('data-code');status.textContent=result.result.state==='UNCHANGED'?'This exact package is already installed.':result.result.state==='STAGED'?'Update staged. The current version and jobs are kept.':'Installed.';
   if(result.result.cleanupCode)status.append(document.createTextNode(' Import cleanup needs attention.'));
   await updateModuleNavigation();const module=(await moduleRecords()).find(m=>m.id===result.result.id);if(module?.enabled&&module.pages.length){const link=node('a','Open '+(module.name??module.id));link.href=moduleURL(module);status.append(document.createTextNode(' '),link);}
+  await onInstalled();
  });
  form.append(label,file,budgetLabel,budget,install,status);area.append(form);
 }
