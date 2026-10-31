@@ -2,6 +2,7 @@ import {requireCore as check,project,publicError} from '../core/records.mjs';
 import {bindingObservation} from './account-observations.mjs';
 const MODULE='pcms-accounts',UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const END=new Set(['LOGIN_REQUIRED','READY']);
+const errorCode=e=>typeof e?.code==='string'&&/^[A-Z][A-Z_]*$/.test(e.code)?e.code:publicError(e);
 const lifecycleStates={ARCHIVED:'ARCHIVED',REACTIVATING:'HELD',REMOVING:'REMOVING'};
 // Finite Accounts policy. Donor owns all Persona/routing operations; Core's
 // one queue owns dispatch, generation/Pause admission and uncertain outcomes.
@@ -124,7 +125,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   }
   check(kind==='REMOVE'||kind==='REACTIVATE'&&a.admission==='ARCHIVED','ACCOUNT_COMMAND_DENIED');
   if(kind==='REMOVE'){
-   a=await save(a,{state:'REMOVING',admission:'REMOVING',holdCode:null,flow:{requestId,jobId:null,purpose:'REMOVE',stage:'REMOVE_PERSONA',startedAt:clock(),confirmedAt:clock()}},'CONFIRM_LOCAL_REMOVE','COMPLETE',{id:'account-command:'+requestId,signature});
+   a=await save(a,{state:'REMOVING',admission:'REMOVING',holdCode:null,flow:{requestId,jobId:null,purpose:'REMOVE',stage:'REMOVE_TABS',startedAt:clock(),confirmedAt:clock()}},'CONFIRM_LOCAL_REMOVE','COMPLETE',{id:'account-command:'+requestId,signature});
   }else{
    const wasReady=!!a.expectedPrincipal,stage=a.routeId?'VERIFY':a.personaUid?'SELECT':'CREATE';
    a=await save(a,{state:'PREPARING',admission:'REACTIVATING',holdCode:null,flow:{requestId,jobId:null,purpose:'REACTIVATE',stage,wasReady,startedAt:clock(),confirmationAt:wasReady?clock():null}},'REACTIVATE_ACCOUNT','COMPLETE',{id:'account-command:'+requestId,signature});
@@ -136,20 +137,21 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   if(core.queue.accountActive(a.id))return hold(a,job,'ACCOUNT_EFFECT_DRAINING');
   if(a.flow.stage==='REMOVE_DATA'){
    if(reconcile)return result(job,'READY');
-   try{await admit();const m=await module();check(m.generation===job.generation,'STALE_GENERATION');
+   try{check((await donor.observeRemoval(scope(a),{}))?.ok===true,'ACCOUNT_REMOVAL_UNKNOWN');await admit();const m=await module();check(m.generation===job.generation,'STALE_GENERATION');
     await core.removeAccountData({accountId:a.id,jobId:job.id,expectedRev:a.rev});await pins(core);return result(job,'COMPLETE');
-   }catch(error){return hold(a,job,error.code??publicError(error));}
+   }catch(error){return hold(a,job,errorCode(error));}
   }
-  const operationId=job.id+'-REMOVE_PERSONA',current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);
+  const stage=a.flow.stage;check(['REMOVE_TABS','REMOVE_PERSONA'].includes(stage),'ACCOUNT_REMOVAL_SCOPE_DENIED');const read=()=>stage==='REMOVE_TABS'?donor.observeClosedTabs(scope(a),{}):donor.observeRemoval(scope(a),{});
+  const operationId=job.id+'-'+stage,current=await core.read('jobs',job.id),possible=current.effect?.boundary==='POSSIBLE',observed=current.effects?.some(e=>e.operationId===operationId);
   try{
    if(!possible&&!observed){if(reconcile)return result(job,'READY');await admit();
-    await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_REMOVE_PERSONA',write:true,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {ok:latest.rev===a.rev&&!core.queue.accountActive(a.id),accountRevision:latest.rev};},call:()=>donor.removePersona(scope(a),{operationId}),observe:async()=>{const value=await donor.observeRemoval(scope(a),{operationId});return {matched:value?.ok===true,operationId};}});
+    await core.queue.dispatch(job.id,current.rev,{operationId,kind:'ACCOUNT_'+stage,write:true,preflight:async()=>{await admit();const latest=await core.read('accounts',a.id);return {ok:latest.rev===a.rev&&!core.queue.accountActive(a.id),accountRevision:latest.rev};},call:()=>stage==='REMOVE_TABS'?donor.closeTabs(scope(a),{operationId}):donor.removePersona(scope(a),{operationId}),observe:async()=>{const value=await read();return {matched:value?.ok===true,operationId};}});
     return removal(await core.read('accounts',a.id),await core.read('jobs',job.id),true);
    }
-   const value=await donor.observeRemoval(scope(a),{operationId});if(!value?.ok)return hold(a,job,value?.code??'ACCOUNT_REMOVAL_UNKNOWN');
+   const value=await read();if(!value?.ok)return hold(a,job,value?.code??'ACCOUNT_REMOVAL_UNKNOWN');
    if(possible)await core.queue.reconcile(job.id,current.rev,operationId,{matched:true,operationId});
-   a=await core.read('accounts',a.id);await save(a,{holdCode:null,flow:{...a.flow,stage:'REMOVE_DATA'}},'ACCOUNT_PERSONA_REMOVED');return result(job,'CONTINUE');
-  }catch(error){return hold(await core.read('accounts',a.id),job,error.code??'ACCOUNT_REMOVAL_UNKNOWN');}
+   a=await core.read('accounts',a.id);await save(a,{holdCode:null,flow:{...a.flow,stage:stage==='REMOVE_TABS'?'REMOVE_PERSONA':'REMOVE_DATA'}},stage==='REMOVE_TABS'?'ACCOUNT_TABS_CLOSED':'ACCOUNT_PERSONA_REMOVED');return result(job,'CONTINUE');
+  }catch(error){return hold(await core.read('accounts',a.id),job,errorCode(error));}
  }
  return {
   initialize:async()=>{await pins(core);const m=await module();if(!available(m)||!m.enabled||m.lifecycle)return;let cursor=null;do{const page=await core.list({table:'accounts',cursor});for(const p of page.rows){const a=await core.read('accounts',p.id);if(a.admission)core.queue.fenceAccount(a.id);else core.queue.unfenceAccount(a.id);if(a.flow&&!a.flow.jobId&&!END.has(a.flow.stage))await ensure(a);}cursor=page.cursor;}while(cursor);},

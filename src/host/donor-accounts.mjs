@@ -250,8 +250,10 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   if(!p&&containerId&&containers.some(c=>c.cookieStoreId===containerId))return {code:'ACCOUNT_CONTEXT_CHANGED'};
   return {state,profile:p||null,containerPresent:!!containerId&&containers.some(c=>c.cookieStoreId===containerId)};
  }
+ async function observeClosedTabs(scope){try{await initialize();if(!scope.containerId){const found=await removalState(scope);return found.profile?fail('ACCOUNT_CONTEXT_CHANGED'):{ok:true};}return (await api.tabs.query({cookieStoreId:scope.containerId})).length?fail('ACCOUNT_TABS_STILL_OPEN'):{ok:true};}catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}}
+ async function closeTabs(scope){const found=await removalState(scope);if(found.code)return fail(found.code);if(!scope.containerId)return found.profile?fail('ACCOUNT_CONTEXT_CHANGED'):{ok:true};try{return await localMutationFence(scope.containerId,async()=>{const fresh=await removalState(scope);if(fresh.code)return fail(fresh.code);const tabs=await api.tabs.query({cookieStoreId:scope.containerId});if(tabs.length)await api.tabs.remove(tabs.map(t=>t.id));return observeClosedTabs(scope);});}catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}}
  async function observeRemoval(scope){
-  try{const found=await removalState(scope);if(found.code)return fail(found.code);if(found.containerPresent)return fail('ACCOUNT_REMOVAL_UNKNOWN');
+  try{const found=await removalState(scope);if(found.code)return fail(found.code);if(found.containerPresent)return fail('ACCOUNT_REMOVAL_UNKNOWN');if(!(await observeClosedTabs(scope)).ok)return fail('ACCOUNT_TABS_STILL_OPEN');
    // The destructive API can complete before its donor metadata commit.
    // Absence is independently established; finish only that local metadata.
    if(found.profile)await localMutationFence(found.profile.containerId,()=>stateManager.mutate(draft=>{const p=draft.profiles[found.profile.containerId];if(!p)return;if(p.personaUid!==found.profile.personaUid||p.pcmsAccountId!==scope.accountId)throw Error('ACCOUNT_CONTEXT_CHANGED');delete draft.profiles[p.containerId];for(const script of Object.values(draft.scripts??{}))script.profileIds=(script.profileIds??[]).filter(id=>id!==p.containerId);for(const workflow of Object.values(draft.workflows??{}))for(const step of workflow.steps??[])if(step.profileId===p.containerId)step.profileId='';}));
@@ -261,8 +263,8 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
  async function removePersona(scope){
   const found=await removalState(scope);if(found.code)return fail(found.code);
   if(!found.containerPresent)return observeRemoval(scope);
-  const p=found.profile;
+  const p=found.profile;if(!(await observeClosedTabs(scope)).ok)return fail('ACCOUNT_TABS_STILL_OPEN');
   try{await localMutationFence(p.containerId,async()=>{const fresh=await removalState(scope);if(fresh.code||fresh.profile?.personaUid!==p.personaUid)throw Error('ACCOUNT_CONTEXT_CHANGED');await personaPlatform.remove(p.containerId,{expectedRevision:fresh.state.__stateMeta?.revision,expectedBootId:fresh.state.__stateMeta?.bootId});});return observeRemoval(scope);}catch{return fail('ACCOUNT_REMOVAL_UNKNOWN');}
  }
- return Object.freeze({removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ return Object.freeze({closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }
