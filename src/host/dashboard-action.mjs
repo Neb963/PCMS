@@ -1,6 +1,7 @@
 // Adapted from pinned Alpha dashboard-action.mjs; no provider authority.
 export function createDashboardAction(api, onFailure = () => {}, onSuccess = () => {}) {
   let pending = null;
+  let clicks = 0, outcome = 'IDLE';
   const target = api.runtime.getURL('ui/index.html');
   function open() {
     if (pending) return pending;
@@ -17,7 +18,10 @@ export function createDashboardAction(api, onFailure = () => {}, onSuccess = () 
     return pending;
   }
   function register() {
-    api.action.onClicked.addListener(() => { void open().then(onSuccess, onFailure); });
+    api.action.onClicked.addListener(() => {
+      clicks++; outcome = 'OPENING';
+      void open().then(value => { outcome = 'OPENED'; onSuccess(value); }, () => { outcome = 'FAILED'; onFailure(); });
+    });
   }
-  return {register, open};
+  return {register, open, status: () => ({clicks, outcome})};
 }

@@ -24,7 +24,7 @@ export function registerShell(api) {
   api.runtime.onConnect.addListener(port => {
     if (port.name !== STATUS_PORT) return;
     if (!trustedShell(api, port.sender)) { port.disconnect(); return; }
-    void hostStatus(api).then(status => port.postMessage({...status, shellFailure}))
+    void hostStatus(api).then(status => port.postMessage({...status, shellFailure, icon: action.status()}))
       .catch(() => { try { port.postMessage({admission: 'BLOCKED', code: 'STATUS_UNAVAILABLE'}); } catch {} });
   });
   return action;

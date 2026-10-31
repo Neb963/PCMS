@@ -31,7 +31,7 @@ The generated module-entry package omits the unsupported MV3 `persistent` field.
 
 **Remote checkpoint:** [PR #1](https://github.com/Neb963/PCMS/pull/1). Git shell push has no credentials; use the connected GitHub integration. Earlier published code trees matched local staged trees.
 
-**Next unresolved action:** Publish the default-container correction and rerun the same required installed journey. Record actual failures; merge only after P01 evidence passes.
+**Next unresolved action:** Run `41215687178` passed first startup, both real icon clicks and Settings navigation after the default-container correction. Its real-process restart then observed no dashboard after the icon click. Add bounded icon-delivery diagnostics and inspect before/after startup state; do not bypass the failed toolbar oracle with direct navigation. Merge only after the unchanged P01 journey passes.
 
 **Deferred:** H at P42 is **NOT TESTED** for the real native bridge, protected contexts and route capacity. No live Perchance/Git-provider or native route mutations occurred. This is an incomplete development XPI; module seed/workflows and durable Core records belong to later phases.
 

@@ -61,6 +61,9 @@ def toolbar(session):
       CustomizableUI.addWidgetToArea(id,CustomizableUI.AREA_NAVBAR);
       const node=document.getElementById(id);
       if(!node)throw Error('REAL_TOOLBAR_ACTION_NOT_FOUND');
+      const {ExtensionParent}=ChromeUtils.importESModule('resource://gre/modules/ExtensionParent.sys.mjs');
+      const ext=ExtensionParent.GlobalManager.getExtension('persona-route-manager@local');
+      window.pcmsBeforeClick={backgroundState:ext.backgroundState,listeners:[...ext.persistentListeners.keys()]};
       window.pcmsToolbarEvents=[];
       for(const type of ['mousedown','mouseup','click','command'])node.addEventListener(type,e=>window.pcmsToolbarEvents.push({type:e.type,trusted:e.isTrusted,target:e.target.id,button:e.button}),{once:true});
       const action=node.querySelector('.webextension-browser-action');
@@ -158,9 +161,17 @@ def main():
                         listeners:[...ext?.persistentListeners?.keys()||[]],
                         views:[...ext?.views||[]].map(v=>({type:v.viewType,url:v.uri?.spec})),
                         toolbar:[...document.querySelectorAll('[data-extensionid="persona-route-manager@local"] toolbarbutton')].map(n=>({id:n.id,class:n.className})),
-                        toolbarEvents:window.pcmsToolbarEvents,
+                        toolbarEvents:window.pcmsToolbarEvents,beforeClick:window.pcmsBeforeClick,
                         console:Services.console.getMessageArray().map(m=>m.message).filter(m=>/moz-extension|PCMS|PersonaMonkey|SyntaxError|background|module/i.test(m)).slice(-25),
                         tabs:[...gBrowser.tabs].map(t=>t.linkedBrowser.currentURI.spec)};""",[ID])
+                    # Inspection only after the required toolbar oracle failed.
+                    # Direct navigation here cannot turn this failed test green.
+                    url=script(sid,"return WebExtensionPolicy.getByID(arguments[0]).getURL('ui/index.html')",[ID])
+                    context(sid,'content')
+                    call('POST',f'/session/{sid}/url',{'url':url})
+                    diagnostic['hostStatus']=script(sid,"""const done=arguments[arguments.length-1];
+                      const p=browser.runtime.connect({name:'pcms-host-status'});
+                      p.onMessage.addListener(s=>{done(s);p.disconnect();});""",asynchronous=True)
                     (OUT/'failure.json').write_text(json.dumps(diagnostic,indent=2)+'\n')
                     print('P01_FAILURE_DIAGNOSTIC '+json.dumps(diagnostic),flush=True)
                 except Exception as error: print('DIAGNOSTIC_UNAVAILABLE '+str(error),flush=True)
