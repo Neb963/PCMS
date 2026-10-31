@@ -1,3 +1,4 @@
+import {createQueue} from './queue.mjs';
 // The only PCMS record store. Callers are packaged Core services, never ZIP code.
 export const DATABASE = 'pcms-core';
 export const TABLES = ['accounts','generators','jobs','modules','files'];
@@ -31,7 +32,7 @@ export function safeEvent(event) {
 const fields={
   accounts:['accountId','label','state','principalLabel','personaUid','observedAt','holdCode'],
   generators:['generatorId','slug','accountId','repositoryId','folder','listing','state','observedAt','holdCode'],
-  jobs:['jobId','logicalKey','moduleId','targetId','accountId','state','step','dueAt','recovery','batchId'],
+  jobs:['jobId','logicalKey','moduleId','targetId','accountId','state','step','dueAt','recovery','batchId','kind','effect'],
   modules:['moduleId','name','version','enabled','generation','state'],
   files:['captureId','type','automatic','filename','bytes','sha256','state','completedAt'],
   events:['sequence','time','operationId','jobId','targetId','moduleId','step','result','code','severity','evidence']
@@ -42,26 +43,29 @@ export function project(table,row) {
   const out={id:row.id,rev:row.rev,sequence:row.sequence};
   for(const key of fields[table])if(row[key]!==undefined)out[key]=structuredClone(row[key]);
   // Typed recovery contains no opaque module/provider data.
+  if(out.effect)out.effect={operationId:out.effect.operationId,boundary:out.effect.boundary,kind:out.effect.kind};
   if(out.recovery) out.recovery={action:id(out.recovery.action)?out.recovery.action:'INSPECT',code:id(out.recovery.code)?out.recovery.code:'UNKNOWN'};
   return out;
 }
 export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clock=Date.now}={}) {
-  const opening=indexedDB.open(name,1);
+  const opening=indexedDB.open(name,2);
   opening.onupgradeneeded=()=>{
     const db=opening.result;
-    for(const name of STORES)db.createObjectStore(name,{keyPath:name==='meta'?'key':'key'});
+    for(const name of STORES)if(!db.objectStoreNames.contains(name))db.createObjectStore(name,{keyPath:name==='meta'?'key':'key'});
     for(const table of TABLES) {
       const s=opening.transaction.objectStore(table);
-      s.createIndex('dataset','dataset');
-      s.createIndex('updated',['dataset','sequence']);
-      for(const field of ({accounts:['state'],generators:['accountId','listing','state'],jobs:['moduleId','state','dueAt','targetId','accountId'],modules:['state'],files:['state','type']})[table])s.createIndex(field,['dataset',field]);
+      if(!s.indexNames.contains('dataset'))s.createIndex('dataset','dataset');
+      if(!s.indexNames.contains('updated'))s.createIndex('updated',['dataset','sequence']);
+      for(const field of ({accounts:['state'],generators:['accountId','listing','state'],jobs:['moduleId','state','dueAt','targetId','accountId'],modules:['state'],files:['state','type']})[table])if(!s.indexNames.contains(field))s.createIndex(field,['dataset',field]);
     }
     for(const [table,definitions] of Object.entries({accounts:{persona:'personaKey',principal:'principalKey',exit:'exitKey'},generators:{slug:'slugKey',folder:'folderKey'},jobs:{logical:'logicalKeyUnique'}})) {
-      for(const [index,field] of Object.entries(definitions))opening.transaction.objectStore(table).createIndex(index,['dataset',field],{unique:true});
+      for(const [index,field] of Object.entries(definitions))if(!opening.transaction.objectStore(table).indexNames.contains(index))opening.transaction.objectStore(table).createIndex(index,['dataset',field],{unique:true});
     }
     const e=opening.transaction.objectStore('events');
-    for(const field of ['time','targetId','jobId','moduleId','severity'])e.createIndex(field,['dataset',field,'sequence']);
-    e.createIndex('tokens','tokenKeys',{multiEntry:true});
+    for(const field of ['time','targetId','jobId','moduleId','severity'])if(!e.indexNames.contains(field))e.createIndex(field,['dataset',field,'sequence']);
+    if(!e.indexNames.contains('tokens'))e.createIndex('tokens','tokenKeys',{multiEntry:true});
+    const versions=opening.transaction.objectStore('versions');
+    if(!versions.indexNames.contains('workOrder'))versions.createIndex('workOrder',['dataset','workRank','id','sequence']);
   };
   const db=await req(opening);
   db.onversionchange=()=>db.close();
@@ -107,7 +111,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       const row={...structuredClone(value),key:[r.dataset,recordId],dataset:r.dataset,id:recordId,schema:1,rev,sequence,refs:closure,deleted:value===null};
       if(table==='accounts')for(const [field,raw] of [['personaKey',row.personaUid],['principalKey',row.expectedPrincipal],['exitKey',row.observedExit]])if(raw!==undefined)row[field]=raw;
       if(table==='generators'){if(row.slug)row.slugKey=row.slug;if(row.repositoryId&&row.folder)row.folderKey=[row.repositoryId,row.folder];}
-      if(table==='jobs'&&row.logicalKey)row.logicalKeyUnique=row.logicalKey;
+      if(table==='jobs'){if(row.logicalKey)row.logicalKeyUnique=row.logicalKey;row.workRank=['HELD','FAILED'].includes(row.state)?0:row.state==='RUNNING'?1:['WAITING','READY'].includes(row.state)?2:3;}
       if(value===null)await req(s(table).delete(row.key));else await req(s(table).put(row));
       await req(s('versions').add({...row,key:[r.dataset,table,recordId,sequence],table}));
     }
@@ -165,6 +169,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }
   };
   attachBlobs(core,transact,root,checkedRefs,append);
+  core.queue=createQueue({transact,root,writeRows,append,req,check:requireCore,clock});
   return core;
 }
 function attachBlobs(core,transact,root,checkedRefs,append) {
