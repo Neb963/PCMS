@@ -42,3 +42,5 @@ Initial P28 T41304038004 failed (215/222): the newly written auth regex had an e
 ## Installed verification checkpoint
 
 Source2f3d6ddc passed222 T/build in41304132324. The older Creator B selected by the prior workflow failed in its polling helper before Creator intake linked a newly visible folder (KeyError creatorJobId); the helper now waits safely for that link. Required P28 B is now selected: actual protected localStorage, real Firefox cookie partitions/FPI/attributes, two accounts, private-byte reopen, unrelated/human-edit sentinels, secret-safe UI, unknown/rotating sessions, Pause/Journal-disabled/Backup Disable and actual restart. Its result is pending.
+
+Collector review tightened the known required guard: a logged-in authentication record with missing session-change key is incomplete, not an absent login. Cookie partition origin validation preserves ports permitted by the existing donor service. Added the focused missing-guard case; B remains pending.

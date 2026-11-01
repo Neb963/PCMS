@@ -36,7 +36,7 @@ def main():
    ids=[]
    for label,email in [('First capture account','first@fixture.test'),('Second capture account','second@fixture.test')]:
     id=add(sid,label);settle(sid,id,'LOGIN_REQUIRED');login(sid,id,email);click(sid,'#account-confirm');settle(sid,id,'READY');ids.append(id)
-   one,two=ids;token='disposable-exact-'+chr(0)+'雪😀\\r\\n'
+   one,two=ids;token='disposable-exact-'+chr(0)+'雪😀\r\n'
    with fixture.lock:fixture.logins[account(sid,one)['routeId']]['sessionToken']=token
    configure_auth(sid,one,token)
    setup=asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),a=await c.read('accounts',arguments[0]),b=await c.read('accounts',arguments[1]);c.close();const expires=Math.floor(Date.now()/1000)+7200,base={url:'https://perchance.org/',name:'managed-secret',value:'cookie-one-opaque',path:'/',secure:true,httpOnly:true,sameSite:'strict'};await browser.cookies.set({...base,storeId:a.containerId});await browser.cookies.set({...base,name:'persistent',domain:'.perchance.org',path:'/guard',expirationDate:expires,sameSite:'lax',storeId:a.containerId});await browser.cookies.set({...base,value:'fpi-opaque',firstPartyDomain:'example.org',storeId:a.containerId});await browser.cookies.set({...base,value:'partition-opaque',partitionKey:{topLevelSite:'https://example.net',hasCrossSiteAncestor:true},storeId:a.containerId});await browser.cookies.set({...base,value:'cookie-two-opaque',storeId:b.containerId});await browser.cookies.set({...base,name:'unrelated-cookie',value:'excluded-default-sentinel',storeId:'firefox-default'});const t=await browser.tabs.create({cookieStoreId:a.containerId,url:'https://perchance.org/human-review#edit',active:false});return {expires,human:t.id,one:a.containerId,two:b.containerId};""",ids)
@@ -65,7 +65,7 @@ def main():
    if sid:
     try:stop(sid,profile)
     except Exception:pass
-   proc.terminate();proc.wait(timeout=10);log.close();fixture.close();(OUT/'installed-backup-sessions.json').write_text(json.dumps(receipt,indent=2)+'\\n')
+   proc.terminate();proc.wait(timeout=10);log.close();fixture.close();(OUT/'installed-backup-sessions.json').write_text(json.dumps(receipt,indent=2)+'\n')
  print(json.dumps(receipt),flush=True)
 def inspect_paused(sid):
  return asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),s=await c.queue.status();c.close();return s.paused;")

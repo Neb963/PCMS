@@ -22,3 +22,5 @@ test('wrong principal/document, iframe and concurrent session rotation never adm
  let f=fixture();assert.equal((await f.run({principalFingerprint:'a'.repeat(64)})).code,'ACCOUNT_PRINCIPAL_CHANGED');assert.equal((await f.run({documentWitness:'stale'})).code,'ACCOUNT_DOCUMENT_CHANGED');
  f.context.top={};assert.equal((await f.run()).code,'AUTH_CONTEXT_UNAVAILABLE');f=fixture();f.rotate();const r=await f.run();assert.equal(r.code,'AUTH_SESSION_CHANGED');assert.equal(r.ok,false);assert.equal('data' in r,false);
 });
+
+test('an authenticated user without the required session guard remains incomplete',async()=>{const f=fixture();f.storage.delete('sessionTokenLastChangeTime');assert.equal((await f.run()).code,'AUTH_GUARD_MISSING');});
