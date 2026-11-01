@@ -37,7 +37,7 @@ def complete(sid):
   if c['state']=='COMPLETE':return v
   j=v['job']
   if j['state'] in ['HELD','FAILED']:
-   key=(j['state'],j['rev'],(j.get('effect') or {}).get('operationId'),(j.get('effect') or {}).get('boundary'),c['state'])
+   key=(j['state'],j.get('rev'),(j.get('effect') or {}).get('operationId'),(j.get('effect') or {}).get('boundary'),c['state'])
    if held['key']!=key:held.update(key=key,since=time.monotonic())
    if j['state']!='FAILED' and time.monotonic()-held['since']<20:return None
    p=(c.get('participants') or [{}])[0]
