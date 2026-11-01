@@ -7,13 +7,14 @@ export async function observeSavedSource(request){
  if(!request||!['META','ASSET'].includes(request.kind)||!/^[a-z0-9][a-z0-9-]{0,99}$/.test(request.slug??'')||!/^public_[A-Za-z0-9_-]{1,100}$/.test(request.remoteId??'')||!/^[a-f0-9]{64}$/.test(request.principalFingerprint??''))return hold('SOURCE_REQUEST_INVALID');
  if(location.origin!=='https://perchance.org'||typeof request.documentWitness!=='string'||globalThis.__PCMS_ACCOUNT_DOCUMENT_1!==request.documentWitness)return hold('ACCOUNT_DOCUMENT_CHANGED');
  if(document.querySelector('#challenge-running,#challenge-form,.cf-turnstile,iframe[src*="challenges.cloudflare.com"]'))return hold('ACCOUNT_CHALLENGE');
+ let stage='SESSION';
  try{
   const raw=localStorage.getItem('app-storage'),change=localStorage.getItem('sessionTokenLastChangeTime'),user=JSON.parse(raw)?.user;
   if(user?.loggedIn!==true||typeof user.email!=='string'||typeof user.sessionToken!=='string'||!user.sessionToken)return hold('ACCOUNT_LOGIN_REQUIRED');
   const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join(''),email=user.email.trim().toLowerCase();if(await hash(new TextEncoder().encode(email))!==request.principalFingerprint)return hold('ACCOUNT_PRINCIPAL_CHANGED');
   const same=()=>location.origin==='https://perchance.org'&&globalThis.__PCMS_ACCOUNT_DOCUMENT_1===request.documentWitness&&localStorage.getItem('app-storage')===raw&&localStorage.getItem('sessionTokenLastChangeTime')===change;
   async function read(endpoint,body,authenticated=true){if(!same())throw Error('ACCOUNT_DOCUMENT_CHANGED');const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);try{const response=await fetch('https://perchance.org/api/'+endpoint,{method:'POST',credentials:'same-origin',redirect:'error',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify(authenticated?{email,sessionToken:user.sessionToken,...body}:body),signal:controller.signal});if(!same())throw Error('ACCOUNT_DOCUMENT_CHANGED');if(response.status===429)throw Error('SOURCE_RATE_LIMITED');if(response.status!==200||!String(response.headers.get('content-type')).includes('json'))throw Error('SOURCE_READ_UNAVAILABLE');return await response.json();}finally{clearTimeout(timer);}}
-  const inventory=await read('getGeneratorsByUser',{}),owned=inventory?.generators?.filter(g=>g?.name===request.slug);if(inventory?.status!=='success'||!Array.isArray(inventory.generators)||owned.length!==1||typeof owned[0].isPrivate!=='boolean')return hold('SOURCE_ACCOUNT_UNVERIFIED');
+  stage='METADATA';const inventory=await read('getGeneratorsByUser',{}),owned=inventory?.generators?.filter(g=>g?.name===request.slug);if(inventory?.status!=='success'||!Array.isArray(inventory.generators)||owned.length!==1||typeof owned[0].isPrivate!=='boolean')return hold('SOURCE_ACCOUNT_UNVERIFIED');
   const ownership=await read('checkGeneratorOwnership',{generatorName:request.slug}),page=await read('getGeneratorPageData',{generatorName:request.slug},false),g=page?.generator;
   if(ownership?.status!=='is-owner'||page?.status!=='success'||g?.name!==request.slug||'public_'+g.publicId!==request.remoteId||g.isPrivate!==owned[0].isPrivate)return hold('SOURCE_IDENTITY_UNVERIFIED');
   if(typeof g.modelText!=='string'||!g.modelText.isWellFormed()||typeof g.outputTemplate!=='string'||!g.outputTemplate.isWellFormed())return hold('SOURCE_SCHEMA_UNSUPPORTED');
@@ -26,10 +27,10 @@ export async function observeSavedSource(request){
   if(!same())return hold('ACCOUNT_DOCUMENT_CHANGED');
   if(request.kind==='META')return {...base,pjs:g.modelText,html:g.outputTemplate,assets};
   if(request.sourceStamp!==sourceStamp)return hold('SOURCE_CHANGED_DURING_READ');const entry=assets.find(a=>a.path===request.path);if(!entry||entry.key!==request.key||entry.bytes!==request.bytes)return hold('SOURCE_ASSET_SCOPE');
-  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);let response,bytes;
+  stage='ASSET_FETCH';const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);let response,bytes;
   try{response=await fetch('https://user.uploads.dev/file/'+entry.key,{method:'GET',credentials:'omit',cache:'no-store',redirect:'error',signal:controller.signal});if(response.status!==200)return hold('SOURCE_ASSET_UNAVAILABLE');bytes=new Uint8Array(await response.arrayBuffer());}catch{return hold('SOURCE_ASSET_UNAVAILABLE');}finally{clearTimeout(timer);}
-  if(!same())return hold('ACCOUNT_DOCUMENT_CHANGED');if(bytes.length!==entry.bytes)return hold('SOURCE_ASSET_LENGTH');const sha256=await hash(bytes);if(entry.sha256&&entry.sha256!==sha256)return hold('SOURCE_ASSET_HASH');let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));return {...base,path:entry.path,bytes:bytes.length,sha256,base64:btoa(binary)};
- }catch(error){return hold(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'SOURCE_READ_UNKNOWN');}
+  if(!same())return hold('ACCOUNT_DOCUMENT_CHANGED');if(bytes.length!==entry.bytes)return hold('SOURCE_ASSET_LENGTH');stage='ASSET_HASH';const sha256=await hash(bytes);if(entry.sha256&&entry.sha256!==sha256)return hold('SOURCE_ASSET_HASH');stage='ASSET_ENCODING';let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));return {...base,path:entry.path,bytes:bytes.length,sha256,base64:btoa(binary)};
+ }catch(error){return {...hold(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'SOURCE_READ_UNKNOWN'),diagnostic:{stage,errorClass:['TypeError','ReferenceError','DataError','SecurityError','InvalidCharacterError','OperationError'].includes(error.name)?error.name:'OTHER'}};}
 }
 
 // MAIN-world observation only. No setter, save, reload, markClean or editor
