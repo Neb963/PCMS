@@ -44,3 +44,7 @@ Run41323888550 passed the new packaged donor tests and restore cases, but existi
 ## Finite restore integration checkpoint
 
 Backup0.5 now routes fixed RESTORE/readonly-status actions through the existing module host and queue. Its policy validates/selects/stages a native Blob, confirms replacement once, drains ordinary effects, holds exact editor/native work, checkpoints prior donor data, allocates/readbacks one fresh blocked Persona per turn, applies donor state and individual storage keys with same-op receipts, copies verified binary/metadata into the inactive generation and stops at STAGED/auth pending. Rollback is a separate guarded local readback path; no activation exists. Primary restore UI and full T/B/DSK are still pending. Core dispatch guard regression fix must pass before acceptance.
+
+## Primary restore UI checkpoint
+
+Settings Backup now has native File selection/whole-archive validation through the existing trusted RPC, secret-safe coverage/age/prerequisite preview, one explicit replacement checkbox/Confirm, retained mapping/copy progress, current-versus-staged status, contextual editor inspection, Check/rollback/cancel and interrupted source-copy recovery. Export/capture controls are held during restore maintenance; Work has the exact restore/check link. The UI never labels STAGED as active or operational. Required end-to-end T and actual File/B/DSK tests remain pending.
