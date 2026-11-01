@@ -90,3 +90,6 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - Wire export reconciliation to the real Downloads event, cold start and alarm wake. Immediate small-file observation can conceal a missing event hook. A capture-complete state must never be called a disk-complete export.
 - Byte-fidelity tokens deliberately differ from an independent fixture server's valid login. Correct ACCOUNT_LOGIN_REQUIRED after restart is evidence that bytes do not establish operational login; use actual fixture Sign in/Confirm for subsequent account work.
 - Importing a test helper can change global fixture handlers. Avoid unrelated imports; establish the exact fixture boundary before counting installed evidence.
+
+- P32 installed41328125038: a phase reducer can pass direct tests while the packaged background emits undefined checkpoint fields rejected by the strict host ABI. Exercise the actual bundled background through validateStep; optional fields must be explicit JSON values.
+- P32 installed41328838186: cross-process cookie preservation needs a persistent sentinel with explicit expiry. A session-only cookie may correctly disappear when Firefox terminates. Keep the independent oracle faithful to the browser lifetime being tested; view rows also retain a value envelope distinct from core.view().

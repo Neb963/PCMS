@@ -41,7 +41,7 @@ def reached_stop(sid):
  if v['job'] and v['job']['state'] in ['HELD','FAILED'] and not (v['control']['state']=='DRAIN' and v['control'].get('code')=='RESTORE_EDITOR_INSPECTION_REQUIRED'):raise AssertionError(('PRE_INTERRUPTION_HOLD',v['control']['state'],v['control'].get('code'),v['job'].get('recovery')))
  return False
 def unrelated(sid,label):
- return asyncjs(sid,"const c=await browser.contextualIdentities.create({name:arguments[0],color:'purple',icon:'circle'});await browser.cookies.set({storeId:c.cookieStoreId,url:'https://example.org/',name:'sentinel',value:'unrelated-exact',secure:true});return c.cookieStoreId;",[label])
+ return asyncjs(sid,"const c=await browser.contextualIdentities.create({name:arguments[0],color:'purple',icon:'circle'});await browser.cookies.set({storeId:c.cookieStoreId,url:'https://example.org/',name:'sentinel',value:'unrelated-exact',secure:true,expirationDate:Math.floor(Date.now()/1000)+86400});return c.cookieStoreId;",[label])
 def assert_unrelated(sid,id):
  assert asyncjs(sid,"return (await browser.contextualIdentities.query({})).some(c=>c.cookieStoreId===arguments[0])&&(await browser.cookies.getAll({storeId:arguments[0]})).some(c=>c.name==='sentinel'&&c.value==='unrelated-exact');",[id])
 def inspect_staged(sid,source_id,model,baseline,previous_dataset):

@@ -36,7 +36,20 @@ export async function buildRestoreDonorPlan({source,current,mappings,destination
  for(const [key,value]of Object.entries(source.storage.local)){
   if(key==='state')continue;if(inactiveKey(key)){inactive.push('local:'+key);continue;}
   if(key.startsWith('gm-values:')){const old=key.slice(10),mapped=sourceScriptIds.get(old);need(mapped,'RESTORE_GM_MAP_INCOMPLETE');local['gm-values:'+mapped]=clone(value);}
-  else if(key==='automationJobs'){local[key]=remapAutomationHistory(Array.isArray(value)?value:Object.values(value??{}),{profileSource:sourceToDestination,workflow:sourceWorkflowIds}).map(j=>({...j,lease:null,runtimeInvalidated:true,...j.profileId?{profileId:sourceToDestination.get(j.profileId)??j.profileId}:{},...j.tabId!=null?{tabId:null}:{},...j.tasks?{tasks:j.tasks.map(t=>({...t,...t.tabId!=null?{tabId:null}:{}}))}:{}}));}
+  else if(key==='automationJobs'){
+   const history=Array.isArray(value)?value:Object.values(value??{}),inert=(row,original)=>{
+    const out={...row,lease:null,runtimeInvalidated:true};
+    if(Object.hasOwn(original,'profileId')){out.sourceProfileId=original.profileId;out.profileId=sourceToDestination.get(original.profileId)??null;}
+    for(const field of ['tabId','frameId','documentId'])if(Object.hasOwn(original,field)){out['source'+field[0].toUpperCase()+field.slice(1)]=original[field];out[field]=null;}
+    return out;
+   };
+   local[key]=remapAutomationHistory(history,{profileSource:sourceToDestination,workflow:sourceWorkflowIds}).map((job,index)=>{
+    const original=history[index],out=inert(job,original);
+    if(Object.hasOwn(original,'workflowId')){out.sourceWorkflowId=original.workflowId;out.workflowId=sourceWorkflowIds.get(original.workflowId)??null;}
+    for(const field of ['tasks','stepProgress'])if(Array.isArray(job[field]))out[field]=job[field].map((row,i)=>inert(row,original[field][i]));
+    return out;
+   });
+  }
   else local[key]=clone(value);
  }
  for(const [key,value]of Object.entries(source.storage.sync)){if(inactiveKey(key))inactive.push('sync:'+key);else sync[key]=clone(value);}

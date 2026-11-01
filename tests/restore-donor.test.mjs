@@ -28,3 +28,10 @@ test('newer donor/storage changes, unknown orphan allocation and editor contexts
  await f.manager.mutate(state=>{delete state.profiles[m.destinationContainerId];});assert.equal((await f.donor.observeAllocation({mapping:f.mapping})).code,'RESTORE_ALLOCATION_ORPHAN');await assert.rejects(f.donor.allocate({mapping:f.mapping},async()=>true),e=>e.code==='RESTORE_ALLOCATION_ORPHAN');assert.equal(f.creates(),1);
  f.tabs.push({id:7,cookieStoreId:f.oldId,url:'https://perchance.org/example/edit',draft:'human draft exact'});const held=await f.donor.gate({accounts:f.destinationAccounts});assert.equal(held.code,'RESTORE_EDITOR_INSPECTION_REQUIRED');assert.equal(f.tabs[0].draft,'human draft exact');
 });
+
+test('historical native runtime references never adopt an unrelated destination ID while opaque source bytes stay exact',async()=>{
+ const f=await fixture(),m=await f.allocate(),history=[{id:'old-job',state:'running',profileId:f.sourceId,workflowId:'unmapped-workflow',tabId:47,documentId:'old-document',lease:{owner:'old'},prompt:'opaque '+f.sourceId+'\0雪',tasks:[{profileId:f.unrelated,tabId:48}],stepProgress:[{profileId:f.sourceId,frameId:3}]}];
+ f.source.storage.local.automationJobs=history;
+ const plan=await f.donor.plan({source:f.source,current:await f.donor.snapshot(),previous:f.previous,mappings:[m],destinationAccounts:f.destinationAccounts,restoreId:crypto.randomUUID()}),job=plan.writes.find(w=>w.key==='automationJobs').after[0];
+ assert.equal(job.state,'interrupted');assert.equal(job.profileId,m.destinationContainerId);assert.equal(job.sourceProfileId,f.sourceId);assert.equal(job.workflowId,null);assert.equal(job.sourceWorkflowId,'unmapped-workflow');assert.equal(job.tabId,null);assert.equal(job.documentId,null);assert.equal(job.lease,null);assert.equal(job.prompt,history[0].prompt);assert.equal(job.tasks[0].profileId,null);assert.equal(job.tasks[0].sourceProfileId,f.unrelated);assert.equal(job.tasks[0].tabId,null);assert.equal(job.stepProgress[0].profileId,m.destinationContainerId);assert.equal(job.stepProgress[0].frameId,null);assert.equal(history[0].tabId,47);
+});
