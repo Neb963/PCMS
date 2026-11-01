@@ -37,7 +37,7 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
   const op='restore-'+j.id+'-'+label,key='restore-op:'+op;
   const validNow=async()=>{const latest=await fresh(j),m=await module(),r=await core.status();return enabled(m)&&m.generation===latest.generation&&r.restoreHold?.jobId===j.id&&latest.rev===dispatchRevision;};
   let dispatchRevision=null,observed;
-  const observation=async()=>{observed=await observe();const receipt=await core.view(key);return observed?.ok?{matched:true,operationId:op}:receipt?.noDispatch?{resolved:true,outcome:'FAILED',operationId:op,code:receipt.code??'RESTORE_EFFECT_FAILED'}:{matched:false,operationId:op};};
+  const observation=async()=>{observed=await observe();const receipt=await core.view(key);return observed?.ok?{matched:true,operationId:op}:(observed?.noDispatch||observed?.resolved||receipt?.noDispatch)?{resolved:true,outcome:'FAILED',operationId:op,code:observed?.code??receipt?.code??'RESTORE_EFFECT_FAILED'}:{matched:false,operationId:op};};
   let latest=await fresh(j);
   if(latest.effect?.boundary==='POSSIBLE'){
    check(latest.effect.operationId===op,'RESTORE_OPERATION_SCOPE');if(inflight.has(op))return {done:false,code:'RESTORE_EFFECT_PENDING'};const result=await observation();
@@ -54,7 +54,7 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
    },observe:observation});
    latest=await fresh(j);if(latest.effect?.boundary==='POSSIBLE')return {done:false,code:observed?.code??'RESTORE_EFFECT_UNKNOWN'};if(!observed)await observation();
   }
-  latest=await fresh(j);if(latest.state==='FAILED')return {done:false,code:observed?.code??'RESTORE_EFFECT_FAILED'};
+  latest=await fresh(j);if(latest.state==='FAILED')return {done:false,rejected:true,observed,code:observed?.code??'RESTORE_EFFECT_FAILED'};
   return {done:true,observed};
  }
  async function rollbackStart(j,c){
@@ -87,7 +87,7 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
    const ready=await donor.checkBinding(scope,{stage:'PREREQUISITES',readOnly:true});if(!ready?.ok){await update(j,c,{code:ready?.code??'RESTORE_PREREQUISITE_MISSING'});return output(j,'HELD',ready?.code??'RESTORE_PREREQUISITE_MISSING');}
    const plan=p.state==='ROUTE_PLAN',operation={operationId,...plan?{}:{stage:p.state}};
    const r=await step(j,c,label,valid=>plan?donor.restoreParticipantPlanRoute(args(operation),valid):donor.restoreParticipantRoute(args(operation),valid),()=>plan?donor.restoreParticipantObservePlan(args(operation)):donor.restoreParticipantObserveRoute(args(operation)),reconcile);
-   if(!r.done)return output(j,r.notStarted?'CONTINUE':'HELD',r.code);
+   if(!r.done){if(r.rejected){const nativePlan=await donor.restoreAdvancePlan({plan:await privateData(c,'plan'),scope,operationId,stage:plan?'RESTORE_ROUTE_PLAN':p.state,disposition:'REJECTED'});await core.restore.secret(c.id,'plan',JSON.stringify(nativePlan),c.destinationAccounts.map(a=>a.id),guard(await fresh(j)));await save({route:{state:'HELD',code:r.code}});}return output(j,r.notStarted?'CONTINUE':'HELD',r.code);}
    const nativePlan=await donor.restoreAdvancePlan({plan:await privateData(c,'plan'),scope,operationId,stage:plan?'RESTORE_ROUTE_PLAN':p.state});
    await core.restore.secret(c.id,'plan',JSON.stringify(nativePlan),c.destinationAccounts.map(a=>a.id),guard(await fresh(j)));
    if(p.state==='VERIFY'){
