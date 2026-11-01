@@ -33,11 +33,11 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
   },
   async begin({id,guard}){
    core.queue.fenceMaintenance(guard.jobId);
-   try{return await transact(['modules','jobs','events'],'readwrite',async s=>{
+   try{return await transact(['modules','jobs','events','pins'],'readwrite',async s=>{
     const r=await root(s);await assertGuard(s,r,guard);const c=await current(s);check(c?.id===id&&c.previewDataset===r.dataset,'RESTORE_PREVIEW_CHANGED');check(!r.restoreHold||r.restoreHold.id===id,'RESTORE_MAINTENANCE');
     if(c.confirmedAt)return c;check(c.state==='PREVIEW','RESTORE_PREVIEW_CHANGED');
-    const next={...c,rev:c.rev+1,state:'DRAIN',jobId:guard.jobId,confirmedAt:clock(),previousRoot:structuredClone(r),newDataset:'restored-'+crypto.randomUUID(),progress:{blobs:0,rows:0},code:null};
-    r.restoreHold={id,jobId:guard.jobId};r.admissionEpoch=(r.admissionEpoch??0)+1;await req(s('meta').put(next));await event(s,r,id,'RESTORE_MAINTENANCE','HELD');return next;
+    const next={...c,rev:c.rev+1,state:'DRAIN',jobId:guard.jobId,confirmedAt:clock(),previousRoot:structuredClone(r),newDataset:'restored-'+crypto.randomUUID(),progress:{blobs:0,rows:0},previousJournalPin:'restore-previous-'+id,code:null};
+    await req(s('pins').put({key:[r.dataset,next.previousJournalPin],refs:[],...r.sequence>=(r.journalPrunedThrough??0)+1?{journalRange:{first:(r.journalPrunedThrough??0)+1,last:r.sequence}}:{}}));r.restoreHold={id,jobId:guard.jobId};r.admissionEpoch=(r.admissionEpoch??0)+1;await req(s('meta').put(next));await event(s,r,id,'RESTORE_MAINTENANCE','HELD');return next;
    });}catch(error){const r=await core.status();if(!r.restoreHold)await core.queue.releaseMaintenance(guard.jobId);throw error;}
   },
   update:(id,expectedRev,patch,guard)=>transact(['modules','jobs','events'],'readwrite',async s=>{
@@ -54,9 +54,9 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
    for(const d of descriptors){const key=[c.newDataset,d.blobId],b=await req(s('blobs').get(key));check(b&&!b.staging&&b.bytes===d.bytes,'RESTORE_REFERENCE_MISSING');for(const ref of d.refs){const child=await req(s('blobs').get([c.newDataset,ref]));check(child&&!child.staging,'RESTORE_REFERENCE_MISSING');}await req(s('blobs').put({...b,refs:[...d.refs]}));}
   }),
   async rolledBack(id,guard){
-   const result=await transact(['modules','jobs','events'],'readwrite',async s=>{
+   const result=await transact(['modules','jobs','events','pins'],'readwrite',async s=>{
     const r=await root(s),c=await own(s,r,id,guard);check(c.state==='ROLLBACK_VERIFIED'&&c.rollback?.verified===true&&r.dataset===c.previousRoot.dataset,'RESTORE_ROLLBACK_UNVERIFIED');
-    delete r.restoreHold;await req(s('meta').put({...c,state:'ROLLED_BACK',rev:c.rev+1,finishedAt:clock()}));await event(s,r,id,'RESTORE_ROLLED_BACK','COMPLETE');return {state:'ROLLED_BACK',dataset:r.dataset};
+    delete r.restoreHold;await req(s('pins').delete([r.dataset,c.previousJournalPin]));await req(s('meta').put({...c,state:'ROLLED_BACK',rev:c.rev+1,finishedAt:clock()}));await event(s,r,id,'RESTORE_ROLLED_BACK','COMPLETE');return {state:'ROLLED_BACK',dataset:r.dataset};
    });await core.queue.releaseMaintenance(guard.jobId);return result;
   },
   async cancelPreview(id,generation){

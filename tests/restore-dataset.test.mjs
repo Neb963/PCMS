@@ -49,3 +49,11 @@ test('staged binary chunks live only in the controlled destination dataset and p
  await f.c.restore.setBlobRefs(f.id,[{blobId:id,bytes:blob.size,refs:[]}],f.guard);
  await assert.rejects(f.c.putBlob(blob,{pinId:'forbidden',dataset:'unrelated-generation',guard:f.guard}),e=>e.code==='RESTORE_SCOPE_DENIED');
 });
+
+test('enabled Journal maintenance continues during restore while previous Journal cut is pinned',async t=>{
+ const f=await prepared(t),control=await f.c.restore.begin({id:f.id,guard:f.guard}),m=await f.c.read('modules','pcms-journal');
+ await f.c.mutate([{table:'modules',id:m.id,expectedRev:m.rev,refs:m.refs,value:{...m,hostClass:'journal'}}],event);
+ const j=await f.c.queue.enqueue({requestId:'journal-maintenance',logicalKey:'journal-maintenance',moduleId:'pcms-journal',targetId:'pcms-journal',kind:'EXPORT'}),selected=await f.c.queue.next();assert.equal(selected.id,j.id);
+ let calls=0;await f.c.queue.dispatch(j.id,selected.rev,{operationId:'journal-during-restore',kind:'DOWNLOAD',write:false,preflight:async()=>({ok:true}),call:()=>calls++,observe:async()=>({matched:true,operationId:'journal-during-restore'})});assert.equal(calls,1);
+ const before=(await f.c.status()).journalPrunedThrough??0;await f.c.pruneJournal({beforeTime:Date.now()+86400000,exportedThrough:control.previousRoot.sequence});assert.equal((await f.c.status()).journalPrunedThrough??0,before);
+});
