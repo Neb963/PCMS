@@ -22,3 +22,7 @@ P31 [PR23](https://github.com/Neb963/PCMS/pull/23) merged main30cf3715cbc7cedc3a
 P19 remains genuinely held by the missing qualified native source revision/precondition recipe. Accepted Discovery ZIP cannot be extracted while local execution is unavailable; source fingerprints are not CAS. P20–P27/P35/P37/P38 and descendants wait. GitHub/Actions work; no unavailable local checks claimed and no historical investigations repeated.
 
 H/G/P1–P5 NOT TESTED/unauthorized. P42–P49 need named disposable resources/effects. P48 qualifies actual login/route portability, P49 fleet resources. Production bytes and synthetic CI are not operational/full acceptance. P32 implementation/T/B/DSK pending.
+
+## Core staging foundation checkpoint
+
+Added a synchronous plus durable maintenance fence to the existing queue, including the final dispatch race, and private restore preview/hold/staged-generation/rollback primitives in the same Core database. No activation method exists in P32. Added typed mapping transformations: secrets/drafts/source strings are never searched/replaced, old download IDs lose cleanup authority, imported jobs/leases/route/tab evidence are held/inert, and all historical module ZIP/manifests remain distinct. Fresh-profile container IDs may share the same numeric spelling as a source profile; freshness requires the actual allocation baseline/receipt, not string inequality. Required tests and all donor/UI integration are still pending.
