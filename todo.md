@@ -16,4 +16,4 @@ Base actual main5a337144; branch p27-develop-completion.
 - Required installed B goes automatically from READY through actual review/Finish to full independent source/Git/listing/pool/DONE, then update, with distinct root inputs and interruption. No hidden manual source save/publication; reuse prior unchanged evidence. Live G/P46 remain NOT TESTED/unauthorized.
 - Push checkpoints; merge after required T/B, verify main and continue P34, then every remaining dependency-eligible phase.
 
-P27 implementation not yet started.
+Original immutable source maps, conditional complete Git SOURCE, exact post-writeback source-map checks, publication/pool/DONE reuse, owner-binding gates and typed account-Ready continuation are implemented. Focused initial73T PASS; targeted complete first/update, changed nominally-Ready owner and cold Git/account recovery3T PASS. Existing drift/unknown SOURCE cases passed; full selected T/build and required installed B are pending. The new B drives actual first and update Finish, truncates the SOURCE ref response, restarts Firefox, and independently checks source/Git/listing/pool/cycle and every root input.

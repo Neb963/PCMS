@@ -7,7 +7,7 @@ import {sourcePaths,lfsPointer} from '../core/source-set.mjs';
 // mutable path download. Catalog revision is checked again by the caller.
 export function createDeploymentInputs({core,read=createGitReader({})}){
  const cache=new Map();
- return async (g,{fresh=false}={})=>{
+ return async (g,{fresh=false,sourceOnly=false}={})=>{
   const connection=(await core.view('git-catalog'))?.connection;
   check(connection?.repositoryId===g.repositoryId,'GIT_REPOSITORY_CHANGED');
   check(gitSha(g.folderTreeSha)&&gitSha(g.catalogHead),'GIT_INPUT_MAP_REQUIRED');
@@ -39,12 +39,18 @@ export function createDeploymentInputs({core,read=createGitReader({})}){
     if(e.type==='tree'){check(e.mode==='040000','GIT_SOURCE_NOT_REGULAR');pending.push({sha:e.sha,prefix:prefix+e.path+'/'});}else{check(regular(e),'GIT_SOURCE_NOT_REGULAR');wanted.push({...e,path:prefix+e.path});}
    }}sourcePaths(wanted.map(e=>e.path));
   }
+  const sourceMap={};
+  if(parsed.action==='DEPLOY')for(const e of wanted)sourceMap[e.path]=e.sha;
+  else {for(const path of ['main.pjs','index.html']){const e=entries.find(e=>e.path===path);if(e){check(regular(e),'GIT_SOURCE_NOT_REGULAR');sourceMap[path]=e.sha;}}
+   const src=entries.find(e=>e.path==='src'),pending=[];if(src){check(src.type==='tree'&&src.mode==='040000','GIT_SOURCE_NOT_REGULAR');pending.push({sha:src.sha,prefix:'src/'});}
+   while(pending.length){const n=pending.pop();for(const e of await tree(n.sha)){check(typeof e.path==='string'&&!e.path.includes('/')&&e.path!=='.'&&e.path!=='..','SOURCE_PATH_UNSUPPORTED');if(e.type==='tree'){check(e.mode==='040000','GIT_SOURCE_NOT_REGULAR');pending.push({sha:e.sha,prefix:n.prefix+e.path+'/'});}else{check(regular(e),'GIT_SOURCE_NOT_REGULAR');sourceMap[n.prefix+e.path]=e.sha;}}}sourcePaths(['main.pjs','index.html',...Object.keys(sourceMap).filter(p=>p.startsWith('src/'))]);}
+  if(sourceOnly)return {sourceMap};
   const files=[];for(const e of wanted.sort((a,b)=>a.path<b.path?-1:1)){
    const bytes=await decodeGitBlob(await object('blobs',e.sha),e.sha);check(!lfsPointer(bytes),'SOURCE_LFS_POINTER');
    if(parsed.action==='DEVELOP'||['main.pjs','index.html'].includes(e.path))try{new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);}catch{check(false,'SOURCE_TEXT_UNSUPPORTED');}
    files.push({path:e.path,bytes,gitSha:e.sha});
   }
   const inputHash=await sha256(new TextEncoder().encode(JSON.stringify([parsed.action,...await Promise.all(files.map(async f=>[f.path,f.bytes.length,await sha256(f.bytes)]))])));
-  const source=await core.source(files);return {...source,inputHash,commit:g.catalogHead,version:parsed.version,action:parsed.action,status:parsed.status,expectedInputs:Object.fromEntries([['DEPLOYMENT.md',marker.sha],...files.map(f=>[f.path,f.gitSha])])};
+  const source=await core.source(files);return {...source,sourceMap,inputHash,commit:g.catalogHead,version:parsed.version,action:parsed.action,status:parsed.status,expectedInputs:Object.fromEntries([['DEPLOYMENT.md',marker.sha],...files.map(f=>[f.path,f.gitSha])])};
  };
 }
