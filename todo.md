@@ -16,4 +16,4 @@ Base main `efd84eaaba651a9fa78789ba1de1d08fb8171e7c`, tree `59835227893ac8a69f00
 
 ### Evidence and holds
 
-Implementation not started. T/B NOT TESTED for P20. G/H/P1–P5 remain NOT TESTED and unauthorized, except existing supplied P19 source evidence. No live provider mutation is authorized. Required installed evidence may use controlled fixtures. Accepted specification/design/PHASES remain unchanged.
+Checkpoint: immutable input reader, automatic version/Creator intake, same-job source preparation and contextual UI are implemented but unverified. Existing source/native focused regression: 46 T PASS before runtime wiring. New P20 T/B remain NOT TESTED. G/H/P1–P5 remain NOT TESTED and unauthorized, except existing supplied P19 source evidence. No live provider mutation is authorized. Required installed evidence may use controlled fixtures. Accepted specification/design/PHASES remain unchanged.
