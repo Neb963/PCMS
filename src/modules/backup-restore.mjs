@@ -8,7 +8,7 @@ import {restoreParticipantPlan,restoredCookieReadback,restoredAuthReadback} from
 import {checkedCookies} from './backup-session.mjs';
 import {bindingObservation} from './account-observations.mjs';
 const terminal=new Set(['CANCELLED','ROLLED_BACK','COMPLETE']);
-export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()=>{},verifyGit=async()=>({state:'NOT_CONFIGURED'}),clock=Date.now}){
+export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()=>{},quiesce=async()=>{},verifyGit=async()=>({state:'NOT_CONFIGURED'}),clock=Date.now}){
  const id='pcms-backup',inflight=new Map();let cached=null;
  const module=()=>core.read('modules',id),capable=m=>m?.packageClass==='bundled-backup'&&m.manifest?.capabilities?.includes('backup.restore'),enabled=m=>capable(m)&&m.enabled&&!m.lifecycle;
  const guard=j=>({moduleId:id,generation:j.generation,jobId:j.id,jobRevision:j.rev});
@@ -149,6 +149,7 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
     const unresolved=(await rows('jobs')).filter(x=>x.id!==j.id&&x.effect?.boundary==='POSSIBLE'&&x.effect.write!==false);if(unresolved.length){await update(j,c,{code:'RESTORE_PREVIOUS_WRITE_UNRESOLVED',previousWork:unresolved.map(x=>({id:x.id,kind:x.kind,moduleId:x.moduleId,accountId:x.accountId??null}))});return output(j,'HELD','RESTORE_PREVIOUS_WRITE_UNRESOLVED');}
     const accounts=await rows('accounts'),generators=await rows('generators'),gate=await donor.restoreGate({accounts,editorTabs:generators.flatMap(g=>(g.sourceEditors??[]).map(e=>e.tabId))});
     if(!gate.ok){await update(j,c,{code:gate.code,contexts:gate.contexts??[]});return output(j,'HELD',gate.code);}
+    await quiesce(core);
     if(!await core.credentials.get('restore-previous-'+c.id))await core.restore.secret(c.id,'previous',JSON.stringify(gate.snapshot),accounts.map(a=>a.id),guard(await fresh(j)));
     const checked=await archive(c),baseline=await donor.restoreCensus(),mappings=checked.data.core.records.accounts.filter(a=>a.personaUid).map((a,index)=>({accountId:a.id,personaUid:a.personaUid,sourceContainerId:a.containerId,temporaryUid:crypto.randomUUID(),name:'PCMS restore '+c.id+' '+index,baseline}));
     await update(j,c,{state:'ALLOCATE',mappings,destinationAccounts:accounts.map(a=>({id:a.id,personaUid:a.personaUid,containerId:a.containerId})),progress:{...c.progress,allocate:0},contexts:[],code:null});return output(j,'CONTINUE');
