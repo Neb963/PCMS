@@ -82,11 +82,9 @@ def main():
    # before a new capture. Exporting the old immutable cut needed none of these.
    click(sid,'#pause-core');wait(lambda:not inspect_paused(sid))
    from installed_accounts import account as account_status,page as account_page
-   for id in ids:
+   for index,id in enumerate(ids):
     account_page(sid,id);before_open=account_status(sid,id)['flow']['jobId'];wait(lambda:script(sid,"return !document.getElementById('account-open').disabled"));click(sid,'#account-open');dashboard(sid);wait(lambda:account_status(sid,id)['flow']['jobId']!=before_open)
-    try:settle(sid,id,'READY')
-    except Exception:raise AssertionError({'phase':'RESTART_ACCOUNT_OPEN','account':account_status(sid,id)})
-    dashboard(sid)
+    settle(sid,id,'HELD','ACCOUNT_LOGIN_REQUIRED');login(sid,id,'backup'+str(index+1)+'@fixture.test');configure_auth(sid,id,fixture.logins[account_status(sid,id)['routeId']]['sessionToken']);click(sid,'#account-confirm');settle(sid,id,'READY');dashboard(sid)
    click(sid,'#pause-core');wait(lambda:inspect_paused(sid));backup_page(sid)
    # Force actual Downloads cancellation at its returned ID, then restore the
    # API. The production receipt must report interruption and retain good files.
