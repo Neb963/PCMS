@@ -29,3 +29,7 @@ Official upstream sources establish zip.js2.24.0 and noble-hashes2.4.0. The exis
 ## Streaming foundation checkpoint
 
 Pinned zip.js2.24.0/noble-hashes2.4.0 to exact public npm integrity metadata from41313142839; no transitive dependencies. Removed the temporary metadata command. Added incremental SHA-256 and a fixed-dataset private Core chunk reader that checks every byte/hash without materializing a whole blob. The build packages native-stream ZIP/hash code and licenses under existing CSP, with no new permission or remote runtime URL. Required new focused tests/codec remain pending.
+
+## Codec checkpoint
+
+Implemented versioned section/coverage/closure validation, streamed direct binary ZIP64 encoding, full production self-read (strict ZIP/CRC/SHA/manifest/COMPLETE and embedded module compatibility), immutable re-read handles and resource/cancellation diagnostics. Added independent Python ZIP round-trip and adversarial rewriting tests, 20MiB exact binary/history, forced actual ZIP64 structures and private chunk corruption tests. Focused Actions verification is pending; no P30 completion or disk evidence is claimed. The codec changes no live Core records or source pins.

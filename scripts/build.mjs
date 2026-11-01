@@ -78,6 +78,7 @@ export async function build(output=path.join(ROOT,'build')) {
   await cp(path.join(ROOT,'node_modules/@zip.js/zip.js/index-native.js'),path.join(stage,'codecs/zipjs/index-native.js'));
   await cp(path.join(ROOT,'node_modules/@zip.js/zip.js/LICENSE'),path.join(stage,'licenses/zip-js-LICENSE.txt'));
   const hashPath=path.join(stage,'core/stream-hash.mjs');await writeFile(hashPath,(await readFile(hashPath,'utf8')).replace("from '@noble/hashes/sha2.js'","from '../codecs/noble/sha2.js'"));
+  const archivePath=path.join(stage,'core/backup-archive.mjs');await writeFile(archivePath,(await readFile(archivePath,'utf8')).replace("from '@zip.js/zip.js/index-native.js'","from '../codecs/zipjs/index-native.js'"));
   const journalPath=path.join(stage,'core/journal-archive.mjs');
   await writeFile(journalPath,(await readFile(journalPath,'utf8')).replace("from 'fflate'","from '../codecs/fflate.mjs'"));
   const discoverPath=path.join(stage,'core/discover-archive.mjs');

@@ -22,7 +22,7 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts
-      - run: node --test tests/seed.test.mjs tests/packages.test.mjs
+      - run: node --test tests/backup-archive.test.mjs tests/blob-stream.test.mjs tests/capture-cut.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
