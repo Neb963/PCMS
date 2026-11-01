@@ -28,7 +28,7 @@ export async function observePerchanceCreation(request){
   }
   if(request.kind==='READ_CREATE'){
    const added=names.filter(n=>!request.before.includes(n)),candidate=slug(request.temporarySlug)&&added.includes(request.temporarySlug)?request.temporarySlug:added.length===1?added[0]:null;
-   if(!candidate)return {...hold(added.length?'CREATOR_CREATE_AMBIGUOUS':'CREATOR_CREATE_UNOBSERVED'),candidates:added};const p=await read(candidate);if(!p.owned||!p.privateEmpty)return hold('CREATOR_PRIVATE_EMPTY_UNVERIFIED');return {...base,ok:true,state:'MATCHED',temporarySlug:candidate,remoteId:p.remoteId,listing:p.listing,sourceFingerprint};
+   if(!candidate)return {...hold(added.length?'CREATOR_CREATE_AMBIGUOUS':'CREATOR_CREATE_UNOBSERVED'),candidates:added};const p=await read(candidate);if(!p.owned||!p.privateEmpty)return {...hold('CREATOR_PRIVATE_EMPTY_UNVERIFIED'),candidates:[candidate],candidate:{slug:candidate,remoteId:p.remoteId??null,listing:p.listing??'UNKNOWN',ownerMatches:p.owned===true}};return {...base,ok:true,state:'MATCHED',temporarySlug:candidate,remoteId:p.remoteId,listing:p.listing,sourceFingerprint};
   }
   if(!slug(request.temporarySlug)||request.temporarySlug===request.slug||!/^public_[A-Za-z0-9_-]{1,100}$/.test(request.remoteId??''))return hold('CREATOR_TEMPORARY_ID_INVALID');
   const previous=await read(request.temporarySlug),final=await read(request.slug);
