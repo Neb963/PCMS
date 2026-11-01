@@ -37,7 +37,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now,
   try{const token=await credential(g.repositoryId);check(typeof token==='string','GIT_CREDENTIAL_REQUIRED');const response=await transport('https://api.github.com/repos/'+g.repository+path,{method,credentials:'omit',cache:'no-store',redirect:'error',signal:timer.signal,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:JSON.stringify(body)});
    if(kind==='ref'&&[409,422].includes(response.status))return {rejected:true};
    if([400,401,403,404,409,422,429].includes(response.status))return {failed:response.status===429?'GIT_WRITE_RATE_LIMIT':'GIT_WRITE_DENIED'};
-   check(response.status===200||response.status===201,'GIT_WRITE_OUTCOME_UNKNOWN');await response.json();return {};
+   check(response.status===200||response.status===201,'GIT_WRITE_OUTCOME_UNKNOWN');try{await response.json();}catch{throw new CoreError('GIT_WRITE_OUTCOME_UNKNOWN');}return {};
   }finally{clearTimeout(timeout);}
  }
  async function observeObject(g,desc){try{const body=await object(g,desc.kind,desc.sha);if(desc.kind==='commits')check(body.tree?.sha===desc.body.tree&&JSON.stringify(body.parents?.map(p=>p.sha))===JSON.stringify(desc.body.parents)&&body.message===desc.body.message,'GIT_COMMIT_IDENTITY_MISMATCH');return true;}catch(error){if(error.code==='GIT_OBJECT_UNAVAILABLE')return false;throw error;}}
@@ -110,7 +110,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now,
  return {
   retryRejected:jobId=>serial('git',async()=>{
    const job=await core.read('jobs',jobId),m=job?await core.read('modules',job.moduleId):null;
-   check(job?.git?.active&&job.effect?.boundary==='OBSERVED'&&job.effect.outcome==='FAILED'&&!job.ownerMissing,'GIT_RETRY_NOT_REJECTED');check(m?.enabled&&!m.lifecycle&&m.generation===job.generation,'STALE_GENERATION');
+   check(job?.git?.active&&job.effect?.boundary==='OBSERVED'&&job.effect.outcome==='FAILED'&&job.effect.kind.startsWith('GIT_')&&job.git.active.phase!=='COMPLETE'&&job.effect.operationId.startsWith(job.git.active.operationId+'-')&&!job.ownerMissing,'GIT_RETRY_NOT_REJECTED');check(m?.enabled&&!m.lifecycle&&m.generation===job.generation,'STALE_GENERATION');
    const active={...job.git.active,attempt:job.git.active.attempt+1,phase:'PLAN'};
    await core.mutate([{table:'jobs',id:job.id,expectedRev:job.rev,refs:job.refs,value:{...job,state:'WAITING',effect:null,recovery:null,dueAt:clock(),git:{...job.git,code:null,active}}}],{moduleId:job.moduleId,jobId:job.id,targetId:job.targetId,step:'RECHECK_REJECTED_GIT',result:'WAITING'});return core.read('jobs',job.id);
   }),step:(job,request,reconcile=false)=>serial('git',()=>step(job,request,reconcile).catch(error=>{if(['STALE_REVISION','GIT_JOB_SCOPE_DENIED'].includes(error.code))throw error;return hold(job,code(error));})),check:id=>serial('git',async()=>{const job=await core.read('jobs',id);check(job?.git?.active,'GIT_OPERATION_MISSING');return step(job,job.git.active.request,true);}),status};

@@ -16,3 +16,7 @@ Base actual main6db6939c; branch p22-publication-pool-done. Preserve the accepte
 - Push/verify checkpoints, merge after required T/B, verify postmerge main, then continue to P23 automatically. Live G/P2 remains NOT TESTED/unauthorized until P43/P45.
 
 Publication/pool/DONE continuation, distinct prepared-operation recovery and same-job contextual status are implemented. 39 selected Deployer/Git production T PASS, including denied DONE access followed by corrected Git-only completion, lost publication response, pool transaction failure, source drift, version withdrawal, update/cycle preservation and preparation crash gaps. Required installed B remains pending. Existing CI jobs/triggers are unchanged; only the targeted journey/test selection changes for the affected source/Git boundary.
+
+Checkpoint ffcd4d3/PR29: local141 focused T/build PASS. Installed B pending. The implementation now keeps same-job Source Check in the Deployer workflow when Git is uncertain, rather than misrouting that Git effect to the source reconciler. Shared source adoption stays unavailable for automatic deployment jobs; their immutable READY inputs remain authoritative.
+
+Installed [41351907805](https://github.com/Neb963/PCMS/actions/runs/41351907805) FAIL: after actual publication and process death, the original operation was verified without replay, but account-hook recovery left the Deployer job RUNNING at POOL. No pool/DONE occurred. Fixed the out-of-band finite-step handoff to persist WAITING; a direct recovery/queue-state regression covers it. This run remains FAIL.
