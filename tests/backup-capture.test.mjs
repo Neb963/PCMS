@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cpus,totalmem} from 'node:os';
 import {sha256} from '../src/core/records.mjs';
+import {createBackup} from '../src/modules/backup.mjs';
 import {createBackupCapture} from '../src/modules/backup-capture.mjs';
 import {seeded} from './capture-fixture.mjs';
 const event={step:'FIXTURE_FULL_CAPTURE',result:'COMPLETE'};
@@ -14,7 +15,7 @@ async function fixture(t,count=2){
   endSessionCapture:async({watchId})=>watches.delete(watchId),
   cutExtensionState:async(_,callback)=>{const donor={format:1,revision:7,bootId,storageVersion:3,storage:{local:{state:{secretRoute:'private-route-secret'},gmValues:{exact:'GM-sentinel'},recovery:{key:'private-recovery-key'}},sync:{recovery:'sync-sentinel'}}};const result=await callback(donor);if(mode==='donor-change')return {ok:false,code:'CAPTURE_DONOR_CHANGED',discard:result};return {ok:true,result,donorReceipt:{revision:7,bootId,storageVersion:3,startedAt:Date.now()-1,finishedAt:Date.now()}};}
  };
- const service=createBackupCapture({core:c,donor});
+ await createBackup({core:c,donor}).initialize();const service=createBackupCapture({core:c,donor});
  async function turn(){const j=await c.queue.next();if(!j)return null;const r=await service.effect(j),latest=await c.read('jobs',j.id);if(latest.effect?.boundary!=='POSSIBLE')await c.queue.transition(j.id,r.jobRevision,{state:r.value.state==='COMPLETE'?'COMPLETE':'WAITING',dueAt:Date.now()});return r;}
  async function drain(){for(let i=0;i<count*6+120;i++)if(!await turn())return;throw Error('FINITE_CAPTURE_LIMIT');}
  return {c,s:service,turn,drain,get calls(){return calls;},mode:x=>mode=x,hook:x=>hook=x,lose:()=>{bootId='new-boot';watches.clear();}};
