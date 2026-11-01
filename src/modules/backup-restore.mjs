@@ -193,7 +193,7 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
     await core.restore.setBlobRefs(c.id,descriptors,guard(await fresh(j)));await update(j,c,{progress:{...c.progress,refs:index+descriptors.length},code:null});return output(j,'CONTINUE');
    }
    if(c.state==='COPY_ROWS'){
-    if(reconcile)return output(j,'CONTINUE');const {staged,entries}=await image(c),index=c.progress.rows??0,batch=entries.slice(index,index+200);if(!batch.length){await update(j,c,{state:'STAGED',stagedRoot:staged.root,stagedCounts:Object.fromEntries(Object.entries(staged.records).map(([k,v])=>[k,v.length])),code:'RESTORE_AUTH_IMPORT_PENDING'});return output(j,'HELD','RESTORE_AUTH_IMPORT_PENDING');}
+    if(reconcile)return output(j,'CONTINUE');const {staged,entries}=await image(c),index=c.progress.rows??0,batch=entries.slice(index,index+200);if(!batch.length){const compatible=/^0\.(?:[6-9]|[1-9][0-9]+)\./.test((await module()).manifest?.version??'');await update(j,c,{state:'STAGED',stagedRoot:staged.root,stagedCounts:Object.fromEntries(Object.entries(staged.records).map(([k,v])=>[k,v.length])),code:compatible?null:'RESTORE_AUTH_IMPORT_PENDING'});return output(j,compatible?'CONTINUE':'HELD',compatible?null:'RESTORE_AUTH_IMPORT_PENDING');}
     await core.restore.stageRows(c.id,batch,guard(await fresh(j)));await update(j,c,{progress:{...c.progress,rows:index+batch.length},code:null});return output(j,'CONTINUE');
    }
    if(c.state==='STAGED'){

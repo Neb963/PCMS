@@ -51,7 +51,7 @@ export function createRestoreParticipants({api,bound,patch,prerequisites,prepare
   async register(scope,{input,admitted},validNow){await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.arm(input,validNow,admitted??validNow);},
   async registration(scope,{input}){await target(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.registered(input);},
   async navigate(scope,{input},validNow){
-   await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');const registered=await bootstrap.registered(input),tab=await api.tabs.get(input.tabId),tag=await api.sessions.getTabValue(tab.id,'pcmsRestoreTab');
+   await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');const registered=await bootstrap.registered(input);check(registered.ok,'RESTORE_BOOTSTRAP_NOT_REGISTERED');const tab=await api.tabs.get(input.tabId),tag=await api.sessions.getTabValue(tab.id,'pcmsRestoreTab');
    check(tag?.restoreId===scope.restoreId&&tag.accountId===scope.accountId&&tag.personaUid===scope.personaUid&&tab.cookieStoreId===scope.containerId&&tab.url==='about:blank','RESTORE_CONTEXT_CHANGED');check(await validNow(),'RESTORE_INTERRUPTED');
    await localMutationFence(scope.containerId,async()=>{await active(scope);check(await validNow(),'RESTORE_INTERRUPTED');await api.tabs.update(tab.id,{url:registered.url,active:false});});return {ok:true,operationId:input.operationId,tabId:tab.id};
   },
