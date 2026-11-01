@@ -4,6 +4,7 @@
 import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
+import {createRestoreDonor} from './restore-donor.mjs';
 import {createBackupDonor} from './backup-donor.mjs';
 import {observePerchanceAuth} from '../modules/auth-observations.mjs';
 import {observeSavedSource,observeNativeEditor} from '../modules/source-observations.mjs';
@@ -419,5 +420,6 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   const found=await bound(scope);if(found.code)return fail(found.code);let tab;try{tab=await api.tabs.get(tabId);}catch{return fail('AUTH_CONTEXT_MISSING');}const tag=await api.sessions.getTabValue(tab.id,'pcmsAuthCaptureWitness');if(tab.cookieStoreId!==scope.containerId||tag?.accountId!==scope.accountId||tag.personaUid!==scope.personaUid)return fail('AUTH_CONTEXT_CHANGED');await api.tabs.update(tab.id,{active:true});await api.windows.update(tab.windowId,{focused:true});return {ok:true,tabId:tab.id};
  }
  const backupDonor=createBackupDonor({api,stateManager,initialize,getState,protectedProfile,collectSession,openAuthWitness,closeAuthWitness});
- return Object.freeze({...backupDonor,inspectAuthWitness,collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ const restore=createRestoreDonor({api,stateManager,personaPlatform,initialize,getState,localMutationFence,allPersonaUids,snapshotRestore:backupDonor.snapshotRestore});
+ return Object.freeze({restoreGate:restore.gate,restoreSnapshot:restore.snapshot,restoreCensus:restore.census,restoreInspect:restore.inspect,restoreValidateSource:restore.validateSource,restoreObserveAllocation:restore.observeAllocation,restoreAllocate:restore.allocate,restorePlan:restore.plan,restoreObserveState:restore.observeState,restoreApplyState:restore.applyState,restoreObserveStorage:restore.observeStorage,restoreApplyStorage:restore.applyStorage,restoreRollbackPlan:restore.rollbackPlan,restoreApplyRollbackStorage:restore.applyRollbackStorage,restoreObserveRollbackStorage:restore.observeRollbackStorage,restoreVerifyRollback:restore.verifyRollback,...backupDonor,inspectAuthWitness,collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

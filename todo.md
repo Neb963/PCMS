@@ -1,31 +1,29 @@
-# Current work
+# Current implementation checkpoint
 
-**P31 implemented and verified; merge/postmerge checkpoint next, then P32.**
+P32 is implemented and verified on branch `p32-staged-donor-restore`, PR [#24](https://github.com/Neb963/PCMS/pull/24). Merge and postmerge verification are next, then continue P33, P34 and P36 automatically. No phase confirmation is needed.
 
-P31 PR23 source6f566d7161831ae4b7c50d88d71c80875074aba6/tree3c4113b825751a777c41daecda6337bf77033e3f:35T/build+required B/DSK41318528062 PASS; XPI85848050d0d348f2dbe395571783983330b580c803d7abefa39d2565fe789761 (775640bytes), Firefox155.0/build20260817142839, normal sandbox6. [PR23](https://github.com/Neb963/PCMS/pull/23). Exact source parent/tree/files/ref verified remotely. Focused and installed jobs produced the same tested XPI hash.
+## P32 outcome and evidence
 
-## Implemented bounded outcome
+Backup0.5/host0.32 validates the whole selected production File before restoration writes, shows coverage/age/unencrypted secrets/prerequisites, confirms replacement once and persists maintenance plus the previous cut. Ordinary source/Git/account dispatch and write-admitting Resume are fenced; enabled Journal maintenance continues. Exact editor contexts are held for human inspection without reload or discarded drafts.
 
-Backup0.4 provides real Settings **Back up now**, safe relative destination with preserved draft, separate capture/encoding/staging/download/completion status, filename/bytes/last complete, Work links and Check export. Existing profiles require explicit compatible module update. The existing finite P29 capture and one Core EXPORT job compose the P30 codec and shared Downloads adapter. No alternate scheduler/controller.
+Fresh blocked Persona allocations use a durable logical/source/destination map and same-operation readback. Existing donor state-manager/import services restore typed references and private bytes while runtime tab/route/lease/download authority becomes inert; unmapped historical IDs cannot adopt unrelated destination resources. Verified blobs/history/views/credentials/packages are copied into a separate inactive dataset. P32 deliberately stops at STAGED/auth import pending: no activation or operational login claim.
 
-Private Core Blob writes hash incrementally and persist verified1MiB chunks with guarded durable staging; partial blobs cannot be read or referenced as complete. The file receipt/pin survives interruption. Stable captured timestamps make same-cut encoding deterministic for local-stage recovery. Downloads dispatch remains at the synchronous queue boundary; exact extension/profile/path/time/URL/ID readback holds ambiguous/missing effects without replay. Backup receives actual Downloads events and cold/alarm reconciliation independently of Journal.
+Rollback is a guarded operation through the same queue. It requires original donor bindings/storage readback and retains old data/containers; prior Ready accounts become held for fresh route/login checks. A qualified before-value Unknown remains held across Checks and can be explicitly rejected for rollback using the existing queue contract. It never authorizes replay.
 
-Archive/capture/quota/disk/ACK failures retain the cut, prior complete files and Pause/writer holds. Undispatched partial staging can be explicitly discarded; any possible download blocks that action. Manual receipts remain excluded from shared automatic retention. Scheduling/restore are later phases.
+- Source `12f0c8a7406627ad3a2661fadbae6a79267ffafc`, tree `5e96779ba7f74f5745058b4989dbe8def9f13faf`.
+- [41330365265](https://github.com/Neb963/PCMS/actions/runs/41330365265): **48T/build + required B/DSK PASS**; focused124918979998 and installed124918979824.
+- XPI SHA-256 `7989e3c2e3c881d64417ef0ecc6db532c43253b99581176b3e1add00677c89b9`,794712bytes; Firefox155.0/build20260817142839, normal content sandbox6/CSP, persistent dedicated clean profiles.
+- T covers mapping/reference/secret/history/runtime invalidation, staged binary isolation, maintenance/Journal/races, strict packaged background ABI, same-operation allocation/state/storage lost receipts across cold Core reopen, no duplicate mutation, and explicit Unknown rollback.
+- B/DSK creates a real production disk ZIP and independently checks CRC/all entry hashes, selects that native File through actual UI/RPC, preserves/inspects/saves a real human draft, stops Firefox after actual allocation and an actual donor write before its ACK, cold-resumes the same map and verifies 1,048,601 exact binary bytes plus source history/draft/possible job/seven module rows while the old cut stays active. Same/fresh actual rollback verifies original donor bindings and unrelated persistent cookies/containers. A separate real Unknown storage intent stays unchanged across two actual Checks before explicit verified rollback. Maintenance Resume is denied and UI never calls staged data active.
+- P30 adversarial ZIP/package/closure evidence and unchanged P31 manual export/Downloads negatives are reused at their recorded identities. Earlier failed runs found the packaged undefined checkpoint and unsupported rollback disposition; their fixes have focused and installed regression evidence in the final run. Test view-envelope/session-lifetime/status-refresh assertions were corrected, never counted as passing failed journeys.
+- Remote parent/tree/ref and all changed file bytes are verified at every checkpoint. Authority files, pinned vendor, permissions, native protocol, Gecko ID and allowlist are unchanged.
 
-## Verification
+## Next work
 
-35 focused T/build in41318528062: real cut→production codec→Blob/chunks→Downloads, exact bytes, Pause with Journal disabled, dedupe, guarded interrupted chunks, lost-ID/ACK/service restart, ambiguity/history loss, disk failure/last-good, removed cut/Disable and deterministic re-encoding. P30's ZIP corpus and P29 native capture evidence are reused with their original identities in memory; no broad historical rerun.
+Merge the verified P32 code plus this documentation-only checkpoint; verify the merge tree and postmerge main. Before P33 implementation, write its concrete plan from current auth/account/module/restore services in this file. P33 adds scoped early auth/cookie import, validated activation and separate login/route/work report; P34 adds deadlines/closed-dashboard/restart/retention completion. P36 is independent of the held source-write chain.
 
-Targeted B/DSK clicks actual Back up now. Python independently reopens production disk ZIP, CRCs and every manifest entry length/SHA/section, exact1,048,601-byte source/history binary, NUL/Unicode auth/credential/draft/cookie/donor data and all7/current+staged module ZIPs. Real process stop mid-Blob stage preserves the same job/filename/cut/pin; actual Check export finishes and independent disk reopen passes. Actual Downloads cancellation and blocked destination fail without last-good replacement/replay. Backup Disable, paused Journal-disabled exports, prior/manual/unrelated sentinels and no unexpected provider writes pass.
+## Holds and evidence limits
 
-Deliberately arbitrary byte-fidelity fixture tokens are correctly rejected by the independent identity server after restart. The fixture uses actual Sign in/Confirm with server-issued tokens before further captures; this does not qualify real login portability. Intermediate failed/cancelled runs remain failed/cancelled, not acceptance evidence.
+P19 remains genuinely held by the missing qualified provider revision/precondition recipe in accessible pinned Alpha source. The accepted Discovery ZIP is located but cannot be extracted while local execution/its Library helper is unavailable. Source fingerprints are not CAS. P20–P27/P35/P37/P38 and descendants wait. GitHub/Actions work; no unavailable local checks are claimed and no historical investigation is repeated.
 
-## Next eligible work
-
-Merge verified P31 and verify exact postmerge main/tree/CI. Then write P32's actual-repository plan here before code: trusted-file validation/preview/one replacement confirmation, same-Core staged dataset, durable maintenance/previous cut, fresh logical container maps on same/fresh profile, donor service restore/rollback, runtime-authority invalidation and targeted interrupted B/DSK. P33 auth bootstrap/activation and P34 schedule follow dependencies; P36 remains independently eligible.
-
-## Holds
-
-P19: accessible pinned Alpha app.saveGenerator lacks a qualified provider revision/precondition recipe. Accepted Discovery ZIP cannot be extracted while local execution is unavailable; sourceStamp/providerRevision:null is not CAS. P20–P27/P35/P37/P38 and descendants wait. GitHub exact leased checkpoints and Actions work; no unavailable local check is claimed.
-
-H/G/P1–P5 NOT TESTED/unauthorized; P42–P49 require named disposable resources/effects. P48 qualifies real login inventory/portability, P49 real fleet capacity. No operational/full-project readiness claim. Continue safely eligible phases automatically.
+H/G/P1–P5 remain **NOT TESTED/unauthorized**. P42–P49 require named disposable resources/effects. P33/P48 must distinguish actual local auth import from independently validated login/route; P49 measures real fleet load. This development checkpoint is not the complete acceptance candidate.

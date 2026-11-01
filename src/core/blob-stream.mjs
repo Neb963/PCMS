@@ -2,10 +2,10 @@ import {newSHA256,hex} from './stream-hash.mjs';
 // Private immutable chunk reader. It pins no new authority and exposes no IDB
 // handles; its dataset is fixed before the first byte, and every byte is hashed.
 export function attachBlobStream(core,{transact,root,req,check}){
- core.blobStream=blobId=>{
+ core.blobStream=(blobId,{dataset:requestedDataset=null}={})=>{
   let info,dataset,cursor=0,size=0,cancelled=false;const hash=newSHA256();
   return new ReadableStream({
-   async start(){check(typeof blobId==='string'&&/^[a-f0-9]{64}$/.test(blobId),'INVALID_REFERENCE');await transact(['blobs'],'readonly',async s=>{const r=await root(s);dataset=r.dataset;info=await req(s('blobs').get([dataset,blobId]));check(!info?.staging,'BLOB_STAGE_INCOMPLETE');check(info&&Number.isSafeInteger(info.bytes)&&info.bytes>=0&&Number.isSafeInteger(info.chunks)&&info.chunks>=0,'MISSING_BLOB');});},
+   async start(){check(typeof blobId==='string'&&/^[a-f0-9]{64}$/.test(blobId),'INVALID_REFERENCE');await transact(['blobs'],'readonly',async s=>{const r=await root(s);const c=requestedDataset&&requestedDataset!==r.dataset?await req(s('meta').get('restore-control')):null;check(!requestedDataset||requestedDataset===r.dataset||requestedDataset===c?.newDataset||requestedDataset===c?.previousRoot?.dataset,'RESTORE_SCOPE_DENIED');dataset=requestedDataset??r.dataset;info=await req(s('blobs').get([dataset,blobId]));check(!info?.staging,'BLOB_STAGE_INCOMPLETE');check(info&&Number.isSafeInteger(info.bytes)&&info.bytes>=0&&Number.isSafeInteger(info.chunks)&&info.chunks>=0,'MISSING_BLOB');});},
    async pull(controller){
     try{
      if(cancelled)return;

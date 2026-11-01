@@ -38,5 +38,12 @@ export function createBackupDonor({api,stateManager,initialize,getState,protecte
    return {ok:true,result,donorReceipt:{bootId:donor.bootId,revision,storageVersion:version,startedAt,finishedAt:clock()}};
   });
  }
- return {beginSessionCapture:begin,checkSessionCapture:check,cutExtensionState:cut,endSessionCapture:end};
+ async function snapshotRestore(){
+  await initialize();return stateManager.withWorkflowAdmissionLock(async()=>{
+   const revision=stateManager.getRevision(),version=storageVersion,state=await getState(),local=await api.storage.local.get(null),sync=api.storage.sync?await api.storage.sync.get(null):{};
+   if(revision!==stateManager.getRevision()||version!==storageVersion)return hold('RESTORE_DONOR_CHANGED');
+   return {ok:true,data:{format:1,bootId:stateManager.getBootId(),revision,storageVersion:version,state,storage:{local,sync}}};
+  });
+ }
+ return {snapshotRestore,beginSessionCapture:begin,checkSessionCapture:check,cutExtensionState:cut,endSessionCapture:end};
 }

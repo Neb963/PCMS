@@ -1,3 +1,4 @@
+import {attachRestoreDataset} from './restore-dataset.mjs';
 import {attachBlobWrite} from './blob-write.mjs';
 import {attachBlobStream} from './blob-stream.mjs';
 import {attachCaptureCut} from './capture-cut.mjs';
@@ -261,6 +262,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result:result.value}));
     return {value:result.value,job:await req(s('jobs').get([r.dataset,job.id])),generator:await req(s('generators').get([r.dataset,generator.id]))};
   });
+  attachRestoreDataset(core,{transact,root,req,check:requireCore,assertGuard,append,writeRows,clock,tables:TABLES});
   core.queue=createQueue({transact,root,writeRows,append,req,check:requireCore,clock});
   return core;
 }

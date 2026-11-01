@@ -22,8 +22,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts
-      - run: node --test tests/blob-write.test.mjs tests/backup-export.test.mjs tests/downloads.test.mjs tests/backup.test.mjs tests/capture-cut.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - run: npm run build
+      - run: node --test tests/backup-background.test.mjs tests/backup-restore.test.mjs tests/restore-dataset.test.mjs tests/restore-donor.test.mjs tests/queue.test.mjs tests/blob-write.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}
@@ -53,12 +53,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Targeted manual production Backup export and independent disk reopen (normal sandbox)
-        run: python3 tests/installed_backup_export.py build/pcms-dev.xpi
+      - name: Targeted production staged restore and disk recovery (normal sandbox)
+        run: python3 tests/installed_restore.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-backup-export-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-restore-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json
