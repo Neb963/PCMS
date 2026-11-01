@@ -27,3 +27,7 @@ Implemented private verified Blob→existing1MiB chunk staging with durable part
 ## Primary UI checkpoint
 
 Settings Backup now has Back up now, persisted safe destination/draft, separate capture/export status, filename/bytes/last complete, Work links, exact Check export and safe pre-dispatch partial-stage disposal. Export progress never labels capture completion as disk completion. Disabled Backup blocks controls; Journal separation is preserved in Core. Focused and actual B/DSK checks remain pending.
+
+## Focused verification checkpoint
+
+Added production cut→codec→Blob/chunks→Core Downloads T, paused/Journal-disabled dedupe, exact private bytes, lost-ID/ACK/service-restart/ambiguity/history-loss, disk failure/last-good/Disable/removed-cut, deterministic re-encoding and interrupted guarded Blob staging. Seed identity expectations now require the explicit Backup0.4 release. Initial storage checkpoint's codec checks passed33/35; two failures were the old0.3 seed version expectations. New focused verification and B/DSK remain pending.
