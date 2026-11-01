@@ -53,7 +53,7 @@ def check_main(sid):
  click(sid,'nav a[href="#generators"]');wait(lambda:script(sid,"return !!document.getElementById('catalog-check')"));click(sid,'#catalog-check')
 def unknown(sid,slug,kind):
  s=inspect_creator(sid);g=next((g for g in s['rows'] if g['slug']==slug),None)
- return next((j for j in s['jobs'] if g and j['id']==g['creatorJobId'] and j['state']=='HELD' and j.get('effect',{}).get('boundary')=='POSSIBLE' and j['effect']['kind']==kind),None)
+ return next((j for j in s['jobs'] if g and j['id']==g.get('creatorJobId') and j['state']=='HELD' and j.get('effect',{}).get('boundary')=='POSSIBLE' and j['effect']['kind']==kind),None)
 def restart_recover(sid,profile,binary,owner,provider,slug):
  prior=stop(sid,profile);sid,_=session15(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);account_page(sid,owner);click(sid,'#account-open');settle(sid,owner,'READY');dashboard(sid)
  with provider.lock:provider.hide=None
