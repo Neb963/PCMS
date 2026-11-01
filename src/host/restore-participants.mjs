@@ -45,7 +45,7 @@ export function createRestoreParticipants({api,bound,patch,prerequisites,prepare
    const tabs=await api.tabs.query({cookieStoreId:scope.containerId});check(!tabs.length,'RESTORE_CONTEXT_INSPECTION_REQUIRED');check(await validNow(),'RESTORE_INTERRUPTED');
    await patch(scope,{pcmsOperation:{operationId,stage:'RESTORE_BLANK',phase:'POSSIBLE'}});
    const tab=await localMutationFence(scope.containerId,()=>personaPlatform.open(scope.containerId,'about:blank',false));await api.sessions.setTabValue(tab.id,'pcmsRestoreTab',{restoreId:scope.restoreId,accountId:scope.accountId,personaUid:scope.personaUid,operationId});
-   await patch(scope,{pcmsOperation:{operationId,stage:'RESTORE_BLANK',phase:'COMPLETE',tabId:tab.id}});return {ok:true,operationId,tabId:tab.id};
+   await api.sessions.setTabValue(tab.id,'pcmsAccountTab',{accountId:scope.accountId,personaUid:scope.personaUid,operationId});await patch(scope,{pcmsOperation:{operationId,stage:'RESTORE_BLANK',phase:'COMPLETE',tabId:tab.id}});return {ok:true,operationId,tabId:tab.id};
   },
   observeBlank,
   async register(scope,{input,admitted},validNow){await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.arm(input,validNow,admitted??validNow);},

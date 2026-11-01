@@ -8,7 +8,7 @@ import {restoreParticipantPlan,restoredCookieReadback,restoredAuthReadback} from
 import {checkedCookies} from './backup-session.mjs';
 import {bindingObservation} from './account-observations.mjs';
 const terminal=new Set(['CANCELLED','ROLLED_BACK','COMPLETE']);
-export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()=>{},clock=Date.now}){
+export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()=>{},verifyGit=async()=>({state:'NOT_CONFIGURED'}),clock=Date.now}){
  const id='pcms-backup',inflight=new Map();let cached=null;
  const module=()=>core.read('modules',id),capable=m=>m?.packageClass==='bundled-backup'&&m.manifest?.capabilities?.includes('backup.restore'),enabled=m=>capable(m)&&m.enabled&&!m.lifecycle;
  const guard=j=>({moduleId:id,generation:j.generation,jobId:j.id,jobRevision:j.rev});
@@ -207,7 +207,7 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
     if(reconcile)return output(j,'CONTINUE');const index=c.progress.account??0,p=c.participants[index];
     if(p){
      const a=await core.restore.staged(c.id,'accounts',p.accountId),valid=p.login.state==='VALIDATED'&&p.route.state==='VALIDATED',b=p.binding,flow={requestId:crypto.randomUUID(),jobId:null,purpose:'RESTORE',stage:valid?'READY':'LOGIN_REQUIRED',startedAt:c.confirmedAt,wasReady:valid,confirmationAt:null};
-     await core.restore.account(c.id,a.id,a.rev,{...b,state:valid?'READY':'LOGIN_REQUIRED',holdCode:valid?null:p.login.code,flow,tabId:p.tabId,identityObservedAt:valid?p.login.observedAt:null,observedAt:clock(),principalLabel:valid?p.login.principalLabel:a.principalLabel,restoreValidation:{restoreId:c.id,dataset:c.newDataset,state:valid?'VALIDATED':'LOGIN_REQUIRED'}},guard(await fresh(j)));
+     await core.restore.account(c.id,a.id,a.rev,{routeId:b.routeId,exitAddresses:b.exitAddresses,observedExit:b.observedExit,routeObservedAt:b.routeObservedAt,routeEvidenceId:b.routeEvidenceId,state:valid?'READY':'LOGIN_REQUIRED',holdCode:valid?null:p.login.code,flow,tabId:p.tabId,identityObservedAt:valid?p.login.observedAt:null,observedAt:clock(),principalLabel:valid?p.login.principalLabel:a.principalLabel,restoreValidation:{restoreId:c.id,dataset:c.newDataset,state:valid?'VALIDATED':'LOGIN_REQUIRED'}},guard(await fresh(j)));
      c=await core.restore.read();await update(j,c,{progress:{...c.progress,account:index+1}});return output(j,'CONTINUE');
     }
     // Validation of the selected file and guarded writes already established
@@ -215,7 +215,7 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
     await archive(c);await core.restore.activate(c.id,guard(await fresh(j)));await core.queue.rebind();return output(j,'CONTINUE');
    }
    if(c.state==='REBUILD'){
-    if(reconcile)return output(j,'CONTINUE');await rebuild(core);await pins(core);c=await core.restore.read();await update(j,c,{rebuilt:true});await core.restore.finish(c.id,guard(await fresh(j)));return output(j,'COMPLETE');
+    if(reconcile)return output(j,'CONTINUE');await rebuild(core);await pins(core);c=await core.restore.read();const git=await verifyGit();await update(j,c,{rebuilt:true,git});await core.restore.finish(c.id,guard(await fresh(j)));return output(j,'COMPLETE');
    }
 
    return output(j,'HELD',c.code??'RESTORE_AUTH_IMPORT_PENDING');
@@ -247,6 +247,6 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
   async discardSource({id:sourceId}){const m=await admit();return core.restore.discardSource(sourceId,m.generation);},
   async inspect({id:restoreId,tabId}){await admit();const c=await core.restore.read(),context=c?.contexts?.find(x=>x.tabId===tabId);check(c?.id===restoreId&&context,'RESTORE_CONTEXT_CHANGED');return donor.restoreInspect(context);},
   async changed(){const c=await core.restore.read();if(!c?.jobId||terminal.has(c.state))return;const j=await core.read('jobs',c.jobId);if(j?.effect?.boundary==='POSSIBLE')await effect(j,true);},
-  async status(){const m=await module(),c=await core.restore.read(),r=await core.status(),j=c?.jobId?await core.read('jobs',c.jobId):null;return {available:capable(m),enabled:enabled(m),maintenance:!!r.restoreHold,current:c?{id:c.id,revision:c.rev,state:c.state,code:c.code??j?.recovery?.code??null,summary:c.summary,jobId:c.jobId??null,progress:c.progress??null,mappings:c.mappings.map(({accountId,personaUid,sourceContainerId,destinationContainerId})=>({accountId,personaUid,sourceContainerId,destinationContainerId:destinationContainerId??null})),contexts:c.contexts??[],activeDataset:r.dataset,stagedDataset:c.newDataset??null,previousDataset:c.previousRoot?.dataset??null,stagedCounts:c.stagedCounts??null,rollback:c.rollback?{verified:c.rollback.verified,routeValidation:c.rollback.routeValidation}:null}:null,partialSources:(await rows('files')).filter(f=>f.kind==='RESTORE_SOURCE'&&f.state==='STAGING_SOURCE').map(f=>({id:f.id,name:f.filename,bytes:f.bytes}))};}
+  async status(){const m=await module(),c=await core.restore.read(),r=await core.status(),j=c?.jobId?await core.read('jobs',c.jobId):null;return {available:capable(m),enabled:enabled(m),maintenance:!!r.restoreHold,current:c?{id:c.id,revision:c.rev,state:c.state,code:c.code??j?.recovery?.code??null,summary:c.summary,jobId:c.jobId??null,progress:c.progress??null,mappings:c.mappings.map(({accountId,personaUid,sourceContainerId,destinationContainerId})=>({accountId,personaUid,sourceContainerId,destinationContainerId:destinationContainerId??null})),contexts:c.contexts??[],activeDataset:r.dataset,stagedDataset:c.newDataset??null,previousDataset:c.previousRoot?.dataset??null,stagedCounts:c.stagedCounts??null,archiveValid:true,dataRestored:r.dataset===c.newDataset&&!!c.switchedAt,git:c.git??{state:'NOT_CHECKED'},previousWork:c.previousWork??[],participants:(c.participants??[]).map(p=>({accountId:p.accountId,label:p.label,state:p.state,containerId:p.containerId,tabId:p.tabId??null,local:p.local,login:p.login,route:p.route,work:p.work,expiredCookies:p.expiredCookies})),rollback:c.rollback?{verified:c.rollback.verified,routeValidation:c.rollback.routeValidation}:null}:null,partialSources:(await rows('files')).filter(f=>f.kind==='RESTORE_SOURCE'&&f.state==='STAGING_SOURCE').map(f=>({id:f.id,name:f.filename,bytes:f.bytes}))};}
  };
 }

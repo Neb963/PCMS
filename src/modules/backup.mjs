@@ -4,8 +4,8 @@ import {createBackupExport} from './backup-export.mjs';
 import {createBackupCapture} from './backup-capture.mjs';
 import {checkedSession} from './backup-session.mjs';
 // Backup policy composes the existing capture, queue and Core Downloads.
-export function createBackup({core,donor,downloads=null,pins=async()=>{},rebuild=async()=>{},clock=Date.now}){
- const capture=createBackupCapture({core,donor,clock}),exports=createBackupExport({core,capture,downloads,clock}),restore=createBackupRestore({core,donor,pins,rebuild,clock});
+export function createBackup({core,donor,downloads=null,pins=async()=>{},rebuild=async()=>{},verifyGit=async()=>({state:'NOT_CONFIGURED'}),clock=Date.now}){
+ const capture=createBackupCapture({core,donor,clock}),exports=createBackupExport({core,capture,downloads,clock}),restore=createBackupRestore({core,donor,pins,rebuild,verifyGit,clock});
  const id='pcms-backup';let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
  const module=()=>core.read('modules',id),capable=m=>m?.packageClass==='bundled-backup'&&m.manifest?.capabilities?.includes('backup.capture'),enabled=m=>capable(m)&&m.enabled&&!m.lifecycle;
  const scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal,tabId:a.tabId});
