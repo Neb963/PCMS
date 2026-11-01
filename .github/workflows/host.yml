@@ -52,12 +52,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Targeted complete source and editor inspection (normal sandbox)
-        run: python3 tests/installed_source.py build/pcms-dev.xpi
+      - name: Targeted private creation and same-operation recovery (normal sandbox)
+        run: python3 tests/installed_creation.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-source-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-creation-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json

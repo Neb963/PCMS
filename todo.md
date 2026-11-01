@@ -15,3 +15,7 @@ Require the exact generator field set in both independent native service fixture
 Then resume P19, which requires source-grounded native save revision handling; an unsupported mechanism must hold writes. Accepted Discovery ZIP is located but cannot currently be extracted because the execution environment is unavailable. GitHub reads/writes and Actions remain available; no unavailable local check will be claimed. Do not invent a provider revision API or local-lock protection against external devices. If this remains a genuine dependency, preserve it and continue independent eligible phases P28/P36 in dependency order.
 
 H/G/P1–P5 remain NOT TESTED and unauthorized; P42–P49 need named disposable resources/effects. No live provider/native acceptance mutation or operational login portability is established.
+
+## Correction checkpoint
+
+Implementation now sends the exact four generator fields and top-level empty manifest. Both independent fixtures reject extra metadata. Patch XPI0.18.1; existing installed job selects only the affected creation/recovery journey. T/build/B pending; no result claimed yet.
