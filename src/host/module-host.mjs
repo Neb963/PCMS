@@ -155,7 +155,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
     const latest=await core.read('jobs',job.id);if(latest.rev!==runner.expectedRevision||latest.state==='FAILED')return;
     if(latest.runtimeInvalidated&&latest.effect?.boundary!=='POSSIBLE'){patch.state='HELD';patch.recovery={action:'OPEN_BACKUP',code:latest.kind==='DEVELOP'?'RESTORE_SAME_CHAT_INSPECTION_REQUIRED':'RESTORED_WORK_REVIEW_REQUIRED'};}
     if(latest.effect?.boundary==='POSSIBLE')await core.queue.reconciliationCheckpoint(job.id,latest.rev,result.checkpoint??null);else await core.queue.transition(job.id,latest.rev,patch);
-   }catch(error){const latest=await core.read('jobs',job.id),m=await core.read('modules',job.moduleId);if(error.message!=='STALE_REVISION'&&m?.enabled&&!m.lifecycle&&latest?.generation===runner.generation&&latest?.effect?.boundary!=='POSSIBLE'&&latest?.state!=='FAILED')await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
+   }catch(error){const latest=await core.read('jobs',job.id),m=await core.read('modules',job.moduleId);if(error.message!=='STALE_REVISION'&&m?.enabled&&!m.lifecycle&&latest?.generation===runner.generation&&latest?.effect?.boundary!=='POSSIBLE'&&!['FAILED','COMPLETE'].includes(latest?.state))await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
    finally{runner.targetId=null;runner.accountId=null;runner.reconciling=false;runner.jobId=null;await onDue();}
   })().finally(()=>{running=null;});return running;
  }
