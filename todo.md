@@ -51,3 +51,5 @@ P29 source46c268a passed232 T/build, including50-participant S (16.55s staging/v
 ## Required P29 B added
 
 The affected installed job now selects the full production capture journey: two protected origins with independent storage-event documents, real cookies, staged package ZIP, all seven modules, NUL credential/draft/full source/history and an independently reopened1MiB binary, retained Possible writer, concurrent Core progress, exact cut revision, donor rotation invalidation, previous-good, real process interruption/fresh account revalidation and actual capture recovery controls. It is written and pending; no B success claimed.
+
+Added an independent two-document T oracle: a write then restore to the same auth bytes leaves the writer's own storage-event count zero but changes its sibling's count, preventing equal-read-only consistency claims. Trusted human intent is retained for witness cleanup, and missing documents/listeners report Unknown.
