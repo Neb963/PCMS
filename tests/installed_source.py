@@ -42,10 +42,12 @@ account_fixture.Provider=Provider
 def source_state(sid):
  return asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();let cursor=null,found=null;do{const p=await c.list({table:'generators',cursor});for(const r of p.rows)if(r.slug==='existing-sentinel')found=await c.read('generators',r.id);cursor=p.cursor;}while(cursor);if(!found){c.close();return null;}const job=found.sourceJobId?await c.read('jobs',found.sourceJobId):null,files=found.sourceManifest?await c.verifySource(found.sourceManifest):[],previous=found.previousGood?await c.verifySource(found.previousGood):[];const bytes={};for(const f of files){let raw='';const data=await c.bytes(f.blobId);for(const b of data)raw+=String.fromCharCode(b);bytes[f.path]=btoa(raw);}c.close();return {generator:found,job,files,previous,bytes};""")
 def editor(sid):
- for handle in call('GET',f'/session/{sid}/window/handles'):
-  call('POST',f'/session/{sid}/window',{'handle':handle})
-  if script(sid,"return location.href")=='https://perchance.org/'+SLUG+'#edit':wait(lambda:script(sid,"return !!document.getElementById('fixture-source-model')"));return handle
- raise AssertionError('EXACT_PROTECTED_SOURCE_EDITOR_MISSING')
+ def find():
+  for handle in call('GET',f'/session/{sid}/window/handles'):
+   call('POST',f'/session/{sid}/window',{'handle':handle})
+   if script(sid,"return location.href")=='https://perchance.org/'+SLUG+'#edit' and script(sid,"return !!document.getElementById('fixture-source-model')"):return handle
+  return None
+ return wait(find,30)
 def file_rows(sid):return script(sid,"return [...document.querySelectorAll('#source-files button')].map(b=>({path:b.dataset.sourcePath,text:b.textContent}))")
 def select_file(sid,path):
  wait(lambda:any(r['path']==path for r in file_rows(sid)));element=call('POST',f'/session/{sid}/element',{'using':'xpath','value':"//ul[@id='source-files']//button[@data-source-path="+json.dumps(path,ensure_ascii=False)+"]"})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/element/'+element+'/click',{});wait(lambda:path in script(sid,"return document.getElementById('source-file-state').textContent"))
