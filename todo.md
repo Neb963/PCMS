@@ -46,3 +46,7 @@ Source2f3d6ddc passed222 T/build in41304132324. The older Creator B selected by 
 Collector review tightened the known required guard: a logged-in authentication record with missing session-change key is incomplete, not an absent login. Cookie partition origin validation preserves ports permitted by the existing donor service. Added the focused missing-guard case; B remains pending.
 
 First affected B41304294997 reached and passed real scoped auth/cookie/private-byte, unrelated/human-editor, Pause/Journal-disabled and negative schema assertions, then failed the changing-session fault assertion. A hidden fixture tab's timers are throttled; the rotation fixture now keeps that document visible in a separate window and reports the exact secret-safe observed coverage on failure. The full required journey is still unpassed.
+
+## Local removal contract correction
+
+Review found that keeping raw collected sessions in historical source-style blobs would retain usable secrets after Remove local account. Capsules now use the existing account-scoped privileged credential store, whose P11 removal transaction deletes them. Jobs retain only a private capsule key/hash and public coverage. Status marks a deleted capsule incomplete; a focused actual Remove local data regression verifies deletion. No new store or cleanup authority was added. The affected installed journey independently reopens these private records; required B will rerun.

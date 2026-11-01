@@ -22,7 +22,7 @@ def configure_auth(sid,id,token,unknown=False,rotate=False):
 def private_capsules(sid):
  # The privileged harness independently reopens stored private bytes; values
  # stay in memory and are never copied into receipts/screenshots/logs.
- return asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),m=await c.read('modules','pcms-backup'),j=await c.read('jobs',m.backup.lastCoverageJobId),out=[];for(const r of j.capture.results)if(r.blobId)out.push({accountId:r.accountId,blobId:r.blobId,data:JSON.parse(new TextDecoder().decode(await c.bytes(r.blobId)))});c.close();return out;""")
+ return asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),m=await c.read('modules','pcms-backup'),j=await c.read('jobs',m.backup.lastCoverageJobId),out=[];for(const r of j.capture.results)if(r.capsuleId)out.push({accountId:r.accountId,blobId:r.capsuleHash,data:JSON.parse(await c.credentials.get(r.capsuleId))});c.close();return out;""")
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k)
  receipt={'tier':'B/installed-scoped-auth-and-actual-Firefox-cookies','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]};assert receipt['xpiSha256']==identity['xpiSha256']
