@@ -27,7 +27,7 @@ export async function observeSavedSource(request){
   if(request.kind==='META')return {...base,pjs:g.modelText,html:g.outputTemplate,assets};
   if(request.sourceStamp!==sourceStamp)return hold('SOURCE_CHANGED_DURING_READ');const entry=assets.find(a=>a.path===request.path);if(!entry||entry.key!==request.key||entry.bytes!==request.bytes)return hold('SOURCE_ASSET_SCOPE');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);let response,bytes;
-  try{response=await fetch('https://user.uploads.dev/file/'+entry.key,{method:'GET',credentials:'omit',cache:'no-store',redirect:'error',signal:controller.signal});if(response.status!==200)return hold('SOURCE_ASSET_UNAVAILABLE');bytes=new Uint8Array(await response.arrayBuffer());}finally{clearTimeout(timer);}
+  try{response=await fetch('https://user.uploads.dev/file/'+entry.key,{method:'GET',credentials:'omit',cache:'no-store',redirect:'error',signal:controller.signal});if(response.status!==200)return hold('SOURCE_ASSET_UNAVAILABLE');bytes=new Uint8Array(await response.arrayBuffer());}catch{return hold('SOURCE_ASSET_UNAVAILABLE');}finally{clearTimeout(timer);}
   if(!same())return hold('ACCOUNT_DOCUMENT_CHANGED');if(bytes.length!==entry.bytes)return hold('SOURCE_ASSET_LENGTH');const sha256=await hash(bytes);if(entry.sha256&&entry.sha256!==sha256)return hold('SOURCE_ASSET_HASH');let binary='';for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));return {...base,path:entry.path,bytes:bytes.length,sha256,base64:btoa(binary)};
  }catch(error){return hold(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'SOURCE_READ_UNKNOWN');}
 }
