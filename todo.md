@@ -21,3 +21,7 @@ Use the existing Backup module, Core queue and Settings page. No new controller,
 P19 is unimplemented/held: accessible pinned Alpha app.saveGenerator code has no qualified provider revision/precondition recipe; accepted Discovery ZIP cannot be extracted while the local runtime is unavailable. P18 sourceStamp/providerRevision:null is not CAS. P20–P27/P35/P37/P38 and descendants remain dependency-blocked; do not invent a provider facade or local-lock stale-write protection. P36 remains independent after eligible Backup work.
 
 H/G/P1–P5 NOT TESTED/unauthorized. P42–P49 need named disposable resources/effects. P48 qualifies actual login inventory/portability; synthetic capture bytes never prove operational login. All reported verification runs in remote Actions while local execution is unavailable.
+
+## Core cut checkpoint
+
+Added the private all-store IDB capture cut and pinned reference closure. The native transaction is the short write barrier; it awaits only IDB operations, never provider/native/login work. Captures include active logical rows/history/views/commands/credentials/modules/retained Journal and immutable blob descriptors. Old download payload bytes and older derived capture payloads are excluded explicitly to prevent recursive archives; their metadata remains. Required configured Git credentials and package references are checked. Derived capture secrets are invalidated by existing account removal. Integration/T/S/B pending. P28 postmerge41305056036 passed both jobs.
