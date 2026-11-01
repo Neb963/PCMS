@@ -33,3 +33,5 @@ Pinned zip.js2.24.0/noble-hashes2.4.0 to exact public npm integrity metadata fro
 ## Codec checkpoint
 
 Implemented versioned section/coverage/closure validation, streamed direct binary ZIP64 encoding, full production self-read (strict ZIP/CRC/SHA/manifest/COMPLETE and embedded module compatibility), immutable re-read handles and resource/cancellation diagnostics. Added independent Python ZIP round-trip and adversarial rewriting tests, 20MiB exact binary/history, forced actual ZIP64 structures and private chunk corruption tests. Focused Actions verification is pending; no P30 completion or disk evidence is claimed. The codec changes no live Core records or source pins.
+
+First codec run41315393006 failed on a multiline Python fixture string syntax error; the independent chunk/capture/package checks passed16/16. Corrected the fixture quoting. Upstream writer source also confirms explicit zip64:false forbids promotion; ordinary encoding now leaves that option unset so streams and >4GiB entries promote automatically, while the focused small fixture explicitly exercises ZIP64. Required codec evidence remains pending.

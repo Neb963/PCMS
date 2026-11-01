@@ -28,12 +28,12 @@ export async function encodeBackup(input,{receipt,readBlob,budget,signal=null,fo
  need(typeof readBlob==='function','ARCHIVE_BLOB_READER_MISSING');
  const {blobs,gitCredential}=await validateCapture(data),entries=[],parts=[];let total=0,metadata=0,outputBytes=0;
  const sink=new WritableStream({write(chunk){stopped(signal);outputBytes+=chunk.byteLength;need(count(outputBytes)&&outputBytes<=b.archiveBytes,'ARCHIVE_BUDGET_EXCEEDED');parts.push(new Blob([chunk]));},abort(){parts.length=0;}});
- const writer=new ZipWriter(sink,{...options,zip64:forceZip64,level:6});let closed=false;
+ const writer=new ZipWriter(sink,{...options,...(forceZip64?{zip64:true}:{}),level:6});let closed=false;
  async function add(path,stream,{expected=null,binary=false,store=false}={}){
   stopped(signal);need(entries.length+2<b.entries,'ARCHIVE_BUDGET_EXCEEDED');
   const meter=metered(stream,{signal,max:Math.min(b.entryBytes,b.totalBytes-total),onChunk(bytes){total+=bytes.length;if(!binary)metadata+=bytes.length;need(total<=b.totalBytes&&metadata<=b.metadataBytes,'ARCHIVE_BUDGET_EXCEEDED');}});
   try{
-   await writer.add(path,meter.stream,{...options,level:store?0:6,zip64:forceZip64,signal,...expected?{uncompressedSize:expected.bytes}:{}});
+   await writer.add(path,meter.stream,{...options,level:store?0:6,...(forceZip64?{zip64:true}:{}),signal,...expected?{uncompressedSize:expected.bytes}:{}});
    const descriptor={path,...meter.result(),schema:1,result:'COMPLETE'};need(!expected||descriptor.bytes===expected.bytes&&descriptor.sha256===expected.sha256,'ARCHIVE_BLOB_MISMATCH');entries.push(descriptor);return descriptor;
   }finally{meter.destroy();}
  }

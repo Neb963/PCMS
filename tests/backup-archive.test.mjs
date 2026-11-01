@@ -23,7 +23,7 @@ export async function archiveFixture(t,size=1024*1024+25){
  const raw=await c.credentials.get(receipt.credentialId),data=JSON.parse(raw);
  return {c,name,packages,data,receipt,raw,binary,old,next,encode:options=>encodeBackup(data,{receipt,readBlob:id=>c.blobStream(id),...options})};
 }
-const independent=String.raw'
+const independent=String.raw`
 import sys,io,zipfile,json,hashlib,base64
 z=zipfile.ZipFile(io.BytesIO(sys.stdin.buffer.read()))
 assert z.testzip() is None
@@ -34,9 +34,9 @@ for d in m["entries"]:
  b=z.read(d["path"])
  assert len(b)==d["bytes"] and hashlib.sha256(b).hexdigest()==d["sha256"]
 print(json.dumps({"entries":len(z.infolist()),"methods":sorted(set(i.compress_type for i in z.infolist())),"zip64":any(i.extract_version>=45 for i in z.infolist()),"binary":{i.filename:hashlib.sha256(z.read(i)).hexdigest() for i in z.infolist() if i.filename.startswith("blobs/")}}))
-';
+`;
 function python(script,input){return execFileSync('python3',['-c',script],{input,maxBuffer:96*1024*1024});}
-const rewriteScript=String.raw'
+const rewriteScript=String.raw`
 import sys,io,zipfile,json,base64,hashlib,warnings
 warnings.filterwarnings("ignore",category=UserWarning)
 q=json.load(sys.stdin); z=zipfile.ZipFile(io.BytesIO(base64.b64decode(q["zip"])))
@@ -70,7 +70,7 @@ o=io.BytesIO()
 with zipfile.ZipFile(o,"w",compression=zipfile.ZIP_DEFLATED) as w:
  for p,b in entries: w.writestr(p,b)
 sys.stdout.buffer.write(o.getvalue())
-';
+`;
 async function rewritten(blob,operation){return new Blob([python(rewriteScript,JSON.stringify({zip:Buffer.from(await blob.arrayBuffer()).toString('base64'),operation}))]);}
 test('production ZIP64 codec preserves exact full cut and large binary/history; Python independently reads CRCs, bytes and manifest',async t=>{
  const f=await archiveFixture(t,20*1024*1024+25),encoded=await f.encode({forceZip64:true}),raw=new Uint8Array(await encoded.blob.arrayBuffer()),oracle=JSON.parse(python(independent,raw));
@@ -91,12 +91,12 @@ test('corrupt CRC/local headers, truncated/appended ZIP, missing immutable bytes
  const f=await archiveFixture(t,50),encoded=await f.encode(),raw=new Uint8Array(await encoded.blob.arrayBuffer());
  const p=new Uint8Array(raw);p[30]^=1;await assert.rejects(validateBackup(new Blob([p])));
  await assert.rejects(validateBackup(new Blob([raw.subarray(0,raw.length-3)])));await assert.rejects(validateBackup(new Blob([raw,new Uint8Array([1,2])])));
- const corrupt=python(String.raw'
+ const corrupt=python(String.raw`
 import sys,io,zipfile
 b=bytearray(sys.stdin.buffer.read());z=zipfile.ZipFile(io.BytesIO(b));i=next(i for i in z.infolist() if i.filename.startswith("modules/"))
 p=i.header_offset; n=int.from_bytes(b[p+26:p+28],"little");x=int.from_bytes(b[p+28:p+30],"little");b[p+30+n+x]^=1
 sys.stdout.buffer.write(b)
-',raw);await assert.rejects(validateBackup(new Blob([corrupt])));
+`,raw);await assert.rejects(validateBackup(new Blob([corrupt])));
  await assert.rejects(f.encode({receipt:{...f.receipt,qualified:false}}),e=>e.code==='ARCHIVE_CUT_UNQUALIFIED');
  await assert.rejects(f.encode({budget:{totalBytes:100}}),e=>e.code==='ARCHIVE_BUDGET_EXCEEDED');
  await assert.rejects(validateBackup(encoded.blob,{budget:{metadataBytes:100}}),e=>e.code==='ARCHIVE_BUDGET_EXCEEDED');
