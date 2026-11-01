@@ -34,6 +34,7 @@ export async function validateCapture(data){
   need(blobs.has(p.packageHash)&&blobs.has(p.manifestHash)&&(m.refs??[]).includes(p.packageHash)&&(m.refs??[]).includes(p.manifestHash),'ARCHIVE_PACKAGE_MISSING');
   for(const file of p.manifest.files)need(hashId(file.sha256)&&count(file.bytes)&&p.payload[file.path]===file.sha256&&blobs.get(file.sha256)?.bytes===file.bytes&&(m.refs??[]).includes(file.sha256),'ARCHIVE_PACKAGE_MISSING');
  }
+ for(const m of c.records.modules){need(m.settingsSchema===m.manifest.settingsSchema,'ARCHIVE_SETTINGS_INCOMPATIBLE');for(const j of c.records.jobs.filter(j=>j.moduleId===m.id&&j.state!=='COMPLETE'))need(m.manifest.readsJobSchemas?.includes(j.jobSchema),'ARCHIVE_JOB_INCOMPATIBLE');}
  const catalog=c.views.find(v=>v.key[1]==='git-catalog')?.value,git=catalog?.connection?'github:'+catalog.connection.repositoryId:null;
  need(!git||c.credentials.some(v=>v.key[1]===git&&typeof v.value==='string'&&v.value.length),'ARCHIVE_CREDENTIAL_MISSING');
  for(const credential of c.credentials)need(!credential.captureData&&typeof credential.value==='string','ARCHIVE_CREDENTIAL_INVALID');

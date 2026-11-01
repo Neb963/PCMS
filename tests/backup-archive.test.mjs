@@ -4,6 +4,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {seeded} from './capture-fixture.mjs';
 import {encodeBackup,validateBackup} from '../src/core/backup-archive.mjs';
+import {createBackup} from '../src/modules/backup.mjs';
 import {sha256} from '../src/core/records.mjs';
 const bytes=s=>new TextEncoder().encode(s),hash=b=>createHash('sha256').update(b).digest('hex');
 const event={step:'FIXTURE_ARCHIVE',result:'COMPLETE'};
@@ -15,7 +16,7 @@ export async function archiveFixture(t,size=1024*1024+25){
  const next=await c.source([{path:'main.pjs',bytes:bytes('new exact\n')},{path:'index.html',bytes:bytes('<p>new</p>')}]);
  await c.mutate([{table:'generators',id:'g',value:{slug:'g',accountId:'a',sourceManifest:next.manifestId,previousGood:old.manifestId},refs:[...old.refs,...next.refs]}],event);
  await c.saveView('git-catalog',{connection:{repositoryId:42}},crypto.randomUUID());await c.saveView('human-draft',{pjs:'not saved 雪\0',html:'<p>draft</p>'},crypto.randomUUID());
- await c.credentials.set('github:42','fixture-token\0雪\r\n');await c.queue.pause();
+ await c.credentials.set('github:42','fixture-token\0雪\r\n');await createBackup({core:c,donor:{}}).initialize();await c.queue.pause();
  await c.queue.enqueue({requestId:'archive',logicalKey:'archive',moduleId:'pcms-backup',targetId:'pcms-backup',kind:'CAPTURE',input:{coverageOnly:false,participants:[]}});const j=await c.queue.next(),a=await c.read('accounts','a');
  const auth={adapter:'perchance-auth-1',schema:1,origin:'https://perchance.org',userPresent:true,user:{loggedIn:true,email,sessionToken:'exact\0雪😀\r\n'},guardPresent:true,sessionTokenLastChangeTime:'0001.7'};
  const cookies=[{name:'fixture',value:'a=b%20雪',domain:'.fixture.test',path:'/',hostOnly:false,httpOnly:true,secure:true,session:false,expirationDate:1234567890,firstPartyDomain:null,partitionKey:{topLevelSite:'https://example.test',hasCrossSiteAncestor:true},sameSite:'no_restriction'},{name:'session',value:'same',domain:'fixture.test',path:'/native',hostOnly:true,httpOnly:false,secure:false,session:true,expirationDate:null,firstPartyDomain:'example.test',partitionKey:null,sameSite:'lax'}];
