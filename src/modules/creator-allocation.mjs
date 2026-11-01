@@ -3,7 +3,7 @@ import {nativeSlug} from './slug-observations.mjs';
 
 // Creator owns policy; Core supplies one atomic snapshot/commit on its stores.
 export const eligibleAccount=a=>a?.state==='READY'&&!a.admission&&/^[a-f0-9]{64}$/.test(a.expectedPrincipal??'')&&/^[a-f0-9-]{36}$/i.test(a.personaUid??'')&&/^firefox-container-[1-9][0-9]*$/.test(a.containerId??'')&&typeof a.routeId==='string'&&!['','direct','block','__direct__','__block__'].includes(a.routeId);
-export const creationDispatched=job=>job.effect?.boundary==='POSSIBLE'||job.creator?.dispatched===true||job.effects?.some(e=>['PERCHANCE_CREATE','PERCHANCE_RENAME'].includes(e.kind));
+export const creationDispatched=job=>job.effect?.boundary==='POSSIBLE'||job.creator?.dispatched===true||job.effects?.some(e=>['PERCHANCE_CREATE','PERCHANCE_RENAME'].includes(e.kind)&&e.disposition!=='REJECTED');
 export function validCreatorTarget(g){return !!g?.folderPresent&&!!g.markerVersion&&!g.gitHoldCode&&!g.ownerMissing;}
 function target(c){
  const {job,generator:g,connection}=c;
@@ -25,11 +25,11 @@ export function reserveCreator(core,job,{accountId=null,requestId=null}={}){
  return core.creatorTransaction({jobId:job.id,expectedRev:job.rev,command},c=>{
   target(c);const {generator:g,job:current,accounts,generators,now}=c;
   check(!g.remoteId,'CREATOR_ALREADY_OWNED');check(!creationDispatched(current),'CREATOR_ALREADY_DISPATCHED');
-  if(g.allocation?.state==='RESERVED'&&!accountId){check(g.allocation.jobId===current.id,'CREATOR_RESERVATION_CONFLICT');return {generator:{...g,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,accountId:g.allocation.accountId,creator:{...current.creator,phase:'RESERVED'},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:'KEEP_CREATOR_RESERVATION',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:g.allocation.accountId}};}
+  if(g.allocation?.state==='RESERVED'&&!accountId){check(g.allocation.jobId===current.id,'CREATOR_RESERVATION_CONFLICT');return {generator:{...g,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,accountId:g.allocation.accountId,creator:{...current.creator,phase:'RESERVED',...accountId?{creation:null,cycle:(current.creator?.cycle??0)+1}:{}},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:'KEEP_CREATOR_RESERVATION',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:g.allocation.accountId}};}
   const loads=accountLoads(generators,g.id,current.creator?.observations??[],accounts,now),candidates=accounts.filter(eligibleAccount).sort((a,b)=>(loads.get(a.id)??0)-(loads.get(b.id)??0)||(a.id<b.id?-1:a.id>b.id?1:0));
   const selected=accountId?candidates.find(a=>a.id===accountId):candidates[0];check(selected,'CREATOR_NO_ELIGIBLE_ACCOUNT');
   const allocation={state:'RESERVED',jobId:current.id,accountId:selected.id,reservedAt:g.allocation?.reservedAt??now,updatedAt:now,override:accountId!==null,epoch:(g.allocation?.epoch??0)+1};
-  return {generator:{...g,allocation,allocationAccountId:selected.id,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,ownerMissing:false,accountId:selected.id,creator:{...current.creator,phase:'RESERVED'},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:accountId?'OVERRIDE_CREATOR_ACCOUNT':'RESERVE_CREATOR_ACCOUNT',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:selected.id}};
+  return {generator:{...g,allocation,allocationAccountId:selected.id,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,ownerMissing:false,accountId:selected.id,creator:{...current.creator,phase:'RESERVED',...accountId?{creation:null,cycle:(current.creator?.cycle??0)+1}:{}},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:accountId?'OVERRIDE_CREATOR_ACCOUNT':'RESERVE_CREATOR_ACCOUNT',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:selected.id}};
  });
 }
 export function adoptCreator(core,job,proof){
@@ -41,5 +41,15 @@ export function adoptCreator(core,job,proof){
   check(!g.accountId||g.accountId===owner.id,'CREATOR_OWNER_CONFLICT');
   check(!generators.some(other=>other.id!==g.id&&other.remoteId===proof.remoteId),'CREATOR_REMOTE_ID_CONFLICT');
   return {generator:{...g,accountId:owner.id,remoteId:proof.remoteId,ownerPrincipal:proof.principalFingerprint,ownerObservedAt:proof.observedAt,ownership:{source:proof.source,observedAt:proof.observedAt,evidenceId:proof.evidenceId},listing:proof.listing,allocation:null,allocationAccountId:null,creatorState:'OWNED',creatorHoldCode:null,state:g.remoteId?g.state:'OWNED'},job:{...current,accountId:owner.id,creator:{...current.creator,phase:'ADOPTED'},state:'COMPLETE',recovery:null},step:'ADOPT_CREATOR_OWNER',value:{state:'ADOPTED',generatorId:g.id,jobId:current.id,accountId:owner.id,remoteId:proof.remoteId}};
+ });
+}
+
+export function confirmCreated(core,job,proof){
+ return core.creatorTransaction({jobId:job.id,expectedRev:job.rev},c=>{
+  target(c);const {generator:g,job:current,accounts,generators,now}=c,a=accounts.find(a=>a.id===current.accountId),p=current.creator?.creation;
+  check(eligibleAccount(a)&&a.rev===proof.accountRevision&&a.expectedPrincipal===p?.principalFingerprint&&proof.principalFingerprint===a.expectedPrincipal,'CREATOR_OWNER_CHANGED');
+  check(current.creator.phase==='CREATE_VERIFIED'&&current.effect?.kind==='PERCHANCE_RENAME'&&current.effect.boundary==='OBSERVED'&&current.effect.disposition==='APPLIED'&&proof.source==='PERCHANCE_CREATION_READBACK_1'&&proof.state==='MATCHED'&&proof.slug===g.slug&&proof.previousSlug===p.temporarySlug&&proof.remoteId===p.remoteId&&proof.listing==='UNLISTED'&&proof.sourceFingerprint===p.sourceFingerprint&&Number.isFinite(proof.observedAt)&&proof.observedAt<=now&&now-proof.observedAt<=60000,'CREATOR_FINAL_UNVERIFIED');
+  check(g.allocation?.jobId===current.id&&g.allocation.accountId===a.id&&!g.remoteId&&!g.accountId,'CREATOR_RESERVATION_CONFLICT');check(!generators.some(other=>other.id!==g.id&&other.remoteId===proof.remoteId),'CREATOR_REMOTE_ID_CONFLICT');
+  return {generator:{...g,accountId:a.id,remoteId:proof.remoteId,ownerPrincipal:a.expectedPrincipal,ownerObservedAt:proof.observedAt,listing:'UNLISTED',allocation:null,allocationAccountId:null,creatorState:'CREATED',creatorHoldCode:null,createdSourceFingerprint:proof.sourceFingerprint,state:'OWNED'},job:{...current,creator:{...current.creator,phase:'CREATED'},state:'COMPLETE',recovery:null},step:'CREATE_GENERATOR_COMPLETE',value:{state:'CREATED',generatorId:g.id,remoteId:proof.remoteId}};
  });
 }
