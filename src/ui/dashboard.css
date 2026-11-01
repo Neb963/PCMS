@@ -10,3 +10,7 @@
 .source-file-path { overflow-wrap: anywhere; text-align: left; max-width: calc(100% - .5rem); }
 #source-file-content { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 32rem; overflow: auto; }
 #source-file-state { overflow-wrap: anywhere; }
+
+#backup-accounts { padding-left: 1.25rem; overflow-wrap: anywhere; }
+#backup-accounts li { padding: .75rem 0; border-bottom: 1px solid #dfe4ea; }
+#backup-coverage { overflow-wrap: anywhere; }

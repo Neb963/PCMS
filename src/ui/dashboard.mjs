@@ -45,7 +45,7 @@ const timeout=setTimeout(()=>{if(!received)show({code:'STATUS_UNAVAILABLE',admis
 port.onMessage.addListener(status=>{received=true;clearTimeout(timeout);show(status);port.disconnect();});
 port.onDisconnect.addListener(()=>{clearTimeout(timeout);if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});});
 
-let disposeModule=null,refreshJournal=null,refreshAccounts=null,refreshCatalog=null,refreshWork=null;
+let disposeModule=null,refreshJournal=null,refreshAccounts=null,refreshCatalog=null,refreshWork=null,refreshBackup=null;
 let view={journalFilter:'',route:'home',scroll:0,workSearch:'',workState:''},pageCursor=null,nextCursor=null;
 let corePort=null;const requests=new Map();
 function connection(){if(corePort)return corePort;const port=browser.runtime.connect({name:'pcms-core-rpc'});corePort=port;
@@ -62,7 +62,7 @@ async function persist(){
 }
 async function renderRecords(key){
  void queueStatus();
- refreshJournal=null;refreshAccounts=null;refreshCatalog=null;refreshWork=null;const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
+ refreshJournal=null;refreshAccounts=null;refreshCatalog=null;refreshWork=null;refreshBackup=null;const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
  if(key==='module'){await renderModule(area);return;}
  if(key==='other'){await renderOther(area);return;}
  if(key==='home'){
@@ -77,8 +77,9 @@ async function renderRecords(key){
  }else if(key==='settings'){
    if(location.hash.split('/')[1]==='connections'){await renderConnections(area);return;}
    if(location.hash.split('/')[1]==='modules'){await renderModuleSettings(area);return;}
+   if(location.hash.split('/')[1]==='backup'){await renderBackup(area);return;}
    if(location.hash.split('/')[1]==='journal'){await renderJournal(area);return;}
-   for(const [name,path] of [['Connections','connections'],['Modules','modules'],['Journal','journal']]){const link=node('a',name);link.href='#settings/'+path;area.append(link,document.createTextNode(' '));}
+   for(const [name,path] of [['Connections','connections'],['Modules','modules'],['Journal','journal'],['Backup','backup']]){const link=node('a',name);link.href='#settings/'+path;area.append(link,document.createTextNode(' '));}
 
  }
 }
@@ -181,7 +182,7 @@ async function renderModule(area){
 }
 
 // Refresh only the visible dashboard status; no background keepalive.
-setInterval(()=>{if(document.visibilityState==='visible'){void queueStatus();if(refreshJournal)void refreshJournal();if(refreshAccounts)void refreshAccounts();if(refreshCatalog)void refreshCatalog();if(refreshWork)void refreshWork();}},2000);
+setInterval(()=>{if(document.visibilityState==='visible'){void queueStatus();if(refreshJournal)void refreshJournal();if(refreshAccounts)void refreshAccounts();if(refreshCatalog)void refreshCatalog();if(refreshWork)void refreshWork();if(refreshBackup)void refreshBackup();}},2000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void queueStatus();});
 
 const importMessages={IMPORT_BUDGET_EXCEEDED:'This ZIP needs more import space. Increase the import budget or select a smaller package.',INVALID_IMPORT_BUDGET:'Enter a positive import budget.',DUPLICATE_JSON_KEY:'module.json has a repeated field.',INVALID_JSON:'module.json is not valid JSON.',INVALID_MANIFEST_FIELDS:'The module manifest has missing or unknown fields.',INCOMPATIBLE_CORE_API:'This module needs a different Core API.',UNKNOWN_CAPABILITY:'This module requests an unsupported capability.',INVALID_RELEASE_VERSION:'Use a release version in major.minor.patch format.',INCOMPATIBLE_SCHEMA:'The module job or settings schema is incompatible.',INCOMPATIBLE_SETTINGS_SCHEMA:'This update cannot read the current settings.',INCOMPATIBLE_JOB_SCHEMA:'This update cannot read an unfinished job. Existing work is kept.',SAME_VERSION_CHANGED:'These bytes differ from the installed release. Use a higher version.',DOWNGRADE_REJECTED:'This is an older release. The active package is kept.',UNSAFE_PATH:'The ZIP contains an unsafe file path.',PATH_COLLISION:'The ZIP contains duplicate or conflicting paths.',ENCRYPTED_ZIP:'Encrypted module ZIPs are not supported.',NON_REGULAR_ZIP_ENTRY:'The ZIP contains a link or special file.',PAYLOAD_LIST_MISMATCH:'The ZIP files do not match the manifest.',PAYLOAD_HASH_MISMATCH:'A file does not match its manifest hash.',PAYLOAD_SIZE_MISMATCH:'A file does not match its declared size.',ZIP_CRC_MISMATCH:'A ZIP file failed its CRC check.',UNSUPPORTED_EXECUTABLE_DEPENDENCY:'Bundle module code locally without imports.',INVALID_EXECUTABLE:'A module script is invalid or uses an unsupported import.'};
@@ -315,4 +316,31 @@ async function renderGenerators(area){
  const search=node('input'),filter=node('select'),searchLabel=node('label','Find a generator'),filterLabel=node('label','Git folder state');search.id='catalog-search';search.type='search';search.value=view.catalogSearch??'';searchLabel.htmlFor=search.id;filter.id='catalog-filter';filterLabel.htmlFor=filter.id;for(const value of ['','NOT_READY','READY','DONE_UNVERIFIED','DECLARATION_ERROR','FOLDER_MISSING']){const option=node('option',value||'All folder states');option.value=value;filter.append(option);}filter.value=view.catalogState??'';const list=node('ul'),next=node('button','Next generators'),first=node('button','First page');list.id='generator-list';next.id='catalog-next';first.id='catalog-first';area.append(searchLabel,search,filterLabel,filter,list,first,next);let cursor=view.catalogCursor??null,nextCursor=null,query=0;const rows=new Map();
  async function load(){const generation=++query;next.disabled=true;list.setAttribute('aria-busy','true');await updateStatus();const r=await core('catalog.list',{cursor,search:search.value,state:filter.value});if(!area.isConnected||generation!==query)return;list.setAttribute('aria-busy','false');if(!r.ok){outcome.textContent=gitError(r.code);return;}const wanted=new Set();for(const g of r.result.rows){wanted.add(g.id);let item=rows.get(g.id);if(!item){item=node('li');const a=node('a');a.href='#generators/'+g.id;a.addEventListener('click',()=>{view.catalogSelection=g.id;void persist();});item.append(a);rows.set(g.id,item);}item.firstChild.textContent=[g.slug,g.markerVersion,g.markerAction,g.gitState,g.gitHoldCode,g.creatorState,g.accountId?"Owner: "+g.accountId:g.allocationAccountId?"Reserved: "+g.allocationAccountId:null,g.creatorHoldCode].filter(Boolean).join(' · ');list.append(item);}for(const [key,item]of rows)if(!wanted.has(key)){item.remove();rows.delete(key);}list.querySelector('[data-empty]')?.remove();if(!r.result.rows.length){const empty=node('li','No matching generator folders.');empty.dataset.empty='true';list.append(empty);}nextCursor=r.result.cursor;next.hidden=!nextCursor;next.disabled=false;first.hidden=!cursor;}
  const changed=()=>{cursor=null;view.catalogCursor=null;view.catalogSearch=search.value;view.catalogState=filter.value;void persist();void load();};search.addEventListener('input',changed);filter.addEventListener('change',changed);next.addEventListener('click',()=>{cursor=nextCursor;view.catalogCursor=cursor;void persist();void load();});first.addEventListener('click',()=>{cursor=null;view.catalogCursor=null;void persist();void load();});refreshCatalog=load;await load();
+}
+
+async function renderBackup(area){
+ area.append(node('h2','Backup'),node('p','Archives will be unencrypted and include credentials. This collector checks the known login and cookie inventory; it does not create a backup file or verify a working login.'));
+ const response=await core('backup.status');if(!response.ok){area.append(failure(response.code));return;}
+ if(!response.result.available){const link=node('a','Open Modules');link.href='#settings/modules/pcms-backup';area.append(node('p','Update Backup to use session coverage. Existing settings and work are kept.'),link);return;}
+ const button=node('button','Check session coverage'),outcome=node('p'),summary=node('div'),searchLabel=node('label','Find account or coverage cause'),search=node('input'),list=node('ul'),previous=node('button','Previous accounts'),next=node('button','Next accounts');
+ button.id='backup-check';outcome.id='backup-result';outcome.setAttribute('role','status');summary.id='backup-coverage';search.id='backup-search';search.type='search';search.value=view.backupSearch??'';searchLabel.htmlFor=search.id;list.id='backup-accounts';previous.id='backup-previous';next.id='backup-next';area.append(button,outcome,summary,searchLabel,search,list,previous,next);
+ let state=response.result,busy=false,signature='',page=Number.isSafeInteger(view.backupPage)?view.backupPage:0;
+ const causes={BACKUP_SESSION_REMOVED:'This account was removed locally; its captured session was deleted.',AUTH_GUARD_MISSING:'The required session-change guard is missing; coverage is incomplete.',BACKUP_ACCOUNT_UNAVAILABLE:'Account context is unavailable. Open Accounts to check its route and login.',AUTH_SCHEMA_UNVERIFIED:'The login data has an unsupported structure. No session was admitted.',AUTH_SESSION_CHANGED:'The session or cookies kept changing during collection. Check again when stable.',AUTH_CONTEXT_UNAVAILABLE:'The protected login origin could not be read.',AUTH_COLLECTION_UNAVAILABLE:'The scoped collector could not finish.',ACCOUNT_PRINCIPAL_CHANGED:'The signed-in account changed. Check the account before collection.',ACCOUNT_DOCUMENT_CHANGED:'The source document changed during collection.',STALE_ACCOUNT:'Account details changed during collection. Check again.',NO_MANAGED_PERSONA:'No managed Persona exists; no session collection is required.',COOKIE_SCHEMA_UNVERIFIED:'Cookie attributes are unsupported. Coverage is incomplete.'};
+ function render(){
+  button.disabled=busy||!state.enabled;summary.replaceChildren();if(!state.enabled)summary.append(node('p','Backup is disabled. Saved coverage may be stale; enable Backup in Modules before collecting.'));const c=state.coverage;
+  summary.append(node('p',c?c.state==='COLLECTING'?'Collecting '+c.cursor+' of '+c.total+' accounts.':c.complete?'Known adapter coverage collected. Operational login remains unverified.':'Coverage incomplete. Earlier captured data is kept.':'Not collected.'));
+  if(c?.completedAt)summary.append(node('p','Collected: '+new Date(c.completedAt).toLocaleString()));
+  if(state.lastGood)summary.append(node('p','Previous complete coverage is stale: '+new Date(state.lastGood.completedAt).toLocaleString()));
+  summary.append(node('p','Scope: top-level Perchance login authentication fields and all managed Persona cookies, including partition/FPI context, session and expiry. No required sessionStorage or auth database key is established by this adapter. AI/site workspaces and unrelated browser containers are excluded.'));
+  const q=search.value.toLowerCase(),rows=(c?.rows??[]).filter(r=>[r.label,r.accountId,r.state,r.code].filter(Boolean).join(' ').toLowerCase().includes(q));page=Math.max(0,Math.min(page,Math.max(0,Math.ceil(rows.length/10)-1)));list.replaceChildren();
+  for(const r of rows.slice(page*10,page*10+10)){const item=node('li'),a=node('a',r.label);a.href='#accounts/'+r.accountId;item.append(a,node('p',r.state==='CAPTURED'?'Authentication '+(r.authState==='ABSENT'?'absent':'present')+'; '+r.cookieCount+' cookies captured.':r.state==='NOT_REQUIRED'?'Session not required.':'Incomplete.'),node('p',r.code?(causes[r.code]??'Collection held: '+r.code):'Observed '+new Date(r.observedAt).toLocaleString()));
+   if(r.contexts?.length)item.append(node('p','Cookie contexts: '+r.contexts.map(c=>c.partitionKey?.topLevelSite??(c.firstPartyDomain?'FPI '+c.firstPartyDomain:'unpartitioned')).join(', ')));list.append(item);
+  }
+  if(!rows.length)list.append(node('li',c?.state==='COLLECTING'?'Waiting for the next account result.':'No matching account results.'));
+  previous.hidden=page===0;next.hidden=(page+1)*10>=rows.length;
+ }
+ search.addEventListener('input',()=>{page=0;view.backupSearch=search.value;view.backupPage=page;void persist();render();});for(const [b,delta]of [[previous,-1],[next,1]])b.addEventListener('click',()=>{page+=delta;view.backupPage=page;void persist();render();});
+ async function load(){const r=await core('backup.status');if(!area.isConnected)return;if(!r.ok){outcome.textContent='Coverage status is unavailable.';return;}state=r.result;const sig=JSON.stringify(state);if(sig!==signature){signature=sig;render();}}
+ button.addEventListener('click',async()=>{if(busy)return;busy=true;render();outcome.textContent='Starting session coverage';try{const r=await core('backup.coverage',{requestId:crypto.randomUUID()});outcome.textContent=r.ok?'Coverage collection queued.':causes[r.code]??('Collection held: '+r.code);await load();}finally{busy=false;render();}});
+ refreshBackup=load;render();
 }

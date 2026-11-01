@@ -14,12 +14,13 @@ import {refreshAccountPins} from './account-pins.mjs';
 import {websiteContext,accountAdapter,hostStatus} from './bootstrap.mjs';
 import {createRetention} from '../core/retention.mjs';
 import {createDownloads} from '../core/downloads.mjs';
+import {createBackup} from '../modules/backup.mjs';
 import {createJournal} from '../modules/journal.mjs';
 import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,backup,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -35,9 +36,10 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     downloads=api?.downloads?createDownloads({core:value,api,profileId:(await value.status()).profileId}):null;
     discover=createDiscover({core:value,donor:accountAdapter,downloads,gitWriter,catalog:git});await discover.initialize();
     creator=createCreator({core:value,donor:accountAdapter});await creator.initialize();source=createSourceInspection({core:value,donor:accountAdapter});
+    backup=createBackup({core:value,donor:accountAdapter});await backup.initialize();
     journal=createJournal({core:value,downloads,retention:api?.downloads?createRetention({core:value,api,profileId:(await value.status()).profileId}):null});await journal.initialize();if(downloads)await journal.changed();await discover.changed();await journal.tick();
     if(globalThis.document&&api){
-      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect,discoverEffect:discover.effect,creatorEffect:creator.effect,sourceEffect:source.effect,discoverPage:(name,args)=>name==='discover.list'?discover.list(args):name==='discover.get'?discover.get(args.id):name==='discover.import'?discover.import(args):name==='discover.command'?discover.command(args):name==='discover.export'?discover.export(args):name==='discover.preparations'?discover.checkPreparations(args.id):name==='discover.retryPreparation'?discover.retryPreparation(args):name==='discover.navigate'?discover.navigation(args):discover.changed(),gitEffect:(job,reconcile)=>job.moduleId==='pcms-discover'?discover.prepareEffect(job,reconcile):gitWriter.step(job,{kind:'PREPARE',slug:job.input.slug},reconcile)});
+      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect,discoverEffect:discover.effect,creatorEffect:creator.effect,sourceEffect:source.effect,backupEffect:backup.effect,discoverPage:(name,args)=>name==='discover.list'?discover.list(args):name==='discover.get'?discover.get(args.id):name==='discover.import'?discover.import(args):name==='discover.command'?discover.command(args):name==='discover.export'?discover.export(args):name==='discover.preparations'?discover.checkPreparations(args.id):name==='discover.retryPreparation'?discover.retryPreparation(args):name==='discover.navigate'?discover.navigation(args):discover.changed(),gitEffect:(job,reconcile)=>job.moduleId==='pcms-discover'?discover.prepareEffect(job,reconcile):gitWriter.step(job,{kind:'PREPARE',slug:job.input.slug},reconcile)});
       scripts=createWebsiteScripts({core:value,api,load:modules.load,context:websiteContext});
       const host=modules.lifecycle;
       lifecycle=createLifecycle({core:value,host:{...host,
@@ -55,7 +57,9 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     try {
       const value=await core();let result;
       switch(message?.operation) {
-        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};let m=await lifecycle.request(message.id,message.kind,message.requestId);if(message.id==='pcms-discover'){await discover.changed();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-creator'){await creator.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-deployer'){await source.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}await journal.tick();await accounts.initialize();await discover.initialize();await creator.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};let m=await lifecycle.request(message.id,message.kind,message.requestId);if(message.id==='pcms-discover'){await discover.changed();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-creator'){await creator.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-deployer'){await source.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-backup'){await backup.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}await journal.tick();await accounts.initialize();await discover.initialize();await creator.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'backup.status':result=await backup.status();break;
+        case 'backup.coverage':result=await backup.enqueue({requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.get':{const {current,previous,changes,...summary}=await source.get(message.id);result={...summary,currentFiles:current.length,previousFiles:previous.length};break;}
         case 'source.files':result=await source.list(message);break;
         case 'source.file':result=await source.file(message);break;
@@ -116,7 +120,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'view.get':result=await value.view('shell-view');break;
         case 'view.save': {
           const v=message.value;
-          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount','sourceSelection','sourceSearch','sourceVersions'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
+          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount','sourceSelection','sourceSearch','sourceVersions','backupSearch','backupPage'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
           result=await value.saveView('shell-view',v,message.requestId);break;
         }
         default:return {ok:false,code:'OPERATION_DENIED'};

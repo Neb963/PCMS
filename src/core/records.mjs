@@ -119,6 +119,9 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {revision:r.revision,sequence};
   };
   await transact(['events'],'readwrite',async s=>{const r=await root(s);if(!r.profileId){r.profileId=crypto.randomUUID();await append(s,r,{step:'PROFILE_IDENTITY',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}});
+  async function assertGuard(s,r,guard){
+    if(guard){requireCore(id(guard.moduleId)&&Number.isSafeInteger(guard.generation)&&id(guard.jobId)&&Number.isSafeInteger(guard.jobRevision),'INVALID_GUARD');const m=await req(s('modules').get([r.dataset,guard.moduleId])),job=await req(s('jobs').get([r.dataset,guard.jobId]));requireCore(m?.enabled&&!m.lifecycle&&m.generation===guard.generation,'STALE_GENERATION');requireCore(job?.rev===guard.jobRevision&&job.moduleId===guard.moduleId&&job.generation===guard.generation,'STALE_REVISION');if(guard.accountId!=null){requireCore(id(guard.accountId)&&Number.isSafeInteger(guard.accountRevision)&&typeof guard.principalFingerprint==='string','INVALID_GUARD');const a=await req(s('accounts').get([r.dataset,guard.accountId]));requireCore(a?.rev===guard.accountRevision&&a.state==='READY'&&!a.admission&&a.expectedPrincipal===guard.principalFingerprint,'STALE_ACCOUNT');}}
+  }
   const core={
     close:()=>db.close(),
     status:()=>transact([], 'readonly',s=>root(s)),
@@ -154,7 +157,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     mutate:(changes,event,command=null,guard=null)=>transact([...TABLES,'events','versions','blobs','chunks','commands'],'readwrite',async s=>{
       const r=await root(s);
       if(command){requireCore(id(command.id)&&typeof command.signature==='string','INVALID_REQUEST');const previous=await req(s('commands').get([r.dataset,command.id]));if(previous){requireCore(previous.signature===command.signature,'REQUEST_CONFLICT');return previous.result;}}
-      if(guard){requireCore(id(guard.moduleId)&&Number.isSafeInteger(guard.generation)&&id(guard.jobId)&&Number.isSafeInteger(guard.jobRevision),'INVALID_GUARD');const m=await req(s('modules').get([r.dataset,guard.moduleId])),job=await req(s('jobs').get([r.dataset,guard.jobId]));requireCore(m?.enabled&&!m.lifecycle&&m.generation===guard.generation,'STALE_GENERATION');requireCore(job?.rev===guard.jobRevision&&job.moduleId===guard.moduleId&&job.generation===guard.generation,'STALE_REVISION');if(guard.accountId!=null){requireCore(id(guard.accountId)&&Number.isSafeInteger(guard.accountRevision)&&typeof guard.principalFingerprint==='string','INVALID_GUARD');const a=await req(s('accounts').get([r.dataset,guard.accountId]));requireCore(a?.rev===guard.accountRevision&&a.state==='READY'&&!a.admission&&a.expectedPrincipal===guard.principalFingerprint,'STALE_ACCOUNT');}}
+      await assertGuard(s,r,guard);
       const result=await writeRows(s,r,changes,event);
       if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result}));return result;
     }),
@@ -233,7 +236,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }),
     view:name=>transact(['views'],'readonly',async s=>{requireCore(id(name),'INVALID_VIEW');const r=await root(s);return (await req(s('views').get([r.dataset,name])))?.value??null;}),
     credentials:{
-      set:(name,value,accountId=null)=>transact(['credentials','events'],'readwrite',async s=>{requireCore(id(name)&&typeof value==='string'&&(accountId===null||id(accountId)),'INVALID_CREDENTIAL');const r=await root(s);await append(s,r,{step:'SET_CREDENTIAL',result:'COMPLETE'});const old=await req(s('credentials').get([r.dataset,name]));await req(s('credentials').put({key:[r.dataset,name],value,accountId,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
+      set:(name,value,accountId=null,guard=null)=>transact(['credentials','events','modules','jobs','accounts'],'readwrite',async s=>{requireCore(id(name)&&typeof value==='string'&&(accountId===null||id(accountId)),'INVALID_CREDENTIAL');const r=await root(s);await assertGuard(s,r,guard);requireCore(!guard||guard.accountId===accountId,'INVALID_GUARD');await append(s,r,{step:'SET_CREDENTIAL',result:'COMPLETE'});const old=await req(s('credentials').get([r.dataset,name]));await req(s('credentials').put({key:[r.dataset,name],value,accountId,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
       get:name=>transact(['credentials'],'readonly',async s=>{const r=await root(s);return (await req(s('credentials').get([r.dataset,name])))?.value??null;})
     }
   };
