@@ -4,6 +4,7 @@
 import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
+import {createBackupDonor} from './backup-donor.mjs';
 import {observePerchanceAuth} from '../modules/auth-observations.mjs';
 import {observeSavedSource,observeNativeEditor} from '../modules/source-observations.mjs';
 import {observePerchanceCreation} from '../modules/creation-observations.mjs';
@@ -347,13 +348,13 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    const tabs=await api.tabs.query({cookieStoreId:scope.containerId});let tab=tabs.find(t=>t.id===scope.tabId&&ownOrigin(t.url));
    if(!tab)for(const t of tabs){const tag=await api.sessions.getTabValue(t.id,'pcmsBackupContext');if(tag?.accountId===scope.accountId&&tag.personaUid===scope.personaUid&&ownOrigin(t.url)){tab=t;break;}}
    if(!tab){tab=await personaPlatform.open(scope.containerId,PERCHANCE,false);await api.sessions.setTabValue(tab.id,'pcmsBackupContext',{accountId:scope.accountId,personaUid:scope.personaUid});}
-   const until=Date.now()+15000;for(;;){const current=await api.tabs.get(tab.id),fresh=await protectedProfile(scope);if(fresh.code)return fail(fresh.code);if(current.cookieStoreId!==scope.containerId||!ownOrigin(current.url??current.pendingUrl))return fail('AUTH_CONTEXT_UNAVAILABLE');if(current.status==='complete'){tab=current;break;}if(Date.now()>=until)return fail('AUTH_CONTEXT_UNAVAILABLE');await new Promise(resolve=>setTimeout(resolve,200));}
+   const until=Date.now()+15000;for(;;){const current=await api.tabs.get(tab.id),fresh=await protectedProfile(scope);if(fresh.code)return fail(fresh.code);if(current.cookieStoreId!==scope.containerId)return fail('AUTH_CONTEXT_UNAVAILABLE');if(current.status==='complete'&&ownOrigin(current.url)){tab=current;break;}if(!ownOrigin(current.url)&&!ownOrigin(current.pendingUrl)&&current.url!=='about:blank')return fail('AUTH_CONTEXT_UNAVAILABLE');if(Date.now()>=until)return fail('AUTH_CONTEXT_UNAVAILABLE');await new Promise(resolve=>setTimeout(resolve,200));}
    const run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('AUTH_CONTEXT_UNAVAILABLE');return rows[0].result;};
    const witness=await run(accountDocumentWitness),first=await run(observePerchanceAuth,[{documentWitness:witness,principalFingerprint:scope.expectedPrincipal}]);if(!first?.ok)return fail(first?.code??'AUTH_COLLECTION_UNAVAILABLE');
    const epoch=cookieEpoch,cookies=await cookieService.list(scope.containerId),second=await run(observePerchanceAuth,[{documentWitness:witness,principalFingerprint:scope.expectedPrincipal}]);if(!second?.ok)return fail(second?.code??'AUTH_COLLECTION_UNAVAILABLE');
    const after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);
    if(final.code)return fail(final.code);if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url)return fail('ACCOUNT_DOCUMENT_CHANGED');if(epoch!==cookieEpoch||first.fingerprint!==second.fingerprint)return fail('AUTH_SESSION_CHANGED');
-   return {ok:true,source:'PCMS_MANAGED_SESSION_1',accountId:scope.accountId,personaUid:scope.personaUid,containerId:scope.containerId,startedAt:first.startedAt,observedAt:second.observedAt,fingerprint:second.fingerprint,auth:second.data,cookies};
+   return {ok:true,source:'PCMS_MANAGED_SESSION_1',accountId:scope.accountId,personaUid:scope.personaUid,containerId:scope.containerId,startedAt:first.startedAt,observedAt:second.observedAt,fingerprint:second.fingerprint,context:{tabId:tab.id,witness},auth:second.data,cookies};
   }catch{return fail('AUTH_COLLECTION_UNAVAILABLE');}finally{api.cookies.onChanged.removeListener(changed);}
  }
  async function sourceRead(scope,request){
@@ -405,5 +406,18 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    return {...result,...identity.inventory?{inventory:identity.inventory}:{}};
   }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
  }
- return Object.freeze({collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ async function openAuthWitness(scope,{captureId}){
+  const found=await protectedProfile(scope);if(found.code)return fail(found.code);for(const existing of await api.tabs.query({cookieStoreId:scope.containerId})){const tag=await api.sessions.getTabValue(existing.id,'pcmsAuthCaptureWitness');if(tag?.accountId===scope.accountId&&tag.personaUid===scope.personaUid&&tag.role!=='REVIEW')return fail('AUTH_WITNESS_NEEDS_INSPECTION',{inspectionTabId:existing.id});}const tab=await personaPlatform.open(scope.containerId,PERCHANCE,false);await api.sessions.setTabValue(tab.id,'pcmsAuthCaptureWitness',{accountId:scope.accountId,personaUid:scope.personaUid,captureId});
+  const until=Date.now()+15000;for(;;){const current=await api.tabs.get(tab.id),fresh=await protectedProfile(scope);if(fresh.code)return fail(fresh.code);if(current.cookieStoreId!==scope.containerId)return fail('AUTH_CONTEXT_CHANGED');if(current.status==='complete'&&current.url===PERCHANCE)break;if(current.url!==PERCHANCE&&current.pendingUrl!==PERCHANCE&&current.url!=='about:blank')return fail('AUTH_CONTEXT_CHANGED');if(Date.now()>=until)return fail('AUTH_CONTEXT_UNAVAILABLE');await new Promise(resolve=>setTimeout(resolve,200));}
+  const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:accountDocumentWitness,args:[]});if(rows?.length!==1||typeof rows[0].result!=='string')return fail('AUTH_CONTEXT_UNAVAILABLE');return {tabId:tab.id,witness:rows[0].result};
+ }
+ async function closeAuthWitness(w,context,{preserve=false}={}){
+  const tab=await api.tabs.get(context.tabId),tag=await api.sessions.getTabValue(tab.id,'pcmsAuthCaptureWitness');if(tab.url!==PERCHANCE||tab.cookieStoreId!==w.containerId||tag?.accountId!==w.accountId||tag.personaUid!==w.personaUid||tag.captureId!==w.captureId)return;
+  const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:accountDocumentWitness,args:[]});if(rows?.length===1&&rows[0].result===context.witness){if(preserve)await api.sessions.setTabValue(tab.id,'pcmsAuthCaptureWitness',{...tag,role:'REVIEW'});else await api.tabs.remove(tab.id);}
+ }
+ async function inspectAuthWitness(scope,{tabId}){
+  const found=await bound(scope);if(found.code)return fail(found.code);let tab;try{tab=await api.tabs.get(tabId);}catch{return fail('AUTH_CONTEXT_MISSING');}const tag=await api.sessions.getTabValue(tab.id,'pcmsAuthCaptureWitness');if(tab.cookieStoreId!==scope.containerId||tag?.accountId!==scope.accountId||tag.personaUid!==scope.personaUid)return fail('AUTH_CONTEXT_CHANGED');await api.tabs.update(tab.id,{active:true});await api.windows.update(tab.windowId,{focused:true});return {ok:true,tabId:tab.id};
+ }
+ const backupDonor=createBackupDonor({api,stateManager,initialize,getState,protectedProfile,collectSession,openAuthWitness,closeAuthWitness});
+ return Object.freeze({...backupDonor,inspectAuthWitness,collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

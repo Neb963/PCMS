@@ -1,3 +1,4 @@
+import {attachCaptureCut} from './capture-cut.mjs';
 import {createQueue} from './queue.mjs';
 // The only PCMS record store. Callers are packaged Core services, never ZIP code.
 export const DATABASE = 'pcms-core';
@@ -172,7 +173,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       for(const j of jobs)if(j.id!==jobId){const possible=j.effect?.boundary==='POSSIBLE',value={ownerMissing:true,jobId:j.id,logicalKey:j.logicalKey,moduleId:j.moduleId,targetId:j.targetId,accountId,kind:j.kind,jobSchema:j.jobSchema,generation:j.generation,state:possible?'HELD':['COMPLETE','FAILED'].includes(j.state)?j.state:'FAILED',step:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING',effect:j.effect,effects:j.effects??[],...(possible&&j.git?.schema===1?{git:j.git}:{}),input:j.moduleId==='pcms-creator'&&j.creator?.schema===1?{slug:j.input?.slug,folder:j.input?.folder,repositoryId:j.input?.repositoryId}:{},...(j.moduleId==='pcms-creator'&&j.creator?.schema===1?{creator:j.creator}:{}),needsCheck:false,lease:null,recovery:{action:'INSPECT_OWNER_MISSING',code:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING'},dueAt:j.dueAt};changes.push({table:'jobs',id:j.id,expectedRev:j.rev,value,refs:j.refs??[]});}
       for(const g of await req(s('generators').index('accountId').getAll(IDBKeyRange.only([r.dataset,accountId]))))changes.push({table:'generators',id:g.id,expectedRev:g.rev,value:{...g,ownerMissing:true,ownerLabel:a.label,state:'HELD',holdCode:'OWNER_MISSING'},refs:g.refs??[]});
       await writeRows(s,r,changes,{moduleId:'pcms-accounts',targetId:accountId,jobId,step:'REMOVE_ACCOUNT_DATA',result:'COMPLETE'});
-      let c=await req(s('credentials').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(c){if(c.value.accountId===accountId)await req(c.delete());c=await req(c.continue()||c.request);}
+      let c=await req(s('credentials').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(c){if(c.value.accountId===accountId||c.value.captureData&&c.value.accountIds?.includes(accountId))await req(c.delete());c=await req(c.continue()||c.request);}
       const removedJobs=new Set(jobs.filter(j=>j.id!==jobId).map(j=>j.id));let command=await req(s('commands').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(command){if(removedJobs.has(command.value.jobId))await req(command.delete());command=await req(command.continue()||command.request);}
       // Old account snapshots and old job inputs must not resurrect removed
       // local data through paging or a later backup. Events are secret-safe.
@@ -241,6 +242,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }
   };
   attachBlobs(core,transact,root,checkedRefs,append,clock);
+  attachCaptureCut(core,{transact,root,checkedRefs,append,req,check:requireCore,clock,assertGuard,tables:TABLES,stores:STORES});
   // A fixed privileged data boundary, never exposed to ZIP/dashboard RPC.
   // Creator supplies a synchronous policy over this current atomic snapshot.
   core.creatorTransaction=({jobId,expectedRev,command=null},decide)=>transact(['accounts','generators','jobs','modules','views','commands','events','versions','blobs','chunks'],'readwrite',async s=>{
