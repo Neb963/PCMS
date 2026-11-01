@@ -4,8 +4,11 @@ import {digestStream} from '../core/stream-hash.mjs';
 import {PackageError} from './package.mjs';
 import {ArchiveError,canonical,same} from '../core/backup-format.mjs';
 import {stageRecords} from '../core/restore-mapping.mjs';
+import {restoreParticipantPlan,restoredCookieReadback,restoredAuthReadback} from './restore-import.mjs';
+import {checkedCookies} from './backup-session.mjs';
+import {bindingObservation} from './account-observations.mjs';
 const terminal=new Set(['CANCELLED','ROLLED_BACK','COMPLETE']);
-export function createBackupRestore({core,donor,clock=Date.now}){
+export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()=>{},clock=Date.now}){
  const id='pcms-backup',inflight=new Map();let cached=null;
  const module=()=>core.read('modules',id),capable=m=>m?.packageClass==='bundled-backup'&&m.manifest?.capabilities?.includes('backup.restore'),enabled=m=>capable(m)&&m.enabled&&!m.lifecycle;
  const guard=j=>({moduleId:id,generation:j.generation,jobId:j.id,jobRevision:j.rev});
@@ -55,6 +58,7 @@ export function createBackupRestore({core,donor,clock=Date.now}){
   return {done:true,observed};
  }
  async function rollbackStart(j,c){
+  await donor.restoreParticipantStop?.();await pins(core);
   const latest=await fresh(j);let changed=false;for(let index=0;index<c.mappings.length;index++){const m=c.mappings[index];if(m.destinationContainerId)continue;const observed=await donor.restoreObserveAllocation({mapping:m});if(observed.ok){check(latest.effects?.some(e=>e.operationId==='restore-'+j.id+'-allocate-'+index),'RESTORE_UNEXPECTED_ALLOCATION');c.mappings[index]={...m,destinationContainerId:observed.destinationContainerId,allocationReceipt:observed.allocationReceipt};changed=true;}}if(changed)c=await update(j,c,{mappings:c.mappings});
   const previous=await privateData(c,'previous');let plan;
   try{plan=await privateData(c,'plan');}catch{
@@ -68,6 +72,69 @@ export function createBackupRestore({core,donor,clock=Date.now}){
   }
   const rollback=await donor.restoreRollbackPlan({previous,plan});await core.restore.secret(c.id,'rollback',JSON.stringify(rollback),(await rows('accounts')).map(a=>a.id),guard(await fresh(j)));return update(j,c,{state:'ROLLBACK_STATE',progress:{...c.progress,rollback:0},code:null});
  }
+
+ async function participant(j,c,reconcile){
+  const index=c.progress.participant??0,p=c.participants[index];
+  if(!p){if(reconcile)return output(j,'CONTINUE');await update(j,c,{state:'LOCAL_CHECK',code:null});return output(j,'CONTINUE');}
+  const source=(await archive(c)).data.external.sessions.find(s=>s.accountId===p.accountId),a=await core.restore.staged(c.id,'accounts',p.accountId);
+  check(source&&a,'RESTORE_PARTICIPANT_SCOPE');
+  const scope={restoreId:c.id,accountId:p.accountId,personaUid:p.personaUid,containerId:p.containerId,routeId:p.routeId,preparationId:'restore-'+c.id+'-'+index,tabId:p.tabId??null,expectedPrincipal:a.expectedPrincipal};
+  const save=async patch=>{const current=await core.restore.read();return update(j,current,{participants:current.participants.map((v,i)=>i===index?{...v,...patch}:v),code:null});};
+  const label='participant-'+index+'-'+p.state.toLowerCase()+'-'+(p.attempt??0),operationId='restore-'+j.id+'-'+label;
+  const args=operation=>({scope,operation}),boot=(await core.queue.status()).bootId;
+  const admitted=async()=>{const r=await core.status(),m=await module(),current=await core.restore.read(),latest=await fresh(j);return enabled(m)&&m.generation===latest.generation&&r.restoreHold?.jobId===j.id&&current?.id===c.id&&!current.wantRollback&&current.participants?.[index]?.containerId===p.containerId;};
+  if(['ROUTE_PLAN','ASSIGN','VERIFY'].includes(p.state)){
+   const ready=await donor.checkBinding(scope,{stage:'PREREQUISITES',readOnly:true});if(!ready?.ok){await update(j,c,{code:ready?.code??'RESTORE_PREREQUISITE_MISSING'});return output(j,'HELD',ready?.code??'RESTORE_PREREQUISITE_MISSING');}
+   const plan=p.state==='ROUTE_PLAN',operation={operationId,...plan?{}:{stage:p.state}};
+   const r=await step(j,c,label,valid=>plan?donor.restoreParticipantPlanRoute(args(operation),valid):donor.restoreParticipantRoute(args(operation),valid),()=>plan?donor.restoreParticipantObservePlan(args(operation)):donor.restoreParticipantObserveRoute(args(operation)),reconcile);
+   if(!r.done)return output(j,r.notStarted?'CONTINUE':'HELD',r.code);
+   const nativePlan=await donor.restoreAdvancePlan({plan:await privateData(c,'plan'),scope,operationId,stage:plan?'RESTORE_ROUTE_PLAN':p.state});
+   await core.restore.secret(c.id,'plan',JSON.stringify(nativePlan),c.destinationAccounts.map(a=>a.id),guard(await fresh(j)));
+   if(p.state==='VERIFY'){
+    check(r.observed.fresh===true,'RESTORE_ROUTE_RECHECK_REQUIRED');const binding=await bindingObservation(r.observed.binding);
+    check(binding.personaUid===p.personaUid&&binding.containerId===p.containerId&&binding.routeId===p.routeId&&binding.routeObservedAt>=c.confirmedAt&&binding.routeObservedAt<=clock(),'RESTORE_ROUTE_UNVERIFIED');
+    check(!c.participants.some((v,i)=>i!==index&&v.routeProof?.exitAddresses.some(e=>binding.exitAddresses.includes(e))),'RESTORE_DUPLICATE_EXIT');
+    await save({state:'COOKIES',routeProof:{source:'RESTORE_ROUTE_1',coreBootId:boot,personaUid:p.personaUid,containerId:p.containerId,routeId:p.routeId,exitAddresses:binding.exitAddresses,observedAt:binding.routeObservedAt,evidenceId:binding.routeEvidenceId},route:{state:'VALIDATED',code:null},binding});
+    await pins(core);
+   }else await save({state:plan?'ASSIGN':'VERIFY'});
+   return output(j,'CONTINUE');
+  }
+  check(p.routeProof?.coreBootId===boot,'RESTORE_ROUTE_RECHECK_REQUIRED');await pins(core);
+  if(p.state==='COOKIES'){
+   const cookies=checkedCookies(source.cookies),cookie=cookies[p.cookieIndex];
+   if(!cookie){if(reconcile)return output(j,'CONTINUE');const verified=await donor.restoreParticipantCookies(args({expected:source.cookies}));check(verified.ok,verified.code??'RESTORE_COOKIES_CHANGED');await save({state:'BLANK',cookieReadback:verified});return output(j,'CONTINUE');}
+   const r=await step(j,c,label+'-'+p.cookieIndex,valid=>donor.restoreParticipantCookie(args({cookie}),valid),()=>donor.restoreParticipantObserveCookie(args({cookie})),reconcile);
+   if(!r.done)return output(j,r.notStarted?'CONTINUE':'HELD',r.code);await save({cookieIndex:p.cookieIndex+1});return output(j,'CONTINUE');
+  }
+  if(p.state==='BLANK'){
+   const r=await step(j,c,label,valid=>donor.restoreParticipantBlank(args({operationId}),valid),()=>donor.restoreParticipantObserveBlank(args({operationId})),reconcile);
+   if(!r.done)return output(j,r.notStarted?'CONTINUE':'HELD',r.code);
+   const nativePlan=await donor.restoreAdvancePlan({plan:await privateData(c,'plan'),scope,operationId,stage:'RESTORE_BLANK'});await core.restore.secret(c.id,'plan',JSON.stringify(nativePlan),c.destinationAccounts.map(a=>a.id),guard(await fresh(j)));
+   await save({state:'REGISTER',tabId:r.observed.tabId,bootstrap:{operationId:'restore-auth-'+c.id+'-'+index,nonce:crypto.randomUUID(),authHash:p.sourceAuthHash,tabId:r.observed.tabId,containerId:p.containerId}});return output(j,'CONTINUE');
+  }
+  const input={...p.bootstrap,auth:source.auth};
+  if(p.state==='REGISTER'||p.state==='NAVIGATE'){
+   const registration=p.state==='REGISTER';
+   const r=await step(j,c,label,valid=>registration?donor.restoreParticipantRegister(args({input,admitted}),valid):donor.restoreParticipantNavigate(args({input}),valid),()=>registration?donor.restoreParticipantRegistration(args({input})):donor.restoreParticipantBootstrap(args({input})),reconcile);
+   if(!r.done)return output(j,r.notStarted?'CONTINUE':'HELD',r.code);
+   await save(registration?{state:'NAVIGATE'}:{state:'LOCAL_READBACK',bootstrapReceipt:r.observed});return output(j,'CONTINUE');
+  }
+  if(reconcile)return output(j,'CONTINUE');
+  if(p.state==='LOCAL_READBACK'){
+   await donor.restoreParticipantUnregister(args({input}));
+   const packet=await donor.collectSession(scope),auth=restoredAuthReadback(source.auth,packet?.ok?{ok:true,data:packet.auth}:packet),cookies=packet?.ok?restoredCookieReadback(source.cookies,packet.cookies):{ok:false,code:packet?.code??'RESTORE_COOKIES_UNAVAILABLE'};
+   if(!auth.ok||!cookies.ok){await save({local:{state:'HELD',code:auth.code??cookies.code}});return output(j,'HELD',auth.code??cookies.code);}
+   await save({state:'IDENTITY',local:{state:'IMPORTED',authHash:p.sourceAuthHash,observedAt:packet.observedAt,cookies}});return output(j,'CONTINUE');
+  }
+  if(p.state==='IDENTITY'){
+   const value=await donor.checkBinding(scope,{stage:'IDENTITY',operationId:operationId+'-read',identity:true,readOnly:true}),identity=value?.identity;
+   const valid=value?.ok===true&&value.personaUid===p.personaUid&&value.containerId===p.containerId&&value.routeId===p.routeId&&identity?.ok===true&&identity.source==='PERCHANCE_AUTHENTICATED_IDENTITY'&&identity.principalFingerprint===a.expectedPrincipal&&identity.observedAt>=c.confirmedAt&&identity.observedAt<=clock();
+   const login=valid?{state:'VALIDATED',principalFingerprint:identity.principalFingerprint,principalLabel:identity.principalLabel,observedAt:identity.observedAt}:{state:'HELD',code:value?.ok?'ACCOUNT_PRINCIPAL_CHANGED':value?.code??'ACCOUNT_IDENTITY_UNKNOWN'};
+   await save({state:'DONE',login});return output(j,'CONTINUE');
+  }
+  if(p.state==='DONE'){await update(j,c,{progress:{...c.progress,participant:index+1}});return output(j,'CONTINUE');}
+  check(false,'RESTORE_PARTICIPANT_STATE');
+ }
  // Donor fingerprints use the same canonical JSON helper as their readback.
  async function hashJSON(value){return sha256(new TextEncoder().encode(canonical(value)));}
  async function effect(original,reconcile=false){
@@ -79,6 +146,7 @@ export function createBackupRestore({core,donor,clock=Date.now}){
    if(c.wantRollback&&j.effect?.boundary!=='POSSIBLE'&&!c.state.startsWith('ROLLBACK')){await rollbackStart(j,c);return output(j,'CONTINUE');}
    if(c.state==='DRAIN'){
     if(reconcile)return output(j,'CONTINUE');if(core.queue.maintenanceActive())return output(j,'WAITING','RESTORE_DRAINING',clock()+1000);
+    const unresolved=(await rows('jobs')).filter(x=>x.id!==j.id&&x.effect?.boundary==='POSSIBLE'&&x.effect.write!==false);if(unresolved.length){await update(j,c,{code:'RESTORE_PREVIOUS_WRITE_UNRESOLVED',previousWork:unresolved.map(x=>({id:x.id,kind:x.kind,moduleId:x.moduleId,accountId:x.accountId??null}))});return output(j,'HELD','RESTORE_PREVIOUS_WRITE_UNRESOLVED');}
     const accounts=await rows('accounts'),generators=await rows('generators'),gate=await donor.restoreGate({accounts,editorTabs:generators.flatMap(g=>(g.sourceEditors??[]).map(e=>e.tabId))});
     if(!gate.ok){await update(j,c,{code:gate.code,contexts:gate.contexts??[]});return output(j,'HELD',gate.code);}
     if(!await core.credentials.get('restore-previous-'+c.id))await core.restore.secret(c.id,'previous',JSON.stringify(gate.snapshot),accounts.map(a=>a.id),guard(await fresh(j)));
@@ -128,6 +196,12 @@ export function createBackupRestore({core,donor,clock=Date.now}){
     if(reconcile)return output(j,'CONTINUE');const {staged,entries}=await image(c),index=c.progress.rows??0,batch=entries.slice(index,index+200);if(!batch.length){await update(j,c,{state:'STAGED',stagedRoot:staged.root,stagedCounts:Object.fromEntries(Object.entries(staged.records).map(([k,v])=>[k,v.length])),code:'RESTORE_AUTH_IMPORT_PENDING'});return output(j,'HELD','RESTORE_AUTH_IMPORT_PENDING');}
     await core.restore.stageRows(c.id,batch,guard(await fresh(j)));await update(j,c,{progress:{...c.progress,rows:index+batch.length},code:null});return output(j,'CONTINUE');
    }
+   if(c.state==='STAGED'){
+    if(reconcile)return output(j,'CONTINUE');const m=await module();check(m.manifest?.capabilities?.includes('backup.activate'),'BACKUP_UPDATE_REQUIRED');
+    const checked=await archive(c),plan=await privateData(c,'plan'),participants=await restoreParticipantPlan(checked.data,c.mappings,plan.routeMap,clock());
+    await update(j,c,{state:'PARTICIPANTS',participants,progress:{...c.progress,participant:0},code:null});return output(j,'CONTINUE');
+   }
+   if(c.state==='PARTICIPANTS')return await participant(j,c,reconcile);
    return output(j,'HELD',c.code??'RESTORE_AUTH_IMPORT_PENDING');
   }catch(error){
    const latest=await fresh(j);if(latest.effect?.boundary==='POSSIBLE')return output(j,'HELD',code(error));const m=await module();if(enabled(m)&&latest.generation===m.generation){const current=await core.restore.read();try{await update(latest,current,{code:code(error)});}catch{}}

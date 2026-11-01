@@ -48,7 +48,7 @@ export function createRestoreParticipants({api,bound,patch,prerequisites,prepare
    await patch(scope,{pcmsOperation:{operationId,stage:'RESTORE_BLANK',phase:'COMPLETE',tabId:tab.id}});return {ok:true,operationId,tabId:tab.id};
   },
   observeBlank,
-  async register(scope,{input,admitted=validNow},validNow){await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.arm(input,validNow,admitted);},
+  async register(scope,{input,admitted},validNow){await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.arm(input,validNow,admitted??validNow);},
   async registration(scope,{input}){await target(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.registered(input);},
   async navigate(scope,{input},validNow){
    await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');const registered=await bootstrap.registered(input),tab=await api.tabs.get(input.tabId),tag=await api.sessions.getTabValue(tab.id,'pcmsRestoreTab');
