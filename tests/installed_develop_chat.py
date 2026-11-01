@@ -32,7 +32,7 @@ def main():
   except Exception as error:
    receipt['error']=str(error)
    if sid:
-    try:toolbar(sid);dashboard(sid);receipt['page']=script(sid,"return document.body.innerText");receipt['state']=deployment(sid);(OUT/'p24-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
+    try:call('POST',f'/session/{sid}/window',{'handle':call('GET',f'/session/{sid}/window/handles')[0]});toolbar(sid);dashboard(sid);receipt['page']=script(sid,"return document.body.innerText");receipt['state']=deployment(sid);(OUT/'p24-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise
   finally:

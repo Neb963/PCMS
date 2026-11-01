@@ -13,8 +13,12 @@ export async function nativeAi(request){
   if(!w.__PCMS_AI_DOCUMENT_1)Object.defineProperty(w,'__PCMS_AI_DOCUMENT_1',{value:crypto.randomUUID()});
   if(request.document&&request.document!==w.__PCMS_AI_DOCUMENT_1)return hold('AI_DOCUMENT_CHANGED',true);
   if(!w.__PCMS_AI_RECEIPTS_1)Object.defineProperty(w,'__PCMS_AI_RECEIPTS_1',{value:new Map()});
+  if(!w.__PCMS_AI_RESET_NODES_1)Object.defineProperty(w,'__PCMS_AI_RESET_NODES_1',{value:new Map()});
+  const resetNodes=w.__PCMS_AI_RESET_NODES_1,greeting='👋 I can edit the code and test it live. Ask me to build, change or test something.';
+  if(!w.__PCMS_AI_CLICKS_1){const clicks={newChat:0,send:0,fresh,sendButton:send};fresh.addEventListener('click',()=>clicks.newChat++,true);send.addEventListener('click',()=>clicks.send++,true);Object.defineProperty(w,'__PCMS_AI_CLICKS_1',{value:clicks});}
+  const clicks=w.__PCMS_AI_CLICKS_1;if(clicks.fresh!==fresh||clicks.sendButton!==send)return hold('AI_CONTROLS_CHANGED',true);
   const receipts=w.__PCMS_AI_RECEIPTS_1,previous=receipts.get(request.operationId),sid=()=>src.getDraftChatSid(),digest=async()=>sid()?hash('PCMS_AI_SESSION_1:'+request.nonce+':'+sid()):null;
-  const observation=async()=>{const r=receipts.get(request.operationId);if(r?.action==='SEND'&&!r.complete&&sid()&&input.value===''){r.complete=true;r.chatDigest=await digest();}return {ok:true,source:'PERCHANCE_NATIVE_AI_1',document:w.__PCMS_AI_DOCUMENT_1,chatDigest:await digest(),idle:idle(),queueEmpty:!queue.children.length,receipt:r??null};};
+  const observation=async()=>{const r=receipts.get(request.operationId);if(r&&((r.action==='NEW_CHAT'&&r.clickOrdinal!==clicks.newChat)||(r.action==='SEND'&&r.clickOrdinal!==clicks.send)))return hold('AI_MANUAL_MESSAGE_CHANGED');const reset=resetNodes.get(request.operationId);if(r?.action==='NEW_CHAT'&&!r.complete&&reset?.hadSession&&!sid()&&idle()&&messages.textContent.trim()===greeting&&messages.firstChild!==reset.beforeNode){r.complete=true;r.fresh=true;}if(r?.action==='SEND'&&!r.complete&&sid()&&input.value===''){r.complete=true;r.chatDigest=await digest();}return {ok:true,source:'PERCHANCE_NATIVE_AI_1',document:w.__PCMS_AI_DOCUMENT_1,chatDigest:await digest(),idle:idle(),queueEmpty:!queue.children.length,receipt:r??null};};
   if(request.action==='OBSERVE')return observation();
   if(previous)return previous.complete?observation():hold('AI_EFFECT_UNKNOWN');
   if(!['NEW_CHAT','SEND'].includes(request.action)||!idle()||w.__saveInFlight!==false||w.__pendingCheckpointNote)return hold('AI_NOT_IDLE',true);
@@ -22,14 +26,13 @@ export async function nativeAi(request){
   if(request.action==='NEW_CHAT'){
    if(fresh.disabled)return hold('AI_NEW_CHAT_UNAVAILABLE',true);
    const beforeSid=sid(),beforeNode=messages.firstChild;
-   receipts.set(request.operationId,{action:'NEW_CHAT',complete:false});clicked=true;fresh.click();
+   resetNodes.set(request.operationId,{beforeNode,hadSession:!!beforeSid});receipts.set(request.operationId,{action:'NEW_CHAT',complete:false,clickOrdinal:clicks.newChat+1});clicked=true;fresh.click();
    await new Promise(resolve=>setTimeout(resolve,0));
-   const greeting='👋 I can edit the code and test it live. Ask me to build, change or test something.';
    if(sid()||!idle()||messages.textContent.trim()!==greeting||messages.firstChild===beforeNode||!beforeSid)return hold('AI_FRESH_CHAT_UNVERIFIED');
-   receipts.set(request.operationId,{action:'NEW_CHAT',complete:true,fresh:true});return observation();
+   receipts.set(request.operationId,{action:'NEW_CHAT',complete:true,fresh:true,clickOrdinal:clicks.newChat});return observation();
   }
   const reset=receipts.get(request.newChatOperationId);
-  if(!reset?.complete||!reset.fresh||sid()||send.disabled)return hold('AI_FRESH_CHAT_LOST',true);
+  if(!reset?.complete||!reset.fresh||reset.clickOrdinal!==clicks.newChat||sid()||send.disabled)return hold('AI_FRESH_CHAT_LOST',true);
   // Captured native send() trims and may prefix SW notices. Do not knowingly
   // dispatch altered text, or normalize CRLF through a textarea silently.
   if(typeof request.text!=='string'||request.text!==request.text.trim()||!request.text)return hold('AI_NATIVE_PROMPT_TRANSFORMATION',true);
@@ -37,7 +40,7 @@ export async function nativeAi(request){
   if(await hash(request.text)!==request.promptHash)return hold('AI_PROMPT_HASH',true);
   input.value=request.text;input.dispatchEvent(new Event('input',{bubbles:true}));
   if(input.value!==request.text||await hash(input.value)!==request.promptHash||!idle()||sid()||send.disabled)return hold('AI_INPUT_CHANGED',true);
-  receipts.set(request.operationId,{action:'SEND',complete:false,promptHash:request.promptHash,exactInput:true});clicked=true;send.click();
+  receipts.set(request.operationId,{action:'SEND',complete:false,clickOrdinal:clicks.send+1,promptHash:request.promptHash,exactInput:true});clicked=true;send.click();
   await new Promise(resolve=>setTimeout(resolve,0));
   return observation();
  }catch{return hold(clicked?'AI_EFFECT_UNKNOWN':'AI_NATIVE_CONTRACT',!clicked);}
