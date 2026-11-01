@@ -14,10 +14,13 @@ from git_https_fixture import TOKEN,declaration
 
 class Provider(account_fixture.Provider):
  def do_POST(self):
-  if self.path not in ['/api/checkGeneratorOwnership','/api/getGeneratorPageData']:return super().do_POST()
+  if self.path not in ['/api/checkGeneratorOwnership','/api/getGeneratorPageData','/api/getGeneratorsByUser']:return super().do_POST()
   f=self.server.fixture;body=self.body();slug=body.get('generatorName')
   with f.lock:
-   user=f.logins.get(self.route);valid=user and body.get('email')==user['email'] and body.get('sessionToken')==user['sessionToken'];f.ownership_reads.append({'path':self.path,'slug':slug,'routeId':self.route,'valid':bool(valid)})
+   user=f.logins.get(self.route);valid=user and body.get('email')==user['email'] and body.get('sessionToken')==user['sessionToken']
+   if self.path=='/api/getGeneratorsByUser':
+    f.reads.append({'routeId':self.route,'valid':bool(valid)});names=['remote-sentinel']+(['existing-sentinel'] if valid and user['email']=='second@fixture.test' else []);return self.send({'status':'success','generators':[{'name':n,'isPrivate':True} for n in names],'generatorFolderMap':{}} if valid else {'status':'session-token-error'})
+   f.ownership_reads.append({'path':self.path,'slug':slug,'routeId':self.route,'valid':bool(valid)})
    if self.path=='/api/checkGeneratorOwnership':
     if not valid:return self.send({'status':'session-token-error'})
     if slug=='pending-unknown' and user['email']=='first@fixture.test':return self.send({'status':'incomplete-inventory'})
@@ -55,6 +58,7 @@ def main():
    # Background intake/adoption completes without the dashboard; no direct Core writes.
    wait(lambda:len(provider.ownership_reads)>=7,60);toolbar(sid);dashboard(sid);s=wait(lambda:next((v for v in [inspect_creator(sid)] if len(v['rows'])==3 and all(g.get('creatorState') in ['OWNED','RESERVED'] for g in v['rows'])),None),60);owned=next(g for g in s['rows'] if g['slug']=='existing-sentinel');assert owned['accountId']==second and owned['remoteId']=='public_owned-stable-17' and owned['listing']=='UNLISTED' and owned['markerStatus']=='NOT_READY';assert next(j for j in s['jobs'] if j['id']==owned['creatorJobId'])['state']=='COMPLETE';assert len([r for r in provider.ownership_reads if r['slug']=='existing-sentinel' and r['path']=='/api/checkGeneratorOwnership'])==3
    detail(sid,'existing-sentinel');assert 'owned-stable-17' in script(sid,"return document.getElementById('creator-facts').textContent");assert 'UNLISTED' in script(sid,"return document.getElementById('creator-facts').textContent");assert script(sid,"return document.getElementById('creator-override').hidden")
+   click(sid,'#creator-detail a[href="#work/'+owned['creatorJobId']+'"]');wait(lambda:script(sid,"return !!document.getElementById('creator-work-generator')"));click(sid,'#creator-work-generator');wait(lambda:script(sid,"return document.getElementById('creator-facts')?.textContent.includes('owned-stable-17')"))
    receipt['checks'].append('actual-valid-NOT_READY-Git-intake/closed-dashboard/remote-managed-owner-absent-locally/fresh-confirmed-stable-ID/adoption/no-source-or-listing-change')
    detail(sid,'pending-unknown');wait(lambda:'Account reserved' in script(sid,"return document.getElementById('creator-state').textContent"));assert 'UNKNOWN' in script(sid,"return document.getElementById('creator-observations').textContent");pending=target(sid,'pending-unknown');jobid=pending['creatorJobId'];old=pending['allocation']['accountId'];selected=first if old==second else second
    click(sid,'#creator-account option[value="'+selected+'"]');click(sid,'nav a[href="#home"]');detail(sid,'pending-unknown');assert script(sid,"return document.getElementById('creator-account').value")==selected;click(sid,'#creator-override');wait(lambda:'saved' in script(sid,"return document.getElementById('creator-result').textContent").lower());pending=target(sid,'pending-unknown');assert pending['allocation']['accountId']==selected and pending['creatorJobId']==jobid;epoch=pending['allocation']['epoch'];assert not pending.get('remoteId')

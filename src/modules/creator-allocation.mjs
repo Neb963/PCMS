@@ -13,11 +13,12 @@ function target(c){
  check(g.creatorJobId===job.id,'CREATOR_TARGET_SCOPE');
  check(!g.writerHold,'CREATOR_SOURCE_BUSY');
 }
-export function accountLoads(generators,exclude=null){
- const loads=new Map();
- const add=id=>{if(id)loads.set(id,(loads.get(id)??0)+1);};
- for(const g of generators){if(g.remoteId&&g.accountId)add(g.accountId);if(g.id!==exclude&&g.allocation?.state==='RESERVED')add(g.allocation.accountId);}
- return loads;
+export function accountLoads(generators,exclude=null,observations=[],accounts=[],now=Date.now()){
+ const owned=new Map(),pending=new Map();
+ const set=id=>{if(!owned.has(id))owned.set(id,new Set());return owned.get(id);};
+ for(const p of observations){const a=accounts.find(a=>a.id===p.accountId),v=p.inventory;if(a&&a.rev===p.accountRevision&&a.expectedPrincipal===p.principalFingerprint&&v?.source==='PERCHANCE_AUTHENTICATED_INVENTORY'&&Array.isArray(v.slugs)&&v.slugs.every(n=>nativeSlug(n)===n)&&new Set(v.slugs).size===v.slugs.length&&Number.isFinite(v.observedAt)&&v.observedAt<=now&&now-v.observedAt<=60000)for(const slug of v.slugs)set(a.id).add(slug);}
+ for(const g of generators){if(g.remoteId&&g.accountId)set(g.accountId).add(g.slug);if(g.id!==exclude&&g.allocation?.state==='RESERVED')pending.set(g.allocation.accountId,(pending.get(g.allocation.accountId)??0)+1);}
+ const loads=new Map([...owned].map(([id,slugs])=>[id,slugs.size]));for(const [id,count]of pending)loads.set(id,(loads.get(id)??0)+count);return loads;
 }
 export function reserveCreator(core,job,{accountId=null,requestId=null}={}){
  const command=requestId?{id:'creator-override:'+requestId,signature:JSON.stringify([job.id,accountId])}:null;
@@ -25,7 +26,7 @@ export function reserveCreator(core,job,{accountId=null,requestId=null}={}){
   target(c);const {generator:g,job:current,accounts,generators,now}=c;
   check(!g.remoteId,'CREATOR_ALREADY_OWNED');check(!creationDispatched(current),'CREATOR_ALREADY_DISPATCHED');
   if(g.allocation?.state==='RESERVED'&&!accountId){check(g.allocation.jobId===current.id,'CREATOR_RESERVATION_CONFLICT');return {generator:{...g,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,accountId:g.allocation.accountId,creator:{...current.creator,phase:'RESERVED'},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:'KEEP_CREATOR_RESERVATION',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:g.allocation.accountId}};}
-  const loads=accountLoads(generators,g.id),candidates=accounts.filter(eligibleAccount).sort((a,b)=>(loads.get(a.id)??0)-(loads.get(b.id)??0)||(a.id<b.id?-1:a.id>b.id?1:0));
+  const loads=accountLoads(generators,g.id,current.creator?.observations??[],accounts,now),candidates=accounts.filter(eligibleAccount).sort((a,b)=>(loads.get(a.id)??0)-(loads.get(b.id)??0)||(a.id<b.id?-1:a.id>b.id?1:0));
   const selected=accountId?candidates.find(a=>a.id===accountId):candidates[0];check(selected,'CREATOR_NO_ELIGIBLE_ACCOUNT');
   const allocation={state:'RESERVED',jobId:current.id,accountId:selected.id,reservedAt:g.allocation?.reservedAt??now,updatedAt:now,override:accountId!==null,epoch:(g.allocation?.epoch??0)+1};
   return {generator:{...g,allocation,allocationAccountId:selected.id,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,ownerMissing:false,accountId:selected.id,creator:{...current.creator,phase:'RESERVED'},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:accountId?'OVERRIDE_CREATOR_ACCOUNT':'RESERVE_CREATOR_ACCOUNT',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:selected.id}};

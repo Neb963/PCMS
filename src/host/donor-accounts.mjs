@@ -341,10 +341,10 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   const ready=await prerequisites();if(!ready.ok)return {state:'UNKNOWN',code:ready.code};const protectedNow=await protectedProfile(scope);if(protectedNow.code)return {state:'UNKNOWN',code:protectedNow.code};
   const matches=await ownedTabs(scope),selected=matches.find(x=>x.tab.id===scope.tabId)??(matches.length===1?matches[0]:null);if(!selected)return {state:'UNKNOWN',code:matches.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING'};
   const tab=selected.tab,target={tabId:tab.id,frameIds:[0]},run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target,world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('ACCOUNT_DOCUMENT_CHANGED');return rows[0].result;};
-  try{const witness=await run(accountDocumentWitness),identity=await run(observePerchanceIdentity,[witness]);if(!identity?.ok||identity.principalFingerprint!==scope.expectedPrincipal)return {state:'UNKNOWN',code:identity?.code??'ACCOUNT_PRINCIPAL_CHANGED'};
+  try{const witness=await run(accountDocumentWitness),identity=await run(observePerchanceIdentity,[witness,{inventory:true}]);if(!identity?.ok||identity.principalFingerprint!==scope.expectedPrincipal)return {state:'UNKNOWN',code:identity?.code??'ACCOUNT_PRINCIPAL_CHANGED'};
    const result=await run(observePerchanceOwnership,[{slug,principalFingerprint:scope.expectedPrincipal,documentWitness:witness}]),after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);
    if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url||final.code)return {state:'UNKNOWN',code:final.code??'ACCOUNT_DOCUMENT_CHANGED'};
-   return result;
+   return {...result,...identity.inventory?{inventory:identity.inventory}:{}};
   }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
  }
  return Object.freeze({observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
