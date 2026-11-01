@@ -1,43 +1,19 @@
 # Current work
 
-**P30 — portable archive codec and coverage validation. Plan before implementation.**
+**P30 implemented and verified; merge/postmerge checkpoint next, then P31.**
 
-P01–P18/P28/P29 merged and verified. P29 [PR21](https://github.com/Neb963/PCMS/pull/21), main `d630a968f4ad54c1a4b9424536dddc2d7036f5d3`, exact tree `4d17e0399c61e5bedc0fa11688e54d7783df922e`; post41312348086 PASS (focused and installed). Source691261f3d233b30f7981819f6b8e7dda8b07b800:237 T/build/S+B41311633995; XPIa1b23ac73e122614a04a1b7f5283fcf6dd1b13041faf1db824946dd922ceb371. P19 and descendants retain their independent native-revision evidence hold.
+P30 PR22 source4aa752e9dfa918b1f5650416dcb3a41090c9983c/treecb1ad039282866900de3f241af7862cc3968faa2:35T/build41315775854 PASS, XPId045844d48f8792d64c0a4005c2dc6595af5d2e4f07baf0d2f5ce307c6dd8faf (769022bytes). [PR22](https://github.com/Neb963/PCMS/pull/22). Exact source parent/tree/files/ref verified remotely. Required T uses actual P29 immutable cuts, exact full snapshot equality, 20MiB+25 binary/history, direct module ZIP reopens, independent Python CRC/size/SHA/manifest/forced ZIP64, required credentials/auth/closure/schema/COMPLETE and adversarial unsafe/duplicate/encrypted/method/symlink/split/bounds/corruption/interruption/budget checks. Private chunk streams reject corrupt/missing chunks. Failed intermediate runs remain failed.
 
-## P30 implementation plan
+The packaged maintained zip.js2.24.0/noble-hashes2.4.0 codecs use native streams, exact lockfile integrities and packaged licenses under the existing CSP. Default ZIP64 is automatic; the bounded fixture explicitly forces real ZIP64 structures. Encoding and strict full readback grant no download, restore or live operational authority. Resource limits are explicit and failures leave the immutable cut/prior backup untouched.
 
-1. Encode a qualified immutable P29 cut as one standard unencrypted, credential-inclusive, self-contained ZIP. Keep record sections versioned NDJSON/JSON, direct exact module ZIPs and source/history binary entries, narrow auth/cookie sections, donor state, credentials, manifest and COMPLETE marker. Record prerequisites, individual capture times, coverage, runtime-authority exclusions and Journal range/gaps. No disk success or restore writes in this phase.
-2. Package a maintained ZIP64-capable codec, pinning exact release/integrity/license. The official zip.js v2.24.0 release/source supports streaming and ZIP64; use its native-stream entry/configuration compatible with existing extension CSP. Do not enable unsafe evaluation, native processes or remote codec URLs. Resolve public npm metadata through the existing Actions environment if local/browser metadata tools remain unavailable.
-3. Use bounded byte streams/Blobs and incremental SHA-256 for entries/output, with an established packaged hash implementation rather than a new crypto algorithm. Add only the necessary private Core chunk reader so archive encoding does not require one giant binary/base64 JSON buffer. Preserve exact source bytes and file names inside the captured manifests.
-4. Before declaring complete, validate required fields/sections, immutable package/blob/reference closure, configured credential presence, entry SHA-256/length, manifest digest and completion count. Decode with CRC and ZIP bounds/duplicate/unsafe-path/encryption/split/compatibility checks before exposing a valid archive. A checksum is integrity, not authenticity; no password/encryption/signature program.
-5. Any incomplete cut, missing credential/package/blob, corrupt entry, unsafe/duplicate path, malformed bounds, incompatible schema, resource/quota error or interrupted encoding stays incomplete and retains the cut/previous usable backup. Do not infer success from a Blob or parser ACK.
-6. Required evidence is focused production codec T/build: independent expected bytes and independent ZIP reader, round-trip, full source/history/binary/package/auth/secret fidelity, required-section/closure faults, CRC/SHA/manifest corruption, duplicate/traversal/incompatibility and bounded large/binary plus actual forced ZIP64 structures. Reuse P29's unchanged native/UI B and its source/XPI identity. P31 alone supplies manual Settings export/B/DSK; P32–P34 restore. Select only required tests in CI; no broad browser/provider rerun for this codec-only phase.
-7. Push meaningful exact remote code+todo checkpoints, verify parents/trees/files, record actual results, merge a lightweight verified PR and verify postmerge main, then automatically continue P31 and remaining eligible work.
+P29 native/UI boundary is unchanged and reuses237T/S/B41311633995, source691261f3d233b30f7981819f6b8e7dda8b07b800, XPIa1b23ac73e122614a04a1b7f5283fcf6dd1b13041faf1db824946dd922ceb371; merged maind630a968f4ad54c1a4b9424536dddc2d7036f5d3/tree4d17e0399c61e5bedc0fa11688e54d7783df922e, post41312348086 PASS. No browser/download/restore evidence is claimed for P30, whose required tier is focused production-code T/build.
 
-## Holds and evidence limits
+## Next eligible work
 
-Local execution and the connected browser metadata page were unavailable; GitHub reads/writes/Actions work. Public registry metadata is not a live provider operation. No unavailable local check is claimed.
+Merge the verified P30 lightweight PR and verify exact postmerge main/tree/CI. Then write P31's actual-repository implementation plan here before code. P31 connects the production codec to Core Downloads with real Settings Back up now, durable unique receipts/last-good preservation, exact recovery, Pause/Journal-disabled/Backup-Disable admission and targeted B/DSK independent production disk reopen. P32–P34 follow their dependencies; P36 remains independent.
 
-P19: pinned accessible Alpha app.saveGenerator lacks a qualified provider revision/precondition recipe. Accepted Discovery ZIP cannot be extracted while local execution is unavailable; P18 sourceStamp/providerRevision:null is not CAS. P20–P27/P35/P37/P38 and descendants remain blocked. P36 is independent after eligible Backup work.
+## Holds
 
-H/G/P1–P5 NOT TESTED/unauthorized; P42–P49 need named disposable resources/effects. P48 validates actual login inventory/portability and P49 real50-account resources. Synthetic bytes/scale never establish operational login/route/fleet readiness.
+P19 remains genuinely held: accessible pinned Alpha app.saveGenerator has no qualified provider revision/precondition recipe; accepted Discovery ZIP cannot be extracted without the unavailable local runtime. SourceStamp/providerRevision:null is not CAS. P20–P27/P35/P37/P38 and descendants await that native contract. Local execution unavailable; GitHub exact leased checkpoints and Actions operate. No unavailable local check is claimed.
 
-## Dependency/CI checkpoint
-
-Official upstream sources establish zip.js2.24.0 and noble-hashes2.4.0. The existing focused Actions job now reads their public npm version/integrity metadata, checks module/package invariants and builds. The unchanged P29 installed journey is reused from41311633995 and postmerge41312348086; it is not rerun for codec-only work. P30 implementation/required codec tests remain pending. The temporary metadata command will be removed after exact lockfile resolution.
-
-## Streaming foundation checkpoint
-
-Pinned zip.js2.24.0/noble-hashes2.4.0 to exact public npm integrity metadata from41313142839; no transitive dependencies. Removed the temporary metadata command. Added incremental SHA-256 and a fixed-dataset private Core chunk reader that checks every byte/hash without materializing a whole blob. The build packages native-stream ZIP/hash code and licenses under existing CSP, with no new permission or remote runtime URL. Required new focused tests/codec remain pending.
-
-## Codec checkpoint
-
-Implemented versioned section/coverage/closure validation, streamed direct binary ZIP64 encoding, full production self-read (strict ZIP/CRC/SHA/manifest/COMPLETE and embedded module compatibility), immutable re-read handles and resource/cancellation diagnostics. Added independent Python ZIP round-trip and adversarial rewriting tests, 20MiB exact binary/history, forced actual ZIP64 structures and private chunk corruption tests. Focused Actions verification is pending; no P30 completion or disk evidence is claimed. The codec changes no live Core records or source pins.
-
-First codec run41315393006 failed on a multiline Python fixture string syntax error; the independent chunk/capture/package checks passed16/16. Corrected the fixture quoting. Upstream writer source also confirms explicit zip64:false forbids promotion; ordinary encoding now leaves that option unset so streams and >4GiB entries promote automatically, while the focused small fixture explicitly exercises ZIP64. Required codec evidence remains pending.
-
-Run41315470579 exposed a fixture admission mistake: Pause was entered before Backup registered its maintenance policy, so no capture job was selected. The fixture now uses production Backup.initialize before Pause, preserving the real scheduler contract. Added explicit settings/unfinished-job compatibility validation. No failed run is counted as codec evidence.
-
-Run41315534147 passed adversarial archive/CRC/cancellation checks but exact whole-cut comparison exposed an extra derived Journal count in decoded data. Removed that reconstruction artifact to preserve the original logical snapshot exactly; added incompatible module/job negatives. Required round-trip/build evidence remains pending.
-
-Run41315646250 passed the 20MiB exact whole-cut round-trip, independent Python ZIP64/CRC/digest checks, binary/module reopens, all focused negatives and build. Final closure review adds semantic source-manifest child checks plus explicit unsupported encryption/method/symlink/split/bounds and missing-marker tests for this maintained reader. These final affected checks must pass before merge.
+H/G/P1–P5 NOT TESTED/unauthorized; P42–P49 require named disposable targets/effects. P48 qualifies real auth/login portability; P49 real fleet resources. Synthetic PASS is never operational route/login acceptance. Continue safely eligible work automatically.

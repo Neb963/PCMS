@@ -1,3 +1,5 @@
+P30 PR22 source4aa752e9dfa918b1f5650416dcb3a41090c9983c/treecb1ad039282866900de3f241af7862cc3968faa2:35T/build41315775854 PASS, XPId045844d48f8792d64c0a4005c2dc6595af5d2e4f07baf0d2f5ce307c6dd8faf (769022bytes). Required focused production codec complete; no disk/restore yet. Merge/postverify next, then P31. Maintained native-stream ZIP64+incremental SHA, exact full cut/binary/module validation; P29 native/UI evidence reused unchanged.
+
 # PCMS handoff memory
 
 **Non-authoritative.** Read accepted v42, design revision2, PHASES, todo and CI guidelines. Keep authority files unchanged. User requires continuous sequential work through all safely eligible phases; no phase-stop confirmation.
