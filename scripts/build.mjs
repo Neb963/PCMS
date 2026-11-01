@@ -77,7 +77,7 @@ export async function build(output=path.join(ROOT,'build')) {
   await cp(path.join(ROOT,'vendor/personamonkey/LICENSE'),path.join(stage,'licenses/PersonaMonkey-MIT.txt'));
   const manifest=JSON.parse(await readFile(path.join(donor,'manifest.json'),'utf8'));
   if(manifest.browser_specific_settings.gecko.id!==ID)throw Error('GECKO_ID_CHANGED');
-  manifest.name='PCMS';manifest.version='0.18.0';
+  manifest.name='PCMS';manifest.version='0.18.1';
   manifest.description='Perchance account and generator management with integrated PersonaMonkey protection.';
   manifest.browser_specific_settings.gecko.strict_min_version='154.0';
   manifest.background={scripts:['host/entry.mjs'],type:'module'};

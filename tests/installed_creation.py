@@ -35,7 +35,7 @@ class Provider(account_fixture.Provider):
     if f.hide=='RENAME' and name==f.active_slug:return self.send({'status':'server-error'})
     return self.send({'status':'success','generator':f.model[name]} if name in f.model else {'status':'generator-does-not-exist'})
    if endpoint=='save':
-    g=b.get('generator');assert b.get('srcManifest')==[] and g['name']=='minimal' and g['isPrivate'] is True and g['modelText']=='' and g['outputTemplate']=='';f.created+=1;name='temporary-created-'+str(f.created);value={**g,'name':name,'publicId':'created-stable-'+str(f.created),'srcManifest':[]};f.model[name]=value;f.owned.add(name);f.writes.append({'kind':'CREATE','name':name,'remoteId':value['publicId'],'target':f.active_slug,'routeId':self.route});response={'status':'created','name':name};kind='CREATE'
+    g=b.get('generator');assert set(g)=={'name','isPrivate','modelText','outputTemplate'};assert b.get('srcManifest')==[] and g['name']=='minimal' and g['isPrivate'] is True and g['modelText']=='' and g['outputTemplate']=='';f.created+=1;name='temporary-created-'+str(f.created);value={**g,'name':name,'publicId':'created-stable-'+str(f.created),'srcManifest':[]};f.model[name]=value;f.owned.add(name);f.writes.append({'kind':'CREATE','name':name,'remoteId':value['publicId'],'target':f.active_slug,'routeId':self.route});response={'status':'created','name':name};kind='CREATE'
     if f.ambiguous:
      other='temporary-created-unrelated';f.model[other]={**value,'name':other,'publicId':'unrelated-concurrent-id'};f.owned.add(other)
    else:

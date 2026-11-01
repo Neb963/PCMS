@@ -23,7 +23,7 @@ export async function observePerchanceCreation(request){
   if(!Array.isArray(request.before)||!request.before.every(slug)||new Set(request.before).size!==request.before.length||request.sourceFingerprint!==sourceFingerprint)return hold('CREATOR_PREPARATION_INVALID');
   if(request.kind==='CREATE'){
    const t=await template();if(!hex(request.templateFingerprint)||t.fingerprint!==request.templateFingerprint||JSON.stringify(names)!==JSON.stringify([...request.before].sort())||names.includes(request.slug)||request.wire!=='perchance-private-empty-1/array')return {...hold('CREATOR_PREPARATION_CHANGED'),noDispatch:true};
-   const result=await call('save',{generator:{...t.generator,name:'minimal',isPrivate:true,modelText:'',outputTemplate:''},srcManifest:[]},true,true);
+   const result=await call('save',{generator:{name:'minimal',isPrivate:true,modelText:'',outputTemplate:''},srcManifest:[]},true,true);
    if(result?.status!=='created'||!slug(result.name))return hold('CREATOR_CREATE_ACK_UNKNOWN');return {...base,ok:true,ack:'CREATED',temporarySlug:result.name};
   }
   if(request.kind==='READ_CREATE'){
