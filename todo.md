@@ -1,26 +1,18 @@
 # Current implementation checkpoint
 
-## P22 — Publication, Refresh Pool and DONE
+## P23 — DEVELOP instruction staging
 
-P21 merged PR28 as6db6939ce938efd088db7fc48be9f7140207754a, tree4b0379afbd19c5912d0cdcc01ba63b21012eecf1, identical to verified6a2d6fac. [41351214740](https://github.com/Neb963/PCMS/actions/runs/41351214740) T/build+B PASS (local107 focused tests; hosted adds unchanged host/package checks). Firefox155.0/build20260817142839/sandbox6; XPI3a185e7dd5288c72583f5c17094cf561c1dafdfddab7792f35fa2c5a9d0f18a3,832331bytes. Real packaged catalog/native complete-source/deletion/binary save and process-death recovery had exactly one unlist and one source save. Git stayed read-only. P20 PR27/evidence remains in history.
+P22 merged [PR29](https://github.com/Neb963/PCMS/pull/29) as a8a7a3b4ded082eba432edffa6fdc643b581f917; tree176595e0aba86153d7e203928433573ce643aa93 equals verified9c2156e1. [41352857908](https://github.com/Neb963/PCMS/actions/runs/41352857908):187T/build+B PASS. Firefox155.0/build20260817142839/sandbox6; tested XPI3eb47f201a33a285efdd97d01270626e4d6313d0e2fd170dc0b3e1ccc3c07516 (834073bytes). Independent fixture proved full DEPLOY, source/listing/pool/DONE, exactly3 native saves/1 Git ref, publication interruption and Git response loss with two forced restarts, no replay and intact unrelated files. Earlier failures/fixes remain in learned.md and Git history.
 
 ### Plan before implementation
 
-Base actual main6db6939c; branch p22-publication-pool-done. Preserve the accepted specification/design and prior phases.
+Base actual main a8a7a3b4; branch p23-develop-staging. Preserve P20–P22 and P28–P33.
 
-- Recheck the same READY identity and exact independently saved candidate. Use the shared guarded native save for a distinct listing-only PUBLIC effect. Verify complete source, owner and listing from the protected provider, never public-page availability alone.
-- Add/upsert Refresh Pool membership atomically with the publication/source receipt. Preserve an existing cycle; a new member starts pending for P35. Do not republish to repair a local pool transaction.
-- Use the existing scoped Git writer for a separate matching-version DONE commit/readback. Recheck admission/relevant READY inputs before each Git effect. Preserve root instructions/unrelated files, and retain Published — Git completion pending after denial/loss.
-- Reconcile possible publication/Git effects before any retry; only known rejected Git writes may safely rebuild the same logical operation. Complete/release the generator writer only after all receipts are verified.
-- Wire honest Generators/Work states and same-job Check. Test failures at publication/pool/DONE, withdrawal, duplicate completion, cold recovery and no READY loop. Targeted installed B independently checks source/listing/pool and bare Git history; restart after publication must not publish again.
-- Push/verify checkpoints, merge after required T/B, verify postmerge main, then continue to P23 automatically. Live G/P2 remains NOT TESTED/unauthorized until P43/P45.
+- Resume prepared DEVELOP on its existing job/writer. Recheck immutable four distinct root inputs, current READY/owner, full admitted unlisted source and every editor.
+- Compose a complete candidate from the saved baseline, replacing only src/specification.md, src/ui.md and src/agents.md with exact original bytes. Preserve roots and every other asset. Do not stage prompt.md automatically.
+- Use the shared guarded source writer with its own STAGE operation/purpose. Retain original previous-good, unlist and staging receipts. Recover preparation gaps/readback without restaging an uncertain save.
+- Show verified staging/contextual held state in Generators/Work. No AI chat/send or publication in this phase.
+- Focused production T covers distinct Unicode/newline instructions, existing binary assets, changed Git roots, dirty/conflicting edits, interruption/restart and original-file preservation. Targeted installed B drives real automatic DEVELOP intake through the native save, kills Firefox after staging application/before ACK, and independently checks every byte and untouched Git originals.
+- Push/verify checkpoints; merge after required T/B, verify main, then continue P24. Existing transport probes are accepted and are not rerun. Live P3 remains NOT TESTED/unauthorized until P46.
 
-Publication/pool/DONE continuation, distinct prepared-operation recovery and same-job contextual status are implemented. 39 selected Deployer/Git production T PASS, including denied DONE access followed by corrected Git-only completion, lost publication response, pool transaction failure, source drift, version withdrawal, update/cycle preservation and preparation crash gaps. Required installed B remains pending. Existing CI jobs/triggers are unchanged; only the targeted journey/test selection changes for the affected source/Git boundary.
-
-Checkpoint ffcd4d3/PR29: local141 focused T/build PASS. Installed B pending. The implementation now keeps same-job Source Check in the Deployer workflow when Git is uncertain, rather than misrouting that Git effect to the source reconciler. Shared source adoption stays unavailable for automatic deployment jobs; their immutable READY inputs remain authoritative.
-
-Installed [41351907805](https://github.com/Neb963/PCMS/actions/runs/41351907805) FAIL: after actual publication and process death, the original operation was verified without replay, but account-hook recovery left the Deployer job RUNNING at POOL. No pool/DONE occurred. Fixed the out-of-band finite-step handoff to persist WAITING; a direct recovery/queue-state regression covers it. This run remains FAIL.
-
-Installed [41352333898](https://github.com/Neb963/PCMS/actions/runs/41352333898) FAIL at the final completion assertion. Its independently reopened artifact shows three native saves, one Git ref write, exact source/public/pool/DONE and successful read-only recovery across both restarts. The assertion exposed a transient COMPLETE-before-writer-release gap. Final completion now clears its own writer in the same atomic Core transaction; lost local ACK cannot resurrect completion. The new regression passes. Failed evidence remains FAIL; required final B is still open.
-
-Final recovery review: UI same-operation Check now persists WAITING after readback too. Work's Git Check routes through Deployer; generic Git readback cannot promote a failed effect into a known object if its caller changed FAILED to HELD. New production regressions cover these paths. Native/Git uncertainty is still never replayed.
+Exact three-file candidate composition, same-job STAGE save/readback, prepared-operation recovery and contextual UI are implemented. Focused T/build and required installed B are in progress. CI retains its existing two jobs/triggers and replaces only the affected journey with installed_develop_stage.py; unchanged source/Git invariants stay selected.

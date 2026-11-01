@@ -1,5 +1,6 @@
 import {requireCore as check,publicError,sha256} from '../core/records.mjs';
 import {eligibleAccount} from './creator-allocation.mjs';
+import {stageInstructions} from './develop-staging.mjs';
 import {compareSources} from '../core/source-set.mjs';
 const id='pcms-deployer',scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal,tabId:a.tabId});
 const terminal=j=>['COMPLETE','FAILED'].includes(j.state);
@@ -16,7 +17,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
  async function validate(j,{fresh=true}={}){
   const g=await core.read('generators',j.targetId);check(g?.deploymentJobId===j.id&&g.repositoryId===j.deployment.repositoryId&&g.folder===j.deployment.folder,'DEPLOYMENT_TARGET_CHANGED');
   if(!fresh){check(g.folderPresent==='YES'&&g.markerStatus==='READY','READY_WITHDRAWN');check(g.markerVersion===j.deployment.version&&g.markerAction===j.kind,'READY_CHANGED');return g;}
-  const observed=await inputs(g,{fresh:true});try{check(observed.status==='READY','READY_WITHDRAWN');check(observed.version===j.deployment.version&&observed.action===j.kind,'READY_CHANGED');check(observed.inputHash===j.deployment.inputHash,'VERSION_REUSED');}finally{await core.releasePin(observed.pinId);}return g;
+  const observed=await inputs(g,{fresh:true});try{check(observed.status==='READY','READY_WITHDRAWN');check(observed.version===j.deployment.version&&observed.action===j.kind,'READY_CHANGED');check(observed.inputHash===j.deployment.inputHash,'VERSION_REUSED');check(observed.manifestId===j.deployment.inputManifest,'PINNED_INPUT_CHANGED');}finally{await core.releasePin(observed.pinId);}return g;
  }
  const hasEffects=j=>j.effect?.boundary==='POSSIBLE'||j.effects?.length>0||j.deployment?.acceptance||j.save;
  async function initialize(){
@@ -25,14 +26,14 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
    const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);
-   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING','PUBLICATION_PENDING'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
+   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING','PUBLICATION_PENDING','DEVELOP_STAGING_PENDING'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
    let pinned;try{pinned=await inputs(g);}catch(error){const code=error.code??publicError(error);if(g.deploymentCode!==code)await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentState:'HELD',deploymentCode:code}}],{moduleId:id,targetId:g.id,step:'READ_READY_INPUTS',result:'HELD',code});continue;}
    try{
     const prior=jobs.find(j=>j.targetId===g.id&&j.deployment.version===pinned.version);
     if(prior){
      if(prior.kind!==pinned.action||prior.deployment.inputHash!==pinned.inputHash){if(!terminal(prior))await hold(prior,'VERSION_REUSED');else if(g.deploymentCode!=='VERSION_REUSED')await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentCode:'VERSION_REUSED',deploymentState:'HELD'}}],event(prior,'REJECT_REUSED_VERSION','HELD'));}
      else if(prior.deployment.lastCheckedFolderTreeSha!==g.folderTreeSha){await save(prior,{deployment:{...prior.deployment,lastCheckedFolderTreeSha:g.folderTreeSha}},'VERIFY_UNCHANGED_READY_INPUTS');}
-     else if(!terminal(prior)&&prior.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING','PUBLICATION_PENDING'].includes(prior.recovery?.code)&&prior.effect?.boundary!=='POSSIBLE')await core.queue.transition(prior.id,prior.rev,{state:'WAITING',dueAt:clock(),recovery:null});
+     else if(!terminal(prior)&&prior.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING','PUBLICATION_PENDING','DEVELOP_STAGING_PENDING'].includes(prior.recovery?.code)&&prior.effect?.boundary!=='POSSIBLE')await core.queue.transition(prior.id,prior.rev,{state:'WAITING',dueAt:clock(),recovery:null});
      continue;
     }
     const active=jobs.find(j=>j.targetId===g.id&&!terminal(j));
@@ -52,6 +53,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
    }
    const m=await module();check(enabled(m)&&m.generation===j.generation,'STALE_GENERATION');check(!j.runtimeInvalidated,'RESTORED_WORK_REVIEW_REQUIRED');
    if((j.save?.purpose==='DEPLOY'||j.save?.purpose==null&&j.save?.candidateManifest===j.deployment.inputManifest&&j.save?.targetListing==null)&&j.deployment.phase==='PREPARED')j=await save(j,{deployment:{...j.deployment,phase:'DEPLOY_SAVE'}},'RECOVER_PREPARED_SOURCE');
+   if(j.save?.purpose==='STAGE'&&j.deployment.phase==='PREPARED')j=await save(j,{deployment:{...j.deployment,phase:'STAGE'}},'RECOVER_PREPARED_STAGING');
    if(j.save?.purpose==='PUBLISH'&&j.deployment.phase==='SAVED')j=await save(j,{deployment:{...j.deployment,phase:'PUBLISH'}},'RECOVER_PREPARED_PUBLICATION');
    const g=j.deployment.phase==='DONE'?await core.read('generators',j.targetId):await validate(j,{fresh:j.deployment.phase!=='WAIT_CREATOR'});
    if(j.deployment.phase==='WAIT_CREATOR'){
@@ -77,7 +79,15 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
     j=await save(j,{deployment:{...j.deployment,phase:'PREPARED',unlistReceipt:j.save.receipt}},'VERIFY_UNLIST_BEFORE_EDIT',{deploymentState:'PREPARED',deploymentCode:null});return output(j,'CONTINUE');
    }
    if(j.deployment.phase==='PREPARED'){
-    if(j.kind==='DEVELOP')return hold(j,'DEVELOP_STAGING_PENDING');
+    if(j.kind==='DEVELOP'){
+     const baseline=await writer.capture(j);let candidate;
+     try{
+      check(baseline.manifestId===g.sourceManifest&&baseline.sourceStamp===g.sourceStamp&&baseline.listing==='UNLISTED','SOURCE_REMOTE_CONFLICT');
+      candidate=await stageInstructions(core,baseline.manifestId,j.deployment.inputManifest);
+      j=await writer.prepareJob(j,{candidateManifest:candidate.manifestId,baseline,purpose:'STAGE'});
+      j=await save(j,{deployment:{...j.deployment,phase:'STAGE'}},'PREPARE_DEVELOP_INSTRUCTIONS',{deploymentState:'STAGE',deploymentCode:null});
+     }finally{if(candidate)await core.releasePin(candidate.pinId);await core.releasePin(baseline.pinId);}return output(j,'CONTINUE');
+    }
     const baseline=await writer.capture(j);try{
      if(baseline.manifestId!==g.sourceManifest||baseline.sourceStamp!==g.sourceStamp||baseline.listing!=='UNLISTED'){
       j=await save(j,{deployment:{...j.deployment,conflict:baseline}},'RETAIN_DEPLOYMENT_SOURCE_CONFLICT',null,baseline.refs);check(false,'SOURCE_REMOTE_CONFLICT');
@@ -86,6 +96,12 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
      j=await save(j,{deployment:{...j.deployment,phase:'DEPLOY_SAVE'}},'PREPARE_PINNED_DEPLOY_SOURCE',{deploymentState:'DEPLOY_SAVE',deploymentCode:null});
     }finally{await core.releasePin(baseline.pinId);}return output(j,'CONTINUE');
    }
+   if(j.deployment.phase==='STAGE'){
+    if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
+    check(j.kind==='DEVELOP'&&j.save.purpose==='STAGE','DEVELOP_STAGE_SCOPE');
+    j=await save(j,{deployment:{...j.deployment,phase:'STAGED',stageReceipt:j.save.receipt}},'VERIFY_DEVELOP_INSTRUCTIONS',{deploymentState:'STAGED',deploymentCode:null});return output(j,'CONTINUE');
+   }
+   if(j.deployment.phase==='STAGED')return hold(j,'AI_CHAT_PENDING');
    if(j.deployment.phase==='DEPLOY_SAVE'){
     if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
     j=await save(j,{deployment:{...j.deployment,phase:'SAVED',sourceReceipt:j.save.receipt}},'VERIFY_PINNED_DEPLOY_SOURCE',{deploymentState:'SAVED_PUBLICATION_PENDING',deploymentCode:null});return output(j,'CONTINUE');
