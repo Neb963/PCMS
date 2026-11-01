@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {cpus,totalmem} from 'node:os';
 import {sha256} from '../src/core/records.mjs';
 import {createBackupCapture} from '../src/modules/backup-capture.mjs';
-import {seeded} from './capture-cut.test.mjs';
+import {seeded} from './capture-fixture.mjs';
 const event={step:'FIXTURE_FULL_CAPTURE',result:'COMPLETE'};
 async function fixture(t,count=2){
  const {c}=await seeded(t);let calls=0,mode='good',hook=null,bootId='donor-fixture-boot';const watches=new Map();
@@ -24,7 +24,7 @@ test('full capture joins private donor/auth sections, immutable Core bytes and p
  await f.c.saveView('later',{draft:'later source'},crypto.randomUUID());assert.equal(await f.c.credentials.get(job.fullCapture.receipt.credentialId),raw);f.mode('unavailable');await f.s.enqueue({requestId:'failed'});await f.drain();state=await f.s.status();assert.equal(state.current.complete,false);assert.equal(state.lastGood.jobId,first.jobId);assert.equal(state.lastGood.stale,true);assert.equal((await f.c.queue.status()).paused,true);
 });
 test('changed or lost session provenance is bounded and never substituted by cached equal auth bytes',async t=>{
- for(const mode of ['rotate','lost']){const f=await fixture(t);await f.s.enqueue({requestId:mode});await f.turn();await f.turn();await f.turn();if(mode==='lost')f.lose();else f.mode('rotate');await f.drain();const s=await f.s.status();if(mode==='lost')assert.equal(s.current.complete,true);else{assert.equal(s.current.complete,false);assert.equal(s.current.code,'AUTH_SESSION_CHANGED');assert.equal(f.calls,6);}}
+ for(const mode of ['rotate','lost']){const f=await fixture(t);await f.s.enqueue({requestId:mode});await f.turn();await f.turn();await f.turn();if(mode==='lost')f.lose();else f.mode('rotate');await f.drain();const s=await f.s.status();if(mode==='lost'){assert.equal(s.current.complete,true);assert.equal(f.calls,4);}else{assert.equal(s.current.complete,false);assert.equal(s.current.code,'AUTH_SESSION_CHANGED');assert.equal(f.calls,6);}}
 });
 test('donor revision change after Core cut discards only this candidate and leaves Core usable',async t=>{
  const f=await fixture(t);f.mode('donor-change');const j=await f.s.enqueue({requestId:'donor-race'});await f.drain();const s=await f.s.status();assert.equal(s.current.complete,false);assert.equal(s.current.code,'CAPTURE_DONOR_CHANGED');assert.equal(await f.c.credentials.get('capture-cut-'+j.jobId+'-0'),null);await f.c.saveView('after',{kept:true},crypto.randomUUID());assert.equal((await f.c.view('after')).kept,true);

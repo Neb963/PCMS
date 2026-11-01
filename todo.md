@@ -37,3 +37,7 @@ Backup0.3 adds explicit compatible capture capability and STAGE/CHECK/CUT/BLOBS 
 ## Focused capture verification checkpoint
 
 Added production Core-cut tests for exact drafts/credentials/source/history, old export-payload exclusion, configured-secret/package/reference/account failures and write usability after abort. Added finite full-capture T for private donor/auth sections, previous-good, bounded lost/rotating witnesses, donor post-cut invalidation and 50-participant S measurements while unrelated Core writes progress. These tests are written but not yet run.
+
+## Capture UI checkpoint
+
+Settings → Backup now has actual Prepare capture / Check capture controls, finite phase progress, checked Core/donor revisions, byte/reference/barrier counts, exact missing-account links and previous-complete preservation. Capture readiness explicitly says no backup file was exported. The existing session-coverage controls remain separate and operational; old Backup packages require compatible update for the new capability. Required installed full-capture B is not yet added/passed.
