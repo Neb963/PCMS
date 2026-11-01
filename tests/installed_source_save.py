@@ -4,7 +4,7 @@ All routes and services terminate in the disposable local fixture.
 """
 from installed_source import Provider as ReadProvider,source_state,completed_source,editor,SLUG,HUMAN
 from installed_creator import session15,detail
-from installed_accounts import add,settle,login
+from installed_accounts import add,settle,login,inspect as inspect_accounts
 from installed_lifecycle import permission_choice
 from installed_journal import set_input,close_dashboard
 from installed_git_catalog import connections
@@ -118,7 +118,7 @@ def main():
   except Exception as error:
    receipt['error']=str(error)
    if sid:
-    try:dashboard(sid);receipt['page']=script(sid,"return document.body.innerText");receipt['state']=save_state(sid);(OUT/'p19-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
+    try:toolbar(sid);dashboard(sid);receipt['accounts']=[{'id':a['id'],'state':a['state'],'code':a.get('holdCode'),'stage':a.get('flow',{}).get('stage'),'work':a.get('work')} for a in inspect_accounts(sid)['accounts']];receipt['page']=script(sid,"return document.body.innerText");receipt['state']=save_state(sid);(OUT/'p19-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise
   finally:
