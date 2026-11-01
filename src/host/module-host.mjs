@@ -29,7 +29,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(binding.mode==='validate')throw Error('VALIDATION_READ_ONLY');
   const active=await current(binding),operation=m.operation,args=m.args??{};
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
-  const discoverPageCall=['discover.list','discover.get','discover.import','discover.command','discover.export','discover.check'].includes(args.name);
+  const discoverPageCall=['discover.list','discover.get','discover.import','discover.command','discover.export','discover.check','discover.preparations','discover.retryPreparation','discover.navigate'].includes(args.name);
   const discoverCall=['discover.step','discover.status'].includes(args.name);
   const gitCall=['github.prepareFolder','github.prepareFolderStatus'].includes(args.name);
   const accountCall=['accounts.step','accounts.status'].includes(args.name);
@@ -38,7 +38,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
   if(discoverPageCall){
    if(binding.mode!=='page'||active.id!=='pcms-discover'||!discoverPage||(['discover.list','discover.get'].includes(args.name)?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
-   const result=await discoverPage(args.name,args);if(operation==='action'){void turn().catch(()=>{});await onDue();}return result;
+   const result=await discoverPage(args.name,args);if(args.name==='discover.navigate')notify({type:'navigateTarget',token:binding.channel,route:result.route});if(operation==='action'){void turn().catch(()=>{});await onDue();}return result;
   }
   if(discoverCall){
    if(binding.mode!=='background'||!binding.jobId||active.id!=='pcms-discover'||!discoverEffect||(args.name==='discover.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');

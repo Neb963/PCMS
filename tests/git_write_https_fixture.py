@@ -1,7 +1,7 @@
 """Independent GitHub-shaped HTTPS fixture backed by real Git plumbing.
 Every object/ref stays in a disposable bare repository. No external remotes.
 """
-import base64,datetime,hashlib,http.server,json,os,pathlib,re,socket,ssl,subprocess,sys,threading,uuid
+import base64,datetime,hashlib,http.server,json,os,pathlib,re,socket,ssl,subprocess,sys,threading,uuid,time
 from urllib.parse import urlsplit
 from git_https_fixture import GitFixture,TOKEN,declaration
 SHA=re.compile(r'^[a-f0-9]{40}$')
@@ -65,6 +65,9 @@ def serve(root,nonce,port):
    return url.path.removeprefix(prefix),url.query
   def do_GET(self):
    if self.path=='/__pcms_shutdown/'+nonce:threading.Thread(target=self.server.shutdown,daemon=True).start();return self.send({'stopped':True})
+   if self.headers.get('Host')=='api.mullvad.net' and self.path=='/network/v1-beta1/socks-proxies' and (root/'fixture-socks-catalog.json').exists():
+    with open(root/'fixture-catalog-requests.jsonl','a') as log:log.write('GET fixed SOCKS catalog\n')
+    return self.send(json.loads((root/'fixture-socks-catalog.json').read_text()))
    scope=self.request_scope()
    if scope is None:return self.send({},404)
    path,query=scope
@@ -95,7 +98,7 @@ def serve(root,nonce,port):
      body={'sha':sha,'truncated':False,'tree':walk(sha) if query=='recursive=1' else tree(root,sha)}
     else:
      body=commit(root,sha);controls=json.loads((root/'git-write-controls.json').read_text())
-     if controls['hide_applied_commits'] and 'PCMS-Operation:' in body['message'] and ancestor(root,sha,head(root)):self.record(path,404);return self.send({},404)
+     if controls['hide_applied_commits'] and (not controls.get('hiddenCommit') or controls['hiddenCommit']==sha) and 'PCMS-Operation:' in body['message'] and ancestor(root,sha,head(root)):self.record(path,404);return self.send({},404)
     self.record(path,200);return self.send(body)
   def do_POST(self):self.write_effect()
   def do_PATCH(self):self.write_effect()
@@ -129,7 +132,7 @@ def serve(root,nonce,port):
      if moved.returncode:self.record(path,422,{'force':False,'sha':sha});return self.send({},422)
      status=200
      if controls['lose_applied_ref']:
-      update_controls(root,{'lose_applied_ref':False});self.record(path,status,{'lost':True,'lossBoundary':'RESPONSE_BODY','force':False,'sha':sha});self.close_connection=True
+      update_controls(root,{'lose_applied_ref':False,**({'hide_applied_commits':True,'hiddenCommit':sha} if controls.get('hide_lost_commit') else {})});self.record(path,status,{'lost':True,'lossBoundary':'RESPONSE_BODY','force':False,'sha':sha});self.close_connection=True
       # Begin a valid HTTP response, then lose its application receipt body.
       # A zero-byte disconnect can be transparently retried by the HTTP stack.
       self.send_response(200);self.send_header('Content-Type','application/json');self.send_header('Content-Length','512');self.send_header('Connection','close');self.end_headers();self.wfile.write(b'{\"ref\":');self.wfile.flush()
@@ -137,6 +140,11 @@ def serve(root,nonce,port):
       except OSError:pass
       self.connection.close();return
     else:self.record(path,403);return self.send({},403)
+    if kind=='blobs' and json.loads((root/'git-write-controls.json').read_text()).get('hold_blob_reply'):
+     update_controls(root,{'hold_blob_reply':False,'blob_waiting':sha});self.record(path,status,{'sha':sha,'heldReply':True})
+     until=time.time()+8
+     while time.time()<until and not json.loads((root/'git-write-controls.json').read_text()).get('release_blob_reply'):time.sleep(.05)
+     return self.send({'sha':sha},status)
     self.record(path,status,{'sha':sha,**({'force':False} if kind=='refs/heads/main' else {})});return self.send({'ref':'refs/heads/main','object':{'type':'commit','sha':sha}} if kind=='refs/heads/main' else {'sha':sha},status)
  context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);context.load_cert_chain(str(root/'git-server.pem'),str(root/'git-server.key'));context.set_alpn_protocols(['http/1.1'])
  with http.server.ThreadingHTTPServer(('127.0.0.1',int(port)),Handler) as server:

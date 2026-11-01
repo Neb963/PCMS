@@ -20,7 +20,8 @@ export async function openModulePage({core,moduleId,pageId,container,onError}) {
  window.addEventListener('message',listener);
  const stop=event=>{if(event.detail?.token===channel)iframe.contentWindow.postMessage({type:'STOP',channel,generation:descriptor.generation,callId:crypto.randomUUID()},'*');};
  window.addEventListener('pcms-module-stop',stop);
+ const navigate=event=>{if(!disposed&&event.detail?.token===channel)location.hash=event.detail.route;};window.addEventListener('pcms-module-navigate',navigate);
  iframe.onload=()=>iframe.contentWindow.postMessage({type:'INIT',channel,document:descriptor.document,mode:'page',script:descriptor.script,html:descriptor.html,css:descriptor.css},'*');container.append(iframe);
  const timeout=setTimeout(()=>{if(!ready&&!disposed)onError('MODULE_START_TIMEOUT');},10000);
- const dispose=()=>{if(disposed)return;disposed=true;clearTimeout(timeout);window.removeEventListener('message',listener);window.removeEventListener('pcms-module-stop',stop);iframe.remove();void core('module.close',{token:descriptor.token});};return dispose;
+ const dispose=()=>{if(disposed)return;disposed=true;clearTimeout(timeout);window.removeEventListener('message',listener);window.removeEventListener('pcms-module-stop',stop);window.removeEventListener('pcms-module-navigate',navigate);iframe.remove();void core('module.close',{token:descriptor.token});};return dispose;
 }
