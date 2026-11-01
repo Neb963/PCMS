@@ -43,6 +43,13 @@ const discover=`PCMS.defineModule({
  outcome(result){if(result.state==='COMPLETE')return {kind:'complete'};if(['READY','WAITING'].includes(result.state))return {kind:'wait',dueAt:result.dueAt||Date.now()};return {kind:'hold',reason:result.code||'DISCOVER_NEEDS_ATTENTION',recovery:{action:'OPEN_DISCOVER'}};},
  stop(){}
 });\n`;
+const source=`PCMS.defineModule({
+ start(){},
+ async runStep(job,api){return this.outcome(await api.action({name:'source.step'}));},
+ async reconcile(job,api){return this.outcome(await api.query({name:'source.status'}));},
+ outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{generatorId:result.generatorId}};if(result.state==='WAITING')return {kind:'wait',dueAt:result.dueAt};if(result.state==='CONTINUE')return {kind:'checkpoint',checkpoint:{phase:result.phase}};return {kind:'hold',reason:result.code||'SOURCE_NEEDS_ATTENTION',recovery:{action:'OPEN_SOURCE'}};},
+ stop(){}
+});\n`;
 const creator=`PCMS.defineModule({
  start(){},
  async runStep(job,api){return this.outcome(await api.action({name:'creator.step'}));},
@@ -52,7 +59,7 @@ const creator=`PCMS.defineModule({
 });\n`;
 const stamp=new Date('1980-01-01T00:00:00.000Z');
 export function bundledPackage(id,name){
- const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:id==='pcms-creator'?creator:pending);
+ const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:id==='pcms-creator'?creator:id==='pcms-deployer'?source:pending);
  const manifest={format:1,id,name,version:definition.version,coreApi:1,jobSchema:1,
   readsJobSchemas:[1],capabilities:[...definition.capabilities],entries:{background:'background.js'},
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};

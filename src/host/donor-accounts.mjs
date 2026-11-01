@@ -4,6 +4,7 @@
 import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
+import {observeSavedSource,observeNativeEditor} from '../modules/source-observations.mjs';
 import {observePerchanceCreation} from '../modules/creation-observations.mjs';
 import {observePerchanceOwnership} from '../modules/ownership-observations.mjs';
 const PERCHANCE='https://perchance.org/';
@@ -338,6 +339,30 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    await api.sessions.setTabValue(tab.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});
   }catch{}
  }
+ async function sourceRead(scope,request){
+  const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);
+  const owned=await ownedTabs(scope),tabs=await api.tabs.query({cookieStoreId:scope.containerId}),tab=owned.find(x=>x.tab.id===scope.tabId)?.tab??owned[0]?.tab??tabs.find(t=>t.url===PERCHANCE+request.slug+'#edit');if(!tab)return fail('SOURCE_CONTEXT_MISSING');
+  const run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('ACCOUNT_DOCUMENT_CHANGED');return rows[0].result;};
+  try{const witness=await run(accountDocumentWitness),result=await run(observeSavedSource,[{...request,principalFingerprint:scope.expectedPrincipal,documentWitness:witness}]),after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url||final.code)return fail(final.code??'ACCOUNT_DOCUMENT_CHANGED');return result;}catch{return fail('SOURCE_CONTEXT_UNKNOWN');}
+ }
+ async function openSourceEditor(scope,{slug,remoteId,tabId=null}){
+  if(nativeSlug(slug)!==slug||!/^public_[A-Za-z0-9_-]{1,100}$/.test(remoteId??''))return fail('SOURCE_REQUEST_INVALID');const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);
+  const url=PERCHANCE+slug+'#edit',tabs=await api.tabs.query({cookieStoreId:scope.containerId}),selected=tabs.find(t=>t.url===url&&(tabId===null||t.id===tabId));if(tabId!==null&&!selected)return fail('EDITOR_DOCUMENT_MISSING');if(selected){await api.tabs.update(selected.id,{active:true});await api.windows.update(selected.windowId,{focused:true});return {ok:true,tabId:selected.id};}
+  const tab=await personaPlatform.open(scope.containerId,url,true);await api.sessions.setTabValue(tab.id,'pcmsSourceEditor',{accountId:scope.accountId,slug,remoteId});return {ok:true,tabId:tab.id};
+ }
+ async function inspectSourceEditors(scope,{slug,remoteId}){
+  const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);const tabs=await api.tabs.query({cookieStoreId:scope.containerId}),editors=[];
+  for(const tab of tabs){let url;try{url=new URL(tab.url);}catch{continue;}if(url.origin!=='https://perchance.org'||url.pathname!=='/'+slug||url.hash!=='#edit')continue;
+   if(url.search){editors.push({tabId:tab.id,ok:false,code:'EDITOR_URL_UNSUPPORTED'});continue;}
+   const run=async(func,args=[],world='ISOLATED')=>{const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world,func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('EDITOR_DOCUMENT_CHANGED');return rows[0].result;};
+   try{const witness=await run(accountDocumentWitness),identity=await run(observePerchanceIdentity,[witness]);if(!identity?.ok||identity.principalFingerprint!==scope.expectedPrincipal){editors.push({tabId:tab.id,ok:false,code:'ACCOUNT_PRINCIPAL_CHANGED'});continue;}
+    const observation=await run(observeNativeEditor,[{slug,remoteId}],'MAIN'),after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);editors.push(witness===after&&current.cookieStoreId===scope.containerId&&current.url===tab.url&&!final.code?{...observation,tabId:tab.id,witness}:{ok:false,code:final.code??'EDITOR_DOCUMENT_CHANGED',tabId:tab.id});
+   }catch{editors.push({tabId:tab.id,ok:false,code:'EDITOR_OBSERVATION_UNKNOWN'});}
+  }
+  // A second tab opened during inspection cannot be silently called clean.
+  const after=await api.tabs.query({cookieStoreId:scope.containerId}),beforeIds=tabs.filter(t=>t.url===PERCHANCE+slug+'#edit').map(t=>t.id).sort(),afterIds=after.filter(t=>t.url===PERCHANCE+slug+'#edit').map(t=>t.id).sort();if(JSON.stringify(beforeIds)!==JSON.stringify(afterIds))return fail('EDITOR_SET_CHANGED');
+  return {ok:true,source:'PCMS_EDITOR_DOCUMENT_SET_1',slug,remoteId,principalFingerprint:scope.expectedPrincipal,editors,observedAt:Date.now()};
+ }
  async function creation(scope,request){
   const ready=await prerequisites();if(!ready.ok)return {ok:false,code:ready.code,noDispatch:true};const found=await protectedProfile(scope);if(found.code)return {ok:false,code:found.code,noDispatch:true};
   const matches=await ownedTabs(scope),selected=matches.find(x=>x.tab.id===scope.tabId)??(matches.length===1?matches[0]:null);if(!selected)return {ok:false,code:matches.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING',noDispatch:true};
@@ -363,5 +388,5 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    return {...result,...identity.inventory?{inventory:identity.inventory}:{}};
   }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
  }
- return Object.freeze({creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ return Object.freeze({sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }
