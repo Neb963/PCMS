@@ -20,3 +20,8 @@ test('route planning selects only its imported route through existing state muta
 test('owned blank contexts reuse their exact operation tag; unknown untagged tabs hold instead of duplicate allocation',async()=>{
  const f=fixture();const first=await f.service.openBlank(f.scope,{operationId:'blank'},async()=>true),again=await f.service.openBlank(f.scope,{operationId:'blank'},async()=>true);assert.equal(first.tabId,again.tabId);assert.equal(f.opens(),1);f.tags.clear();assert.equal((await f.service.observeBlank(f.scope,{operationId:'blank'})).code,'RESTORE_CONTEXT_INSPECTION_REQUIRED');assert.equal(f.opens(),1);
 });
+
+test('logical account and Persona IDs remain independent while exact native ownership is checked',async()=>{
+ const f=fixture();f.scope.accountId='independent-account';f.profile.pcmsAccountId=f.scope.accountId;assert.equal((await f.service.target(f.scope)).profile.personaUid,f.scope.personaUid);
+ await assert.rejects(f.service.target({...f.scope,personaUid:'aaaaaaaa-1234-4234-8234-123456789abc'}),e=>e.code==='RESTORE_CONTEXT_CHANGED');
+});

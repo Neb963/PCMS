@@ -1,17 +1,23 @@
 import {requireCore as check} from '../core/records.mjs';
-import {same} from '../core/backup-format.mjs';
+import {same,canonical} from '../core/backup-format.mjs';
 import {restoreCookiePlan,restoredCookieReadback} from '../modules/restore-import.mjs';
 const direct=new Set(['direct','block','__direct__','__block__']);
-const identity=c=>JSON.stringify([c.domain,c.path,c.name,c.firstPartyDomain,c.partitionKey]);
+const identity=c=>canonical([c.domain,c.path,c.name,c.firstPartyDomain,c.partitionKey]);
 export function createRestoreParticipants({api,bound,patch,prerequisites,preparePersona,checkBinding,protectedProfile,personaPlatform,cookieService,localMutationFence,currentTest,bootstrap}){
  async function target(scope){
-  check(typeof scope?.restoreId==='string'&&/^[a-f0-9-]{36}$/i.test(scope.restoreId)&&typeof scope.accountId==='string'&&scope.accountId===scope.personaUid&&typeof scope.containerId==='string'&&typeof scope.routeId==='string'&&scope.routeId.startsWith('route-import-'+scope.restoreId+'-')&&!direct.has(scope.routeId),'RESTORE_PARTICIPANT_SCOPE');
+  check(typeof scope?.restoreId==='string'&&/^[a-f0-9-]{36}$/i.test(scope.restoreId)&&typeof scope.accountId==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,199}$/.test(scope.accountId)&&typeof scope.personaUid==='string'&&/^[a-f0-9-]{36}$/i.test(scope.personaUid)&&typeof scope.containerId==='string'&&typeof scope.routeId==='string'&&scope.routeId.startsWith('route-import-'+scope.restoreId+'-')&&!direct.has(scope.routeId),'RESTORE_PARTICIPANT_SCOPE');
   const found=await bound(scope);check(!found.code,found.code??'RESTORE_CONTEXT_CHANGED');const p=found.profile;
   check(p?.managed&&p.pcmsAccountId===scope.accountId&&p.personaUid===scope.personaUid&&p.containerId===scope.containerId&&p.killSwitch===true&&p.blockLocalNetwork===true,'RESTORE_CONTEXT_CHANGED');return found;
  }
  const op=(p,operationId,stage)=>p.pcmsOperation?.operationId===operationId&&p.pcmsOperation.stage===stage?p.pcmsOperation:null;
  async function ready(scope){const r=await prerequisites();check(r?.ok,r?.code??'RESTORE_PREREQUISITE_MISSING');return target(scope);}
  async function active(scope){await ready(scope);const found=await protectedProfile(scope);check(!found.code,found.code??'RESTORE_ROUTE_RECHECK_REQUIRED');return found;}
+ async function observeBlank(scope,{operationId}){
+   const {profile:p}=await target(scope),known=op(p,operationId,'RESTORE_BLANK'),tabs=await api.tabs.query({cookieStoreId:scope.containerId}),matches=[];
+   for(const tab of tabs){const tag=await api.sessions.getTabValue(tab.id,'pcmsRestoreTab');if(tag?.restoreId===scope.restoreId&&tag.accountId===scope.accountId&&tag.personaUid===scope.personaUid&&tag.operationId===operationId)matches.push(tab);}
+   if(matches.length!==1||known?.tabId!=null&&matches[0].id!==known.tabId)return {ok:false,before:!known&&!tabs.length,code:matches.length>1?'RESTORE_CONTEXT_AMBIGUOUS':tabs.length?'RESTORE_CONTEXT_INSPECTION_REQUIRED':'RESTORE_CONTEXT_UNKNOWN'};
+   return {ok:true,operationId,tabId:matches[0].id};
+  }
  return {
   target,
   async planRoute(scope,{operationId},validNow){
@@ -35,18 +41,13 @@ export function createRestoreParticipants({api,bound,patch,prerequisites,prepare
   async observeCookie(scope,{cookie}){await target(scope);const plan=restoreCookiePlan([cookie]);if(plan.expired)return {ok:true,expired:true};const prior=(await cookieService.list(scope.containerId)).find(c=>identity(c)===identity(cookie));return prior&&same(prior,cookie)?{ok:true}:{ok:false,before:!prior,code:prior?'RESTORE_COOKIE_CHANGED':'RESTORE_COOKIE_UNCONFIRMED'};},
   async cookies(scope,{expected}){await target(scope);return restoredCookieReadback(expected,await cookieService.list(scope.containerId));},
   async openBlank(scope,{operationId},validNow){
-   const {profile:p}=await target(scope),known=op(p,operationId,'RESTORE_BLANK');if(known)return this.observeBlank(scope,{operationId});
+   const {profile:p}=await target(scope),known=op(p,operationId,'RESTORE_BLANK');if(known)return observeBlank(scope,{operationId});
    const tabs=await api.tabs.query({cookieStoreId:scope.containerId});check(!tabs.length,'RESTORE_CONTEXT_INSPECTION_REQUIRED');check(await validNow(),'RESTORE_INTERRUPTED');
    await patch(scope,{pcmsOperation:{operationId,stage:'RESTORE_BLANK',phase:'POSSIBLE'}});
    const tab=await localMutationFence(scope.containerId,()=>personaPlatform.open(scope.containerId,'about:blank',false));await api.sessions.setTabValue(tab.id,'pcmsRestoreTab',{restoreId:scope.restoreId,accountId:scope.accountId,personaUid:scope.personaUid,operationId});
    await patch(scope,{pcmsOperation:{operationId,stage:'RESTORE_BLANK',phase:'COMPLETE',tabId:tab.id}});return {ok:true,operationId,tabId:tab.id};
   },
-  async observeBlank(scope,{operationId}){
-   const {profile:p}=await target(scope),known=op(p,operationId,'RESTORE_BLANK'),tabs=await api.tabs.query({cookieStoreId:scope.containerId}),matches=[];
-   for(const tab of tabs){const tag=await api.sessions.getTabValue(tab.id,'pcmsRestoreTab');if(tag?.restoreId===scope.restoreId&&tag.accountId===scope.accountId&&tag.personaUid===scope.personaUid&&tag.operationId===operationId)matches.push(tab);}
-   if(matches.length!==1||known?.tabId!=null&&matches[0].id!==known.tabId)return {ok:false,before:!known&&!tabs.length,code:matches.length>1?'RESTORE_CONTEXT_AMBIGUOUS':tabs.length?'RESTORE_CONTEXT_INSPECTION_REQUIRED':'RESTORE_CONTEXT_UNKNOWN'};
-   return {ok:true,operationId,tabId:matches[0].id};
-  },
+  observeBlank,
   async register(scope,{input},validNow){await active(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.arm(input,validNow);},
   async registration(scope,{input}){await target(scope);check(input.containerId===scope.containerId,'RESTORE_BOOTSTRAP_SCOPE');return bootstrap.registered(input);},
   async navigate(scope,{input},validNow){

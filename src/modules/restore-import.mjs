@@ -1,6 +1,6 @@
 import {requireCore as check,sha256} from '../core/records.mjs';
 import {checkedCookies} from './backup-session.mjs';
-import {same,plain} from '../core/backup-format.mjs';
+import {same,plain,canonical} from '../core/backup-format.mjs';
 const domain=value=>{
  check(typeof value==='string'&&value.length>0&&value===value.trim(),'RESTORE_COOKIE_DOMAIN');
  const host=value.replace(/^\./,'');let parsed;try{parsed=new URL('https://'+host+'/');}catch{}
@@ -10,7 +10,7 @@ export function restoreCookiePlan(cookies,now=Date.now()){
  const checked=checkedCookies(cookies);for(const c of checked){domain(c.domain);if(c.firstPartyDomain)domain(c.firstPartyDomain);}
  return {active:checked.filter(c=>c.session||c.expirationDate>now/1000),expired:checked.filter(c=>!c.session&&c.expirationDate<=now/1000).length};
 }
-const cookieKey=c=>JSON.stringify([c.domain,c.path,c.name,c.firstPartyDomain,c.partitionKey]);
+const cookieKey=c=>canonical([c.domain,c.path,c.name,c.firstPartyDomain,c.partitionKey]);
 export function restoredCookieReadback(expected,actual,now=Date.now()){
  const wanted=restoreCookiePlan(expected,now),seen=restoreCookiePlan(actual,now),a=new Map(wanted.active.map(c=>[cookieKey(c),c])),b=new Map(seen.active.map(c=>[cookieKey(c),c]));let missing=0,changed=0,extra=0;
  for(const [key,value]of a)if(!b.has(key))missing++;else if(!same(value,b.get(key)))changed++;

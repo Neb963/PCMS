@@ -9,3 +9,8 @@ test('a staged pin requires the current restore owner, exact fresh map and route
  }
  await refreshAccountPins(core);assert.equal(accountRouteAllowed(profile,{ok:false}),false);assert.equal(accountRouteAllowed({...profile,containerId:'firefox-container-90'},verified),false);closeAccountPins();
 });
+
+test('duplicate observed exits never grant either staged participant a route pin',async()=>{
+ const now=Date.now(),one={source:'RESTORE_ROUTE_1',coreBootId:'boot',personaUid:'u1',containerId:'firefox-container-8',routeId:'r1',exitAddresses:['IPv4:8.8.8.8'],observedAt:now},two={...one,personaUid:'u2',containerId:'firefox-container-9',routeId:'r2'},c={id:'r',jobId:'j',confirmedAt:now-1,mappings:[{accountId:'a',personaUid:'u1',destinationContainerId:one.containerId},{accountId:'b',personaUid:'u2',destinationContainerId:two.containerId}],participants:[{accountId:'a',routeProof:one},{accountId:'b',routeProof:two}]},m={enabled:true,generation:1,packageClass:'bundled-backup',manifest:{capabilities:['backup.restore']}},core={list:async()=>({rows:[]}),status:async()=>({restoreHold:{id:'r',jobId:'j'}}),restore:{read:async()=>c},read:async table=>table==='modules'?m:{moduleId:'pcms-backup',kind:'RESTORE',generation:1},queue:{status:async()=>({bootId:'boot'})}};
+ await refreshAccountPins(core);for(const [id,p]of [['a',one],['b',two]])assert.equal(accountRouteAllowed({pcmsAccountId:id,...p},{ok:true,data:{ip:'8.8.8.8'}}),false);closeAccountPins();
+});
