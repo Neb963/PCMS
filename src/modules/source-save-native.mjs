@@ -17,7 +17,7 @@ export async function observeSourceCheckpoint(request){
 
 export async function saveNativeSource(request){
  const hold=(code,extra={})=>({ok:false,code,...extra}),w=window;let dispatched=0,staged=false,ack=null,code=null;
- const fail=c=>{throw Object.assign(Error(c),{code:c});},ensure=(v,c)=>{if(!v)fail(c);},hash=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join(''),encode=new TextEncoder();
+ const fail=c=>{code=c;throw Object.assign(Error(c),{code:c});},ensure=(v,c)=>{if(!v)fail(c);},hash=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join(''),encode=new TextEncoder();
  let fetchOriginal,confirmOriginal,saveOriginal,model,html,src,menu;const options=[],listeners=[],linked=[];
  try{
   ensure(request?.schema===1&&typeof request.operationId==='string'&&Array.isArray(request.files)&&request.checkpoint,'SOURCE_SAVE_CONTRACT');
@@ -53,7 +53,7 @@ export async function saveNativeSource(request){
   // No retry/force escalation, even if native stale or CAPTCHA handling loops.
   w.fetch=async function(input,init){const url=new URL(typeof input==='string'?input:input.url,location.href);if(url.origin==='https://perchance.org'&&url.pathname==='/api/save'){
     ensure(dispatched===0,'SOURCE_REPEATED_SAVE_BLOCKED');ensure(linked.every(x=>x.doc.getValue()===x.value&&x.doc.isClean()===true),'EDITOR_DIRTY');ensure(contextSame()&&checkpointSame()&&solo()&&idle(),'SOURCE_FINAL_GATE_CHANGED');
-    const b=JSON.parse(init?.body);ensure(b.forceSaveDespiteStaleness===undefined&&b.editKey===undefined&&b.collabEditKey===undefined&&b.lastKnownSaveTime===request.checkpoint.time&&b.lastKnownSaveCount===request.checkpoint.saveCount,'SOURCE_PRECONDITION_CHANGED');
+    ensure(equivalent(await current(),candidate),'SOURCE_STAGED_CHANGED');const b=JSON.parse(init?.body);ensure(b.forceSaveDespiteStaleness===undefined&&b.editKey===undefined&&b.collabEditKey===undefined&&b.lastKnownSaveTime===request.checkpoint.time&&b.lastKnownSaveCount===request.checkpoint.saveCount,'SOURCE_PRECONDITION_CHANGED');
     ensure(b.email===user.email&&b.sessionToken===user.sessionToken&&b.generator?.name===request.slug&&b.generator.isPrivate===g.isPrivate&&b.generator.modelText===pjs&&b.generator.outputTemplate===template&&!Object.hasOwn(b.generator,'srcManifest')&&b.srcManifest&&typeof b.srcManifest==='object'&&!Array.isArray(b.srcManifest),'SOURCE_WIRE_CONTRACT');
     ensure(JSON.stringify(Object.keys(b.srcManifest).sort())===JSON.stringify([...expected.keys()].sort()),'SOURCE_MANIFEST_CHANGED');
     ensure(equivalent(await current(),candidate)&&contextSame()&&checkpointSame()&&solo()&&idle(),'SOURCE_STAGED_CHANGED');
