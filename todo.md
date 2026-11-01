@@ -29,3 +29,7 @@ Added the private all-store IDB capture cut and pinned reference closure. The na
 ## Donor provenance checkpoint
 
 Added private capture-scoped scoped-auth storage-event/document witnesses and cookie-change counters, fresh known guard/fingerprint checks, bounded witness lifetime and explicit loss on event-page restart. Full donor local/sync data is read under the existing state-manager admission lock/revision, with a managed-Persona census and no new native export service. The Core cut callback runs only after origin staging/revalidation; donor mutation or missing managed coverage invalidates it. Integration and verification pending.
+
+## Finite capture integration checkpoint
+
+Backup0.3 adds explicit compatible capture capability and STAGE/CHECK/CUT/BLOBS turns on the same queue. Staged secrets stay in scoped credentials; observed witnesses must survive revalidation, and restart/loss/rotation is bounded or incomplete. The donor-locked cut includes all logical Core data plus donor/auth sections; every pinned blob is independently length/hash checked outside the barrier before completion. Previous completed cuts remain available, and disabled work settles only its own read effects. Settings UI/tests remain pending.

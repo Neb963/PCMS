@@ -4,12 +4,13 @@ export function attachCaptureCut(core,{transact,root,checkedRefs,append,req,chec
  core.captureCut=options=>transact(stores,'readwrite',async s=>{
   const {captureId,guard,accounts=[],external={}}=options??{};
   check(typeof captureId==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(captureId),'INVALID_CAPTURE');
-  const startedAt=clock(),r=await root(s);await assertGuard(s,r,guard);
+  const startedAt=clock(),r=await root(s);check(guard?.moduleId==='pcms-backup','INVALID_GUARD');await assertGuard(s,r,guard);
   const credentialId='capture-cut-'+captureId,pinId=credentialId,prior=await req(s('credentials').get([r.dataset,credentialId]));
   if(prior?.captureData)return {credentialId,pinId,...prior.captureReceipt};
   const all=async store=>{const out=[];let c=await req(s(store).openCursor());while(c){if(c.value.dataset===r.dataset||Array.isArray(c.value.key)&&c.value.key[0]===r.dataset)out.push(structuredClone(c.value));c=await req(c.continue()||c.request);}return out;};
   const records={};for(const table of tables)records[table]=await all(table);
-  for(const expected of accounts){const a=records.accounts.find(a=>a.id===expected.id);check(a&&a.rev===expected.revision&&a.expectedPrincipal===expected.principalFingerprint&&a.personaUid===expected.personaUid&&a.containerId===expected.containerId,'CAPTURE_ACCOUNT_CHANGED');}
+  for(const expected of accounts){const a=records.accounts.find(a=>a.id===expected.id);check(a&&a.state==='READY'&&!a.admission&&a.rev===expected.revision&&a.expectedPrincipal===expected.principalFingerprint&&a.personaUid===expected.personaUid&&a.containerId===expected.containerId,'CAPTURE_ACCOUNT_CHANGED');}
+  check(records.accounts.filter(a=>a.personaUid).every(a=>accounts.some(e=>e.id===a.id&&e.personaUid===a.personaUid&&e.containerId===a.containerId)),'CAPTURE_AUTH_COVERAGE_MISSING');
   const versions=await all('versions'),pins=await all('pins'),views=await all('views'),commands=await all('commands'),credentials=await all('credentials'),events=await all('events');
   const downloadPayloads=new Set([...records.files,...versions.filter(v=>v.table==='files')].filter(f=>['journal','discover','backup'].includes(f.type)).map(f=>f.payloadId).filter(Boolean));
   const stripFile=f=>{const copy={...f,refs:(f.refs??[]).filter(id=>id!==f.payloadId)};if(copy.payloadId){delete copy.payloadId;copy.payloadAvailable=false;}return copy;};
@@ -33,4 +34,5 @@ export function attachCaptureCut(core,{transact,root,checkedRefs,append,req,chec
   await append(s,r,{moduleId:'pcms-backup',jobId:guard.jobId,step:'CAPTURE_CORE_CUT',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));
   return {credentialId,pinId,...receipt};
  });
+ core.releaseCaptureCut=captureId=>transact(['credentials','pins','events'],'readwrite',async s=>{const r=await root(s),key='capture-cut-'+captureId,row=await req(s('credentials').get([r.dataset,key]));if(row?.captureData)await req(s('credentials').delete([r.dataset,key]));await req(s('pins').delete([r.dataset,key]));await append(s,r,{moduleId:'pcms-backup',step:'RELEASE_CAPTURE_CUT',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));});
 }

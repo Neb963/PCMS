@@ -59,8 +59,8 @@ const creator=`PCMS.defineModule({
 });\n`;
 const backup=`PCMS.defineModule({
  start(){},
- async runStep(job,api){return this.outcome(await api.action({name:'backup.collect'}));},
- async reconcile(job,api){return this.outcome(await api.query({name:'backup.collectStatus'}));},
+ async runStep(job,api){return this.outcome(await api.action({name:job.input.coverageOnly?'backup.collect':'backup.capture'}));},
+ async reconcile(job,api){return this.outcome(await api.query({name:job.input.coverageOnly?'backup.collectStatus':'backup.captureStatus'}));},
  outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{captureId:result.captureId,coverageComplete:result.coverageComplete}};if(result.state==='CONTINUE')return {kind:'checkpoint',checkpoint:{captureId:result.captureId}};return {kind:'hold',reason:result.code||'BACKUP_COVERAGE_UNAVAILABLE',recovery:{action:'OPEN_BACKUP'}};},
  stop(){}
 });\n`;

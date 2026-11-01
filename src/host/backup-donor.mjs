@@ -8,7 +8,7 @@ export function createBackupDonor({api,stateManager,initialize,getState,protecte
  async function begin(scope,{captureId}){
   await initialize();for(const [watchId,w]of watches)if(w.captureId===captureId&&w.accountId===scope.accountId)await end({watchId});
   const first=await collectSession(scope);if(!first?.ok||!first.context)return first;
-  const w={id:crypto.randomUUID(),bootId,captureId,accountId:scope.accountId,containerId:scope.containerId,personaUid:scope.personaUid,context:first.context,cookieVersion:0,phase:'STAGING',startedAt:Date.now()};w.changed=e=>{if(e.cookie?.storeId===w.containerId)w.cookieVersion++;};api.cookies.onChanged.addListener(w.changed);watches.set(w.id,w);
+  const w={id:crypto.randomUUID(),bootId,captureId,accountId:scope.accountId,containerId:scope.containerId,personaUid:scope.personaUid,routeId:scope.routeId,context:first.context,cookieVersion:0,phase:'STAGING',startedAt:Date.now()};w.changed=e=>{if(e.cookie?.storeId===w.containerId)w.cookieVersion++;};api.cookies.onChanged.addListener(w.changed);watches.set(w.id,w);
   try{const initial=await run(w.context,{kind:'BEGIN',captureId});if(!initial?.ok)throw Error(initial?.code??'CAPTURE_WITNESS_LOST');
    const packet=await collectSession(scope),current=await run(w.context,{kind:'CHECK',captureId});if(!packet?.ok)throw Error(packet?.code??'AUTH_COLLECTION_UNAVAILABLE');
    if(packet.context?.witness!==w.context.witness||packet.context.tabId!==w.context.tabId||current?.ok!==true||current.version!==0||w.cookieVersion!==0||first.fingerprint!==packet.fingerprint)throw Error('AUTH_SESSION_CHANGED');
@@ -30,7 +30,7 @@ export function createBackupDonor({api,stateManager,initialize,getState,protecte
   return stateManager.withWorkflowAdmissionLock(async()=>{
    const startedAt=Date.now(),revision=stateManager.getRevision(),version=storageVersion,state=await getState(),local=await api.storage.local.get(null),sync=api.storage.sync?await api.storage.sync.get(null):{};
    const managed=Object.values(state.profiles??{}).filter(p=>p.managed);
-   if(managed.some(p=>!selected.some(w=>w.personaUid===p.personaUid&&w.containerId===p.containerId)))return hold('CAPTURE_PERSONA_COVERAGE_MISSING');
+   if(managed.some(p=>!selected.some(w=>w.personaUid===p.personaUid&&w.containerId===p.containerId&&w.routeId===p.routeId&&w.accountId===p.pcmsAccountId)))return hold('CAPTURE_PERSONA_COVERAGE_MISSING');
    if(version!==storageVersion||revision!==stateManager.getRevision()||selected.some(w=>w.cookieVersion!==0))return hold('CAPTURE_DONOR_CHANGED');
    const donor={format:1,bootId:stateManager.getBootId(),revision,storageVersion:version,startedAt,observedAt:Date.now(),state,storage:{local,sync},managedPersonas:managed.map(p=>({personaUid:p.personaUid,containerId:p.containerId,accountId:p.pcmsAccountId??null}))};
    const result=await capture(donor);
