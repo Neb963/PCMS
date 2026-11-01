@@ -1,0 +1,24 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {nativeFixture,initial} from './source-save-fixture.mjs';
+const candidate=()=>({'main.pjs':Buffer.from('new\r\n雪\n'),'index.html':Buffer.from('<!doctype html>\r\n<p>new</p>'),'src/keep.bin':Buffer.from([0,255,17,42]),'src/nested/change.txt':Buffer.from('after\r\n'),'src/new.bin':Buffer.from([0,1,2,255])});
+test('native full roots/multifile nested binary add/edit/delete exact bytes, top-level manifest and preserved undo/bookkeeping',async()=>{const f=await nativeFixture(),fetch=f.c.fetch,confirm=f.c.confirm,p=await f.save(candidate());assert.equal(p.ok,true,JSON.stringify(p));assert.equal(f.calls.length,1);assert.equal(f.version.saveCount,3);assert.deepEqual(f.files,candidate());assert.equal(f.listing,true);assert.equal(f.uploads.size,2);assert.equal(f.c.fetch,fetch);assert.equal(f.c.confirm,confirm);assert.equal(f.c.modelTextEditor.getDoc().history.length,1);assert.equal(f.c.generatorSaveCount,3);assert.equal(f.c.srcState.hasPending(),false);});
+test('zero src set deletes every old entry and preserves unlisted state',async()=>{const f=await nativeFixture(),want={'main.pjs':Buffer.from('empty src'),'index.html':Buffer.from('<p>only roots</p>')},p=await f.save(want);assert.equal(p.ok,true,JSON.stringify(p));assert.deepEqual(f.files,want);assert.deepEqual(f.calls[0].srcManifest,{});assert.equal(f.listing,true);});
+test('independent two-editor server race rejects stale exactly once, denies native force and keeps staged candidate/old undo',async()=>{const f=await nativeFixture();f.race();const p=await f.save(candidate());assert.equal(p.code,'SOURCE_STALE');assert.equal(f.calls.length,1);assert.equal(f.version.saveCount,3);assert.equal(f.files['main.pjs'].toString(),'external concurrent editor');assert.equal(f.c.modelTextEditor.getValue(),candidate()['main.pjs'].toString());assert.equal(f.c.modelTextEditor.getDoc().history[0],initial()['main.pjs'].toString());});
+for(const [name,change,code]of [
+ ['dirty manual document',f=>{f.c.modelTextEditor.getDoc().clean=false;},'EDITOR_DIRTY'],
+ ['dirty inactive AI document',f=>{f.c.modelTextEditor.getDoc().linked=[{isClean:()=>false}];},'EDITOR_DIRTY'],
+ ['pending files',f=>f.c.nativeControl.pending=true,'EDITOR_UNVERIFIED'],
+ ['collaboration',f=>f.c.yjsProvider={wsconnected:true},'EDITOR_UNVERIFIED'],
+ ['AI workspace',f=>f.c.nativeControl.workspace={preferWorkspace:{modelText:true}},'EDITOR_AI_PENDING'],
+ ['changed document',f=>f.checkpoint.document='changed','EDITOR_DOCUMENT_CHANGED'],
+ ['principal change',f=>f.storage.set('app-storage','{}'),'ACCOUNT_PRINCIPAL_CHANGED'],
+ ['native path rejection',()=>{},'SOURCE_NATIVE_PATH_UNSUPPORTED'],
+ ['native force attempt',f=>f.c.nativeControl.force=true,'SOURCE_PRECONDITION_CHANGED'],
+ ['nested manifest attempt',f=>f.c.nativeControl.nested=true,'SOURCE_WIRE_CONTRACT'],
+ ['upload failure',f=>f.c.nativeControl.uploadFail=true,'SOURCE_NATIVE_PREPARATION_FAILED'],
+])test(name+' never dispatches /api/save',async()=>{const f=await nativeFixture();change(f);const want=candidate();if(name==='native path rejection')want['src/_bad.txt']=Buffer.from('bad');const p=await f.save(want);assert.equal(p.code,code,JSON.stringify(p));assert.equal(f.calls.length,0);assert.equal(f.version.saveCount,2);assert.deepEqual(f.files,initial());assert.equal(f.c.modelTextEditor.getOption('readOnly'),false);});
+test('request fence refuses a native automatic retry after its first applied save',async()=>{const f=await nativeFixture();f.c.nativeControl.retry=true;const p=await f.save(candidate());assert.equal(f.calls.length,1);assert.equal(f.version.saveCount,3);assert.ok(p.ack?.status==='saved');});
+test('lost response and response-schema drift never fake native success',async()=>{for(const fault of ['lose','drift']){const f=await nativeFixture();f[fault]();const p=await f.save(candidate());assert.equal(p.ok,false);assert.equal(f.calls.length,1);assert.deepEqual(f.files,candidate());}});
+test('post-staging asynchronous human or AI changes never cross the native request boundary',async()=>{const f=await nativeFixture();f.c.nativeControl.beforeSubmit=async()=>{f.c.modelTextEditor.getDoc().text+='late human text';};const p=await f.save(candidate());assert.equal(p.code,'SOURCE_STAGED_CHANGED');assert.equal(f.calls.length,0);assert.deepEqual(f.files,initial());assert.ok(f.c.modelTextEditor.getValue().endsWith('late human text'));});
+test('native global public identity supports the observed save payload that omits publicId from generator metadata',async()=>{const f=await nativeFixture();f.c.generatorPublicId=f.c.app.data.generator.publicId;delete f.c.app.data.generator.publicId;const p=await f.save(candidate());assert.equal(p.ok,true,JSON.stringify(p));assert.equal(f.calls.length,1);assert.deepEqual(f.files,candidate());});

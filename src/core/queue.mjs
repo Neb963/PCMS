@@ -25,6 +25,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   unfenceBatch:id=>batchFences.delete(id),
   fenceAccount:id=>{accountFences.add(id);accountEpochs.set(id,(accountEpochs.get(id)??0)+1);},
   unfenceAccount:id=>accountFences.delete(id),
+  effectAllowed:(operationId,{moduleId,targetId,accountId})=>{const a=active.get(operationId);return !!a&&!a.maintenance&&a.moduleId===moduleId&&a.targetId===targetId&&a.accountId===accountId&&a.gateVersion===gateVersion&&!blocked&&!restoreFence&&!fenced.has(moduleId)&&!accountFences.has(accountId)&&!batchFences.has(a.batchId)&&(accountEpochs.get(accountId)??0)===a.accountEpoch&&(batchEpochs.get(a.batchId)??0)===a.batchEpoch;},
   accountActive:id=>[...active.values()].some(a=>a.accountId===id),
   fence:moduleId=>fenced.add(moduleId),
   unfence:moduleId=>fenced.delete(moduleId),
@@ -149,7 +150,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
         return save(s,r,job,{state:'RUNNING',needsCheck:false,effect:{operationId,kind,write,sourceWrite,inputHash,...accountScopeId?{accountId:dispatchAccountId}:{},boundary:'POSSIBLE',bootId,epoch:r.admissionEpoch??0}},'EFFECT_INTENT','POSSIBLE');
       });
       if(!restoreAllowed(job,{},admittedMaintenance)||blocked&&!admittedMaintenance||fenced.has(job.moduleId)||batchFences.has(job.batchId)||(batchEpochs.get(job.batchId)??0)!==batchEpoch||(accountEpochs.get(dispatchAccountId)??0)!==accountEpoch||dispatchAccountId&&accountFences.has(dispatchAccountId)&&!(job.moduleId==='pcms-accounts'&&['REMOVE','REACTIVATE'].includes(job.kind))){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,!restoreAllowed(job,{},admittedMaintenance)?'RESTORE_MAINTENANCE':batchFences.has(job.batchId)?'BATCH_PAUSED':dispatchAccountId&&accountFences.has(dispatchAccountId)?'ACCOUNT_ADMISSION_HELD':'PAUSED');}
-      const marker={targetId:job.targetId,accountId:dispatchAccountId,maintenance:admittedMaintenance};active.set(operationId,marker);
+      const marker={moduleId:job.moduleId,targetId:job.targetId,accountId:dispatchAccountId,batchId:job.batchId,maintenance:admittedMaintenance,gateVersion,accountEpoch,batchEpoch};active.set(operationId,marker);
       let sent;try{sent=Promise.resolve(call({operationId}));}catch(error){sent=Promise.reject(error);}
       return {job,sent};
     });

@@ -47,7 +47,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   }
   if(sourceCall){
    if(binding.mode!=='background'||!binding.jobId||active.id!=='pcms-deployer'||!sourceEffect||(args.name==='source.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
-   const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.targetId!==binding.targetId||job.accountId!==binding.accountId||job.rev!==binding.expectedRevision||job.kind!=='SOURCE_INSPECT')throw Error('STALE_REVISION');if(['COMPLETE','FAILED'].includes(job.state))throw Error('JOB_FINISHED');
+   const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.targetId!==binding.targetId||job.accountId!==binding.accountId||job.rev!==binding.expectedRevision||!['SOURCE_INSPECT','SOURCE_SAVE'].includes(job.kind))throw Error('STALE_REVISION');if(['COMPLETE','FAILED'].includes(job.state))throw Error('JOB_FINISHED');
    const result=await sourceEffect(job,args.name==='source.status');binding.expectedRevision=result.jobRevision;return result.value;
   }
   if(creatorCall){
@@ -155,7 +155,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
     const latest=await core.read('jobs',job.id);if(latest.rev!==runner.expectedRevision||latest.state==='FAILED')return;
     if(latest.runtimeInvalidated&&latest.effect?.boundary!=='POSSIBLE'){patch.state='HELD';patch.recovery={action:'OPEN_BACKUP',code:latest.kind==='DEVELOP'?'RESTORE_SAME_CHAT_INSPECTION_REQUIRED':'RESTORED_WORK_REVIEW_REQUIRED'};}
     if(latest.effect?.boundary==='POSSIBLE')await core.queue.reconciliationCheckpoint(job.id,latest.rev,result.checkpoint??null);else await core.queue.transition(job.id,latest.rev,patch);
-   }catch(error){const latest=await core.read('jobs',job.id),m=await core.read('modules',job.moduleId);if(error.message!=='STALE_REVISION'&&m?.enabled&&!m.lifecycle&&latest?.generation===runner.generation&&latest?.effect?.boundary!=='POSSIBLE'&&latest?.state!=='FAILED')await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
+   }catch(error){const latest=await core.read('jobs',job.id),m=await core.read('modules',job.moduleId);if(error.message!=='STALE_REVISION'&&m?.enabled&&!m.lifecycle&&latest?.generation===runner.generation&&latest?.effect?.boundary!=='POSSIBLE'&&!['FAILED','COMPLETE'].includes(latest?.state))await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
    finally{runner.targetId=null;runner.accountId=null;runner.reconciling=false;runner.jobId=null;await onDue();}
   })().finally(()=>{running=null;});return running;
  }
