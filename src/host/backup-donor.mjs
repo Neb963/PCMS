@@ -4,7 +4,7 @@ export function createBackupDonor({api,stateManager,initialize,getState,protecte
  const watches=new Map(),bootId=crypto.randomUUID();let storageVersion=0;
  api.storage?.onChanged?.addListener((changes,area)=>{if(['local','sync'].includes(area)&&Object.keys(changes).length)storageVersion++;});
  const hold=code=>({ok:false,code}),run=async(context,request)=>{const rows=await api.scripting.executeScript({target:{tabId:context.tabId,frameIds:[0]},world:'ISOLATED',func:observeAuthWatch,args:[{...request,documentWitness:context.witness}]});return rows?.length===1&&rows[0].frameId===0?rows[0].result:hold('AUTH_CONTEXT_CHANGED');};
- async function end({watchId}){const w=watches.get(watchId);if(!w)return;watches.delete(watchId);api.cookies.onChanged.removeListener(w.changed);try{await run(w.context,{captureId:w.captureId,kind:'END'});}catch{}if(w.secondary)try{const r=await run(w.secondary,{captureId:w.captureId,kind:'END'});if(r?.ok&&!r.human)await closeAuthWitness(w,w.secondary);}catch{}}
+ async function end({watchId}){const w=watches.get(watchId);if(!w)return;watches.delete(watchId);api.cookies.onChanged.removeListener(w.changed);try{await run(w.context,{captureId:w.captureId,kind:'END'});}catch{}if(w.secondary)try{const r=await run(w.secondary,{captureId:w.captureId,kind:'END'});if(r?.ok)await closeAuthWitness(w,w.secondary,{preserve:r.human});}catch{}}
  async function begin(scope,{captureId}){
   await initialize();if(!api.storage?.onChanged||!api.cookies?.onChanged)return hold('CAPTURE_OBSERVER_UNAVAILABLE');for(const [watchId,w]of watches)if(w.captureId===captureId&&w.accountId===scope.accountId)await end({watchId});
   const first=await collectSession(scope);if(!first?.ok||!first.context)return first;
@@ -13,7 +13,7 @@ export function createBackupDonor({api,stateManager,initialize,getState,protecte
    const packet=await collectSession(scope),current=await run(w.context,{kind:'CHECK',captureId}),otherNow=await run(w.secondary,{kind:'CHECK',captureId});if(!packet?.ok)throw Error(packet?.code??'AUTH_COLLECTION_UNAVAILABLE');
    if(packet.context?.witness!==w.context.witness||packet.context.tabId!==w.context.tabId||current?.ok!==true||current.version!==0||otherNow?.ok!==true||otherNow.version!==0||w.cookieVersion!==0||first.fingerprint!==packet.fingerprint)throw Error('AUTH_SESSION_CHANGED');
    w.fingerprint=packet.fingerprint;w.phase='STAGED';return {...packet,watch:{id:w.id,bootId,startedAt:w.startedAt}};
-  }catch(error){await end({watchId:w.id});return hold(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'CAPTURE_WITNESS_LOST');}
+  }catch(error){await end({watchId:w.id});return {...hold(/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'CAPTURE_WITNESS_LOST'),...Number.isSafeInteger(w.secondary?.inspectionTabId)?{inspectionTabId:w.secondary.inspectionTabId}:{}};}
  }
  async function check(scope,{captureId,watchId}){
   const w=watches.get(watchId);if(!w||w.captureId!==captureId||w.bootId!==bootId||w.accountId!==scope.accountId)return hold('CAPTURE_WITNESS_LOST');

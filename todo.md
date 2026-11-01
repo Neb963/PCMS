@@ -57,3 +57,7 @@ Added an independent two-document T oracle: a write then restore to the same aut
 First full B41307455587 failed during fixture package generation (MANIFEST_MISSING) before invoking capture. The staged package fixture now uses Python's independent ZIP writer over the tested XPI's exact bundled package, then the actual file-input/Install control. Production package validation remains strict; no capture behavior or evidence claim was changed.
 
 Full B41307673711 reached the real capture adapter and held AUTH_CONTEXT_CHANGED before staging: the new owned witness tab still exposed its initial about:blank document. Reused the established P14 readiness rule: persist identity, await the exact completed protected URL, then install/check document witness. New collection contexts use the same rule. Scope/witness checks remain strict. All234 focused tests and S passed in that run; required full B remains pending.
+
+## Witness recovery bound
+
+An owned witness whose observation continuity is lost now blocks another witness allocation for that account instead of accumulating abandoned tabs. Its exact collection tab has a packaged Open action; user work is preserved for inspection. A witness with trusted human input is parked as review and never reused or automatically closed. Only an exact untouched owned document is removed. These changes still need affected T/B verification.
