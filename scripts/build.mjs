@@ -102,7 +102,7 @@ export async function build(output=path.join(ROOT,'build')) {
   await writeFile(path.join(stage,'manifest.json'),JSON.stringify(manifest,null,2)+'\n');
   const source=execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim();
   const dirty=!!execFileSync('git',['status','--porcelain','--untracked-files=normal'],{cwd:ROOT,encoding:'utf8'}).trim();
-  const identity={format:1,phase:'P33',source,dirty,donor:provenance.commit,alphaReuse:provenance.alpha};
+  const identity={format:1,phase:'P19',source,dirty,donor:provenance.commit,alphaReuse:provenance.alpha};
   await writeFile(path.join(stage,'build-identity.json'),JSON.stringify(identity,null,2)+'\n');
   await verifyGraph(stage);
   for(const name of await files(stage))if(/\.(mjs|js)$/.test(name))execFileSync(process.execPath,['--check',path.join(stage,name)],{stdio:'pipe'});

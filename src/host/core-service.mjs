@@ -1,3 +1,4 @@
+import {createSourceWriter} from '../core/source-writer.mjs';
 import {createInstaller} from '../modules/install.mjs';
 import {seedBundled} from '../modules/seed.mjs';
 import {ArchiveError} from '../core/backup-format.mjs';
@@ -21,7 +22,7 @@ import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,backup,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,sourceWriter,backup,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -36,11 +37,11 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     accounts=createAccounts({core:value,donor:accountAdapter,pins:refreshAccountPins});await accounts.initialize();
     downloads=api?.downloads?createDownloads({core:value,api,profileId:(await value.status()).profileId}):null;
     discover=createDiscover({core:value,donor:accountAdapter,downloads,gitWriter,catalog:git});await discover.initialize();
-    creator=createCreator({core:value,donor:accountAdapter});await creator.initialize();source=createSourceInspection({core:value,donor:accountAdapter});
+    creator=createCreator({core:value,donor:accountAdapter});await creator.initialize();source=createSourceInspection({core:value,donor:accountAdapter});sourceWriter=createSourceWriter({core:value,donor:accountAdapter});
     backup=createBackup({core:value,donor:accountAdapter,downloads,pins:refreshAccountPins,quiesce:async()=>{if(!scripts)return;let cursor=null;do{const page=await value.list({table:'modules',cursor});for(const row of page.rows){const m=await value.read('modules',row.id),instances=scripts.instances(m);if(instances.length)await scripts.stop(m,{instances,oldGeneration:m.generation});await scripts.unregister(m);}cursor=page.cursor;}while(cursor);},verifyGit:()=>git.verifyRestored(),rebuild:async()=>{await scripts?.rebuild();await modules?.start();await accounts.initialize();await git.initialize();await journal.initialize();await schedule(value);}});await backup.initialize();
     journal=createJournal({core:value,downloads,retention:api?.downloads?createRetention({core:value,api,profileId:(await value.status()).profileId}):null});await journal.initialize();if(downloads)await journal.changed();await discover.changed();await backup.changed();await journal.tick();
     if(globalThis.document&&api){
-      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect,discoverEffect:discover.effect,creatorEffect:creator.effect,sourceEffect:source.effect,backupEffect:backup.effect,discoverPage:(name,args)=>name==='discover.list'?discover.list(args):name==='discover.get'?discover.get(args.id):name==='discover.import'?discover.import(args):name==='discover.command'?discover.command(args):name==='discover.export'?discover.export(args):name==='discover.preparations'?discover.checkPreparations(args.id):name==='discover.retryPreparation'?discover.retryPreparation(args):name==='discover.navigate'?discover.navigation(args):discover.changed(),gitEffect:(job,reconcile)=>job.moduleId==='pcms-discover'?discover.prepareEffect(job,reconcile):gitWriter.step(job,{kind:'PREPARE',slug:job.input.slug},reconcile)});
+      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect,discoverEffect:discover.effect,creatorEffect:creator.effect,sourceEffect:(job,reconcile)=>job.kind==='SOURCE_SAVE'?sourceWriter.effect(job,reconcile):source.effect(job,reconcile),backupEffect:backup.effect,discoverPage:(name,args)=>name==='discover.list'?discover.list(args):name==='discover.get'?discover.get(args.id):name==='discover.import'?discover.import(args):name==='discover.command'?discover.command(args):name==='discover.export'?discover.export(args):name==='discover.preparations'?discover.checkPreparations(args.id):name==='discover.retryPreparation'?discover.retryPreparation(args):name==='discover.navigate'?discover.navigation(args):discover.changed(),gitEffect:(job,reconcile)=>job.moduleId==='pcms-discover'?discover.prepareEffect(job,reconcile):gitWriter.step(job,{kind:'PREPARE',slug:job.input.slug},reconcile)});
       scripts=createWebsiteScripts({core:value,api,load:modules.load,context:websiteContext});
       const host=modules.lifecycle;
       lifecycle=createLifecycle({core:value,host:{...host,
@@ -57,7 +58,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
   async function handle(message,sender={}) {
     try {
       const value=await core();let result;
-      if((await value.status()).restoreHold&&['backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
+      if((await value.status()).restoreHold&&['backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
       switch(message?.operation) {
         case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};let m=await lifecycle.request(message.id,message.kind,message.requestId);if(message.id==='pcms-discover'){await discover.changed();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-creator'){await creator.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-deployer'){await source.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-backup'){await backup.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}await journal.tick();await accounts.initialize();await discover.initialize();await creator.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
         case 'backup.restorePreview':result=await backup.previewRestore({file:message.file});break;
@@ -76,6 +77,12 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'backup.captureCheck':result=await backup.checkCapture({id:message.id});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'backup.status':result=await backup.status();break;
         case 'backup.coverage':result=await backup.enqueue({requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.saveGet':result=await sourceWriter.get(message.id);break;
+        case 'source.savePrepare':result=await sourceWriter.prepare(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.saveRestore':result=await sourceWriter.enqueue({...message,restore:true});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.saveCheck':result=await sourceWriter.check(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.saveAdopt':result=await sourceWriter.adopt(message);await schedule(value);break;
+        case 'source.saveFile':{const s=await sourceWriter.get(message.id),manifestId=({candidate:s.candidateManifest,baseline:s.baselineManifest,remote:s.remoteManifest})[message.version];if(!manifestId)throw new Error('SOURCE_FILE_MISSING');const files=await value.verifySource(manifestId),entry=files.find(f=>f.path===message.path);if(!entry)return {ok:false,code:'SOURCE_FILE_MISSING'};const offset=message.offset??0;if(!Number.isSafeInteger(offset)||offset<0||offset>entry.bytes)return {ok:false,code:'SOURCE_CHUNK_INVALID'};const bytes=(await value.bytes(entry.blobId)).subarray(offset,offset+65536);let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.subarray(i,i+8192));result={path:entry.path,version:message.version,offset,total:entry.bytes,sha256:entry.sha256,base64:btoa(raw),next:offset+bytes.length<entry.bytes?offset+bytes.length:null};break;}
         case 'source.get':{const {current,previous,changes,...summary}=await source.get(message.id);result={...summary,currentFiles:current.length,previousFiles:previous.length};break;}
         case 'source.files':result=await source.list(message);break;
         case 'source.file':result=await source.file(message);break;

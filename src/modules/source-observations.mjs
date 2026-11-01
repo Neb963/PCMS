@@ -25,6 +25,15 @@ export async function observeSavedSource(request){
   assets.sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0);
   const listing=g.isPrivate?'UNLISTED':'PUBLIC',sourceStamp=await hash(new TextEncoder().encode(JSON.stringify({slug:request.slug,remoteId:request.remoteId,listing,pjs:g.modelText,html:g.outputTemplate,assets}))),base={ok:true,source:'PERCHANCE_SAVED_SOURCE_1',slug:request.slug,remoteId:request.remoteId,principalFingerprint:request.principalFingerprint,listing,sourceStamp,observedAt:Date.now(),providerRevision:null};
   if(!same())return hold('ACCOUNT_DOCUMENT_CHANGED');
+  if(request.requireVersion){
+   // Read the native page's literal initial checkpoint, without running its
+   // scripts or reloading a user's editor. Unknown embed shape is a hold.
+   const response=await fetch('https://perchance.org/'+request.slug,{method:'GET',credentials:'same-origin',redirect:'error',cache:'no-store'});
+   if(response.status!==200||!String(response.headers.get('content-type')).includes('text/html'))return hold('SOURCE_VERSION_UNAVAILABLE');
+   const pageText=await response.text(),literal=name=>{const pattern=new RegExp('(?:window\\.)?'+name+'\\s*=\\s*(\\d+)\\s*[;,]','g'),matches=[...pageText.matchAll(pattern)];return matches.length===1?Number(matches[0][1]):null;},time=literal('generatorLastSaveTime'),saveCount=literal('generatorSaveCount');
+   if(!Number.isSafeInteger(time)||time<=0||!Number.isSafeInteger(saveCount)||saveCount<0)return hold('SOURCE_VERSION_CONTRACT');
+   base.serverVersion={source:'PERCHANCE_PAGE_CHECKPOINT_1',time,saveCount};if(!same())return hold('ACCOUNT_DOCUMENT_CHANGED');
+  }
   if(request.kind==='META')return {...base,pjs:g.modelText,html:g.outputTemplate,assets};
   if(request.sourceStamp!==sourceStamp)return hold('SOURCE_CHANGED_DURING_READ');const entry=assets.find(a=>a.path===request.path);if(!entry||entry.key!==request.key||entry.bytes!==request.bytes)return hold('SOURCE_ASSET_SCOPE');
   stage='ASSET_FETCH';const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);let response,bytes;

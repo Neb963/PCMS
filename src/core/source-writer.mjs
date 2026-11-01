@@ -1,0 +1,92 @@
+import {requireCore as check,publicError} from './records.mjs';
+import {sourceMetadata,sourceAsset,sourcePaths,compareSources,lfsPointer} from './source-set.mjs';
+import {eligibleAccount} from '../modules/creator-allocation.mjs';
+const sameFiles=(a,b)=>compareSources(a,b).every(f=>f.state==='UNCHANGED'),sameVersion=(a,b)=>a?.time===b?.time&&a?.saveCount===b?.saveCount;
+const scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal,tabId:a.tabId});
+const encode=bytes=>{let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(s);};
+// A shared source primitive, not deployment intake/publication. Candidates are
+// content-addressed full sets. The original POSSIBLE operation is never replayed.
+export function createSourceWriter({core,donor,clock=Date.now}){
+ let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
+ const event=(j,step,result,code)=>({moduleId:j.moduleId,targetId:j.targetId,jobId:j.id,step,result,...code?{code}:{}});
+ async function bound(j,{write=false}={}){
+  const [g,a,m,status]=await Promise.all([core.read('generators',j.targetId),core.read('accounts',j.accountId),core.read('modules',j.moduleId),core.status()]);
+  check(g&&g.slug===j.input.slug&&g.remoteId===j.input.remoteId&&g.accountId===j.accountId,'SOURCE_TARGET_CHANGED');
+  check(eligibleAccount(a)&&a.expectedPrincipal===j.input.principalFingerprint&&a.personaUid===j.input.personaUid&&a.containerId===j.input.containerId&&a.routeId===j.input.routeId,'SOURCE_OWNER_CHANGED');
+  if(write){check(m?.enabled&&!m.lifecycle&&m.generation===j.generation&&m.manifest?.capabilities?.includes('perchance.source'),'STALE_GENERATION');check(!status.paused,'PAUSED');check(!status.restoreHold&&!j.runtimeInvalidated,'RESTORE_MAINTENANCE');}
+  check(!g.writerHold||g.writerHold.jobId===j.id,'SOURCE_WRITER_BUSY');return {g,a,m};
+ }
+ async function update(j,patch,step,gpatch=null,refs=[]){
+  const changes=[{table:'jobs',id:j.id,expectedRev:j.rev,refs:[...j.refs,...refs],value:{...j,...patch}}];if(gpatch){const g=await core.read('generators',j.targetId);check(g.sourceSaveJobId===j.id,'SOURCE_TARGET_CHANGED');changes.push({table:'generators',id:g.id,expectedRev:g.rev,refs:[...g.refs,...refs],value:{...g,...gpatch}});}
+  await core.mutate(changes,event(j,step,patch.state==='HELD'?'HELD':patch.state==='COMPLETE'?'COMPLETE':'IN_PROGRESS'));return core.read('jobs',j.id);
+ }
+ async function capture(j){
+  const {a}=await bound(j),request={slug:j.input.slug,remoteId:j.input.remoteId,kind:'META',requireVersion:true},target={...request,principalFingerprint:a.expectedPrincipal},first=await donor.sourceRead(scope(a),request);check(first?.ok,first?.code??'SOURCE_READ_UNKNOWN');
+  const m=sourceMetadata(first,target);check(first.serverVersion?.source==='PERCHANCE_PAGE_CHECKPOINT_1'&&Number.isSafeInteger(first.serverVersion.time)&&Number.isSafeInteger(first.serverVersion.saveCount),'SOURCE_VERSION_CONTRACT');
+  const files=[...m.roots];for(const entry of m.assets){const p=await donor.sourceRead(scope(a),{...request,kind:'ASSET',requireVersion:false,sourceStamp:m.sourceStamp,path:entry.virtualPath,key:entry.key,bytes:entry.bytes});check(p?.ok,p?.code??'SOURCE_READ_UNKNOWN');check(p.source==='PERCHANCE_SAVED_SOURCE_1'&&p.slug===j.input.slug&&p.remoteId===j.input.remoteId&&p.principalFingerprint===a.expectedPrincipal&&p.sourceStamp===m.sourceStamp&&p.path===entry.virtualPath&&typeof p.base64==='string','SOURCE_ASSET_UNVERIFIED');const bytes=Uint8Array.from(atob(p.base64),c=>c.charCodeAt(0)),f=await sourceAsset(bytes,entry);check(f.sha256===p.sha256,'SOURCE_ASSET_HASH');files.push({path:f.path,bytes});}
+  const last=await donor.sourceRead(scope(a),request);check(last?.ok,last?.code??'SOURCE_READ_UNKNOWN');const after=sourceMetadata(last,target);check(after.sourceStamp===m.sourceStamp&&sameVersion(first.serverVersion,last.serverVersion),'SOURCE_CHANGED_DURING_READ');
+  const b=await bound(j);check(b.a.rev===a.rev,'SOURCE_OWNER_CHANGED');const source=await core.source(files);return {...source,sourceStamp:m.sourceStamp,listing:m.listing,version:first.serverVersion,observedAt:clock(),accountRevision:a.rev};
+ }
+ async function retain(j,snapshot,field){const next=await update(j,{save:{...j.save,[field]:{manifestId:snapshot.manifestId,sourceStamp:snapshot.sourceStamp,listing:snapshot.listing,version:snapshot.version,observedAt:snapshot.observedAt}}},'PIN_SOURCE_READBACK',null,snapshot.refs);await core.releasePin(snapshot.pinId);return next;}
+ async function held(j,code){j=await core.read('jobs',j.id);j=await update(j,{state:'HELD',recovery:{action:'OPEN_SOURCE',code},save:{...j.save,code}},'HOLD_SOURCE_SAVE',{sourceSaveState:j.effect?.boundary==='POSSIBLE'?'UNKNOWN':'CONFLICT',sourceSaveCode:code});return result(j,'HELD',code);}
+ function result(j,state,code=null){return {jobRevision:j.rev,value:{state,code,generatorId:j.targetId,phase:j.save.phase}};}
+ async function editors(j,snapshot){
+  const {a}=await bound(j,{write:true}),all=await donor.inspectSourceEditors(scope(a),j.input);check(all?.ok,all?.code??'EDITOR_OBSERVATION_UNKNOWN');check(all.source==='PCMS_EDITOR_DOCUMENT_SET_1'&&all.slug===j.input.slug&&all.remoteId===j.input.remoteId&&all.principalFingerprint===a.expectedPrincipal&&Array.isArray(all.editors)&&all.editors.length,'EDITOR_NOT_OPEN');
+  const baseline=await core.verifySource(snapshot.manifestId);for(const e of all.editors){check(e.ok,e.code??'EDITOR_OBSERVATION_UNKNOWN');check(e.source==='PERCHANCE_NATIVE_EDITOR_1'&&e.slug===j.input.slug&&e.remoteId===j.input.remoteId&&e.listing===snapshot.listing,'EDITOR_TARGET_CHANGED');check(e.clean,e.reasons?.[0]??'EDITOR_UNVERIFIED');check(sameFiles(baseline,e.files),'SOURCE_EDITOR_BASE_CHANGED');}
+  const chosen=all.editors.find(e=>e.tabId===j.save.tabId)??(j.save.tabId==null?all.editors[0]:null);check(chosen,'EDITOR_DOCUMENT_CHANGED');const checkpoint=await donor.sourceCheckpoint(scope(a),{...j.input,tabId:chosen.tabId,witness:chosen.witness});check(checkpoint?.ok,checkpoint?.code??'SOURCE_CHECKPOINT_UNSUPPORTED');check(checkpoint.source==='PERCHANCE_NATIVE_CHECKPOINT_1'&&sameVersion(checkpoint,snapshot.version),'SOURCE_STALE');return {all,chosen,checkpoint,accountRevision:a.rev};
+ }
+ async function reconcile(j){
+  const op=j.save.operationId;check(j.effect?.operationId===op&&j.effect.kind==='SOURCE_SAVE'&&j.effect.boundary==='POSSIBLE','SOURCE_OPERATION_SCOPE');
+  let snapshot;try{snapshot=await capture(j);j=await retain(j,snapshot,'readback');}catch(error){return held(await core.read('jobs',j.id),error.code??publicError(error));}
+  const candidate=await core.verifySource(j.save.candidateManifest),base=await core.verifySource(j.save.baselineManifest),receipt=await core.view('source-save:'+op),ack=receipt?.ack;
+  const rejected=receipt?.noDispatch===true||ack?.status==='stale'||receipt?.dispatched===0;
+  if(rejected){await core.queue.reconcile(j.id,j.rev,op,{matched:true,operationId:op,disposition:'REJECTED'});j=await core.read('jobs',j.id);return held(j,ack?.status==='stale'?'SOURCE_STALE':receipt.code??'SOURCE_SAVE_REJECTED');}
+  const version=snapshot.version,expected=j.save.preflight.version,attributed=version.saveCount===expected.saveCount+1&&version.time>=expected.time&&(!ack||ack.status==='saved'&&sameVersion(ack,version));
+  if(!sameFiles(candidate,snapshot.files)||snapshot.listing!==j.save.preflight.listing||!attributed)return held(j,sameFiles(base,snapshot.files)&&sameVersion(expected,version)?'SOURCE_OUTCOME_UNKNOWN':'SOURCE_REMOTE_CONFLICT');
+  // A malformed explicit response remains a contract hold, even when bytes
+  // match. Missing ACK may be reconciled solely at the next exact checkpoint.
+  if(receipt?.code==='SOURCE_RESPONSE_SCHEMA')return held(j,'SOURCE_RESPONSE_SCHEMA');
+  await core.queue.reconcile(j.id,j.rev,op,{matched:true,operationId:op,disposition:'APPLIED'});j=await core.read('jobs',j.id);
+  return finish(j,snapshot,ack??null);
+ }
+ async function finish(j,snapshot,ack){
+  j=await update(j,{state:'COMPLETE',lease:null,recovery:null,save:{...j.save,phase:'COMPLETE',code:null,receipt:{operationId:j.save.operationId,candidateManifest:j.save.candidateManifest,baselineManifest:j.save.baselineManifest,serverVersion:snapshot.version,saveResponse:ack,sourceStamp:snapshot.sourceStamp,verifiedAt:clock()}}},'VERIFY_SOURCE_SAVE',{sourceManifest:j.save.candidateManifest,previousGood:j.save.baselineManifest,sourceStamp:snapshot.sourceStamp,sourceObservedAt:clock(),sourceListing:snapshot.listing,listing:snapshot.listing,sourceState:'VERIFIED',sourceHoldCode:null,sourceSaveState:'VERIFIED',sourceSaveCode:null,sourceSaveVersion:snapshot.version,writerHold:null},[snapshot.manifestId,j.save.candidateManifest,j.save.baselineManifest]);
+  return result(j,'COMPLETE');
+ }
+ async function effect(original,recovery=false){let j=await core.read('jobs',original.id);check(j?.rev===original.rev,'STALE_REVISION');check(j.kind==='SOURCE_SAVE'&&j.save?.schema===1,'SOURCE_JOB_SCOPE');
+  try{
+   if(j.effect?.boundary==='POSSIBLE')return await reconcile(j);
+   if(j.save.phase==='COMPLETE'){if((await core.read('generators',j.targetId))?.writerHold?.jobId===j.id)j=await core.queue.release(j.id,j.rev);return result(j,'COMPLETE');}
+   if(j.effect?.boundary==='OBSERVED'&&j.effect.disposition==='APPLIED'){
+    const snapshot=await capture(j);try{check(snapshot.manifestId===j.save.candidateManifest&&sameVersion(snapshot.version,j.save.readback?.version),'SOURCE_REMOTE_CONFLICT');return await finish(j,snapshot,(await core.view('source-save:'+j.save.operationId))?.ack??null);}finally{await core.releasePin(snapshot.pinId);}
+   }
+   if(recovery){await bound(j,{write:true});j=await update(j,{state:'WAITING',recovery:null},'RECHECK_BEFORE_SOURCE_EFFECT');return result(j,'CONTINUE');}
+   await bound(j,{write:true});j=await core.queue.claim(j.id,j.rev);
+   const snapshot=await capture(j);j=await retain(j,snapshot,'preflight');check(snapshot.manifestId===j.save.baselineManifest&&snapshot.sourceStamp===j.save.baselineStamp&&snapshot.listing===j.save.listing,'SOURCE_REMOTE_CONFLICT');
+   const e=await editors(j,j.save.preflight);j=await update(j,{save:{...j.save,phase:'SAVE',tabId:e.chosen.tabId,witness:e.chosen.witness,checkpoint:e.checkpoint,editors:e.all.editors.map(x=>({tabId:x.tabId,witness:x.witness}))}},'PIN_SOURCE_EFFECT');
+   const files=await Promise.all((await core.verifySource(j.save.candidateManifest)).map(async f=>({...f,base64:encode(await core.bytes(f.blobId))}))),baseFiles=await core.verifySource(j.save.baselineManifest),{a}=await bound(j,{write:true}),request={schema:1,...j.input,...j.save,files,baseFiles,listing:j.save.listing};
+   await core.queue.dispatch(j.id,j.rev,{operationId:j.save.operationId,kind:'SOURCE_SAVE',write:true,sourceWrite:true,inputHash:j.save.candidateManifest,
+    preflight:async()=>{const b=await bound(j,{write:true}),fresh=await capture(j);try{check(fresh.manifestId===j.save.baselineManifest&&sameVersion(fresh.version,j.save.preflight.version),'SOURCE_REMOTE_CONFLICT');await editors(j,j.save.preflight);return {ok:true,accountRevision:b.a.rev};}finally{await core.releasePin(fresh.pinId);}},
+    call:async()=>{const packet=await donor.sourceSave(scope(a),{...request,validNow:async()=>{try{const current=await core.read('jobs',j.id),b=await bound(current,{write:true});return current.effect?.operationId===j.save.operationId&&current.effect.boundary==='POSSIBLE'&&b.a.rev===a.rev&&b.g.writerHold?.jobId===j.id;}catch{return false;}}});await core.saveView('source-save:'+j.save.operationId,packet,crypto.randomUUID());},
+    // Complete independent readback happens in the next read-only step. A
+    // native ACK is never submitted as a queue matched observation.
+    observe:async()=>({matched:false,operationId:j.save.operationId})});
+   return await reconcile(await core.read('jobs',j.id));
+  }catch(error){if(error.code==='STALE_REVISION')throw error;return held(await core.read('jobs',j.id),error.code??publicError(error));}
+ }
+ async function enqueue({id,moduleId='pcms-deployer',candidateManifest,requestId,restore=false,tabId=null}){
+  const [g,m,status]=await Promise.all([core.read('generators',id),core.read('modules',moduleId),core.status()]);check(g?.sourceManifest&&g.sourceStamp,'SOURCE_BASE_REQUIRED');check(m?.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('perchance.source'),'MODULE_DISABLED');check(!status.restoreHold,'RESTORE_MAINTENANCE');check(!status.paused,'PAUSED');
+  const candidate=restore?g.previousGood:candidateManifest;check(candidate,'SOURCE_PREVIOUS_MISSING');const manifest=await core.verifySource(candidate);sourcePaths(manifest.map(f=>f.path));for(const f of manifest){const bytes=await core.bytes(f.blobId);check(!lfsPointer(bytes),'SOURCE_LFS_POINTER');if(['main.pjs','index.html'].includes(f.path))try{new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(bytes);}catch{check(false,'SOURCE_TEXT_UNSUPPORTED');}}
+  const a=await core.read('accounts',g.accountId);check(eligibleAccount(a),'SOURCE_OWNER_REQUIRED');check(typeof requestId==='string'&&/^[a-f0-9-]{36}$/i.test(requestId),'INVALID_REQUEST');
+  const existing=g.sourceSaveJobId?await core.read('jobs',g.sourceSaveJobId):null;if(existing&&!['COMPLETE','FAILED'].includes(existing.state))return get(id);
+  const j=await core.queue.enqueue({requestId:'source-save-'+requestId,logicalKey:'source-save:'+id+':'+requestId,moduleId,targetId:id,accountId:a.id,kind:'SOURCE_SAVE',refs:[candidate,g.sourceManifest],input:{slug:g.slug,remoteId:g.remoteId,principalFingerprint:a.expectedPrincipal,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId}});if(j.save)return get(id);
+  const current=await core.read('generators',id);check(current.sourceManifest===g.sourceManifest&&!current.writerHold,'SOURCE_WRITER_BUSY');
+  await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:[...j.refs,candidate,g.sourceManifest],value:{...j,save:{schema:1,phase:'PREFLIGHT',operationId:crypto.randomUUID(),candidateManifest:candidate,baselineManifest:g.sourceManifest,baselineStamp:g.sourceStamp,listing:g.sourceListing??g.listing,restore,tabId}}},{table:'generators',id,expectedRev:current.rev,refs:[...current.refs,candidate,g.sourceManifest],value:{...current,sourceSaveJobId:j.id,sourceSaveState:'WAITING',sourceSaveCode:null,writerHold:{jobId:j.id,reason:'SOURCE_SAVE'}}}],event(j,'QUEUE_SOURCE_SAVE','WAITING'));return get(id);
+ }
+ async function get(id){const g=await core.read('generators',id);check(g,'TARGET_MISSING');const j=g.sourceSaveJobId?await core.read('jobs',g.sourceSaveJobId):null,files=async manifest=>manifest?core.verifySource(manifest):[],candidate=await files(j?.save?.candidateManifest),baseline=await files(j?.save?.baselineManifest),remote=await files(j?.save?.readback?.manifestId);return {jobId:j?.id??null,state:g.sourceSaveState??'NOT_SAVED',code:g.sourceSaveCode??null,phase:j?.save?.phase??null,possible:j?.effect?.boundary==='POSSIBLE',candidateManifest:j?.save?.candidateManifest??null,baselineManifest:j?.save?.baselineManifest??null,remoteManifest:j?.save?.readback?.manifestId??null,version:j?.save?.receipt?.serverVersion??null,changes:compareSources(baseline,candidate),remoteChanges:compareSources(candidate,remote),canRestore:!!g.previousGood&&g.previousGood!==g.sourceManifest&&!g.writerHold,canAdopt:!!j?.save?.readback&&j.effect?.disposition==='REJECTED',active:!!j&&['WAITING','RUNNING'].includes(j.state)};}
+ return {effect:(j,r=false)=>run(()=>effect(j,r)),enqueue:args=>run(()=>enqueue(args)),get,
+  check:({id})=>run(async()=>{const g=await core.read('generators',id),j=await core.read('jobs',g?.sourceSaveJobId);check(j?.save,'SOURCE_JOB_MISSING');if(j.effect?.boundary==='POSSIBLE'||j.effect?.disposition==='APPLIED')await effect(j,true);else if(j.state==='HELD'&&j.effect?.disposition!=='REJECTED'){await bound(j,{write:true});await update(j,{state:'WAITING',recovery:null,save:{...j.save,code:null}},'RECHECK_BEFORE_SOURCE_EFFECT',{sourceSaveState:'WAITING',sourceSaveCode:null});}return get(id);}),
+  adopt:({id,manifestId})=>run(async()=>{const g=await core.read('generators',id);let j=await core.read('jobs',g?.sourceSaveJobId);check(j?.effect?.disposition==='REJECTED'&&j.effect.boundary==='OBSERVED'&&j.save?.readback?.manifestId===manifestId,'SOURCE_RECONCILE_REQUIRED');const snapshot=await capture(j);try{check(snapshot.manifestId===manifestId&&sameVersion(snapshot.version,j.save.readback.version),'SOURCE_SNAPSHOT_CHANGED');j=await update(j,{state:'FAILED',recovery:{action:'OPEN_SOURCE',code:'SOURCE_SAVE_REJECTED'},save:{...j.save,phase:'REJECTED_REVIEWED'}},'ADOPT_REVIEWED_REMOTE_SOURCE',{sourceManifest:manifestId,sourceStamp:snapshot.sourceStamp,sourceListing:snapshot.listing,listing:snapshot.listing,sourceSaveState:'REJECTED',sourceSaveCode:null},snapshot.refs);await core.queue.release(j.id,j.rev);return get(id);}finally{await core.releasePin(snapshot.pinId);}}),
+  prepare:({id,files,requestId})=>run(async()=>{check(Array.isArray(files),'SOURCE_SET_INCOMPLETE');sourcePaths(files.map(f=>f.path));const source=await core.source(files.map(f=>({path:f.path,bytes:Uint8Array.from(atob(f.base64),c=>c.charCodeAt(0))})));try{return await enqueue({id,candidateManifest:source.manifestId,requestId});}finally{await core.releasePin(source.pinId);}})
+ };
+}
