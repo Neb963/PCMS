@@ -57,6 +57,7 @@ export function createCreator({core,donor,clock=Date.now}){
   let job=await core.read('jobs',original.id);check(job?.rev===original.rev,'STALE_REVISION');check(job.moduleId===id&&job.kind==='CREATE'&&job.creator?.schema===1,'CREATOR_JOB_SCOPE');const m=await admit();check(m.generation===job.generation,'STALE_GENERATION');
   const g=await core.read('generators',job.targetId),connection=(await core.view('git-catalog'))?.connection;
   try{
+   if(job.effect?.boundary==='POSSIBLE'&&['PERCHANCE_CREATE','PERCHANCE_RENAME'].includes(job.effect.kind)&&(!g||g.creatorJobId!==job.id||g.slug!==job.input.slug||g.folder!==job.input.folder||!validCreatorTarget(g)||connection?.repositoryId!==job.input.repositoryId)){await creationReadback({core,donor,job,scope,clock});job=await core.read('jobs',job.id);}
    check(g?.creatorJobId===job.id&&g.slug===job.input.slug&&g.folder===job.input.folder&&validCreatorTarget(g),'CREATOR_FOLDER_CHANGED');check(connection?.repositoryId===job.input.repositoryId,'GIT_REPOSITORY_CHANGED');
    if(nativeSlug(job.input.slug)!==job.input.slug)return hold(job,'CREATOR_SLUG_INVALID');
    if(creates(m)&&['RESERVED','CREATE_PREPARED','CREATE_AVAILABLE','CREATE_VERIFIED'].includes(job.creator.phase))return await advanceCreation({core,donor,job,scope,clock,save,hold,output,admit,reconcile});

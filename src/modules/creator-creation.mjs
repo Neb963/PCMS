@@ -51,6 +51,6 @@ export async function advanceCreation({core,donor,job,scope,clock=Date.now,save,
  job=await core.read('jobs',job.id);proof??=await core.view(key(job,create?'create-proof':'rename-proof'));
  if(job.effect?.boundary==='POSSIBLE')return output(job,'HELD',proof?.code??'CREATOR_OUTCOME_UNKNOWN');
  if(!proof?.ok)return hold(job,proof?.code??'CREATOR_READBACK_UNVERIFIED');
- if(create){await save(job,{creator:{...job.creator,phase:'CREATE_VERIFIED',creation:{...job.creator.creation,temporarySlug:proof.temporarySlug,remoteId:proof.remoteId,accountRevision:proof.accountRevision}}},'VERIFY_PRIVATE_TEMPORARY_IDENTITY',{creatorState:'CREATED_RENAME_PENDING',creatorTemporarySlug:proof.temporarySlug,creatorRemoteId:proof.remoteId,creatorHoldCode:null});return output(job,'CONTINUE');}
+ if(create){await save(job,{state:'WAITING',dueAt:clock(),recovery:null,creator:{...job.creator,phase:'CREATE_VERIFIED',creation:{...job.creator.creation,temporarySlug:proof.temporarySlug,remoteId:proof.remoteId,accountRevision:proof.accountRevision}}},'VERIFY_PRIVATE_TEMPORARY_IDENTITY',{creatorState:'CREATED_RENAME_PENDING',creatorTemporarySlug:proof.temporarySlug,creatorRemoteId:proof.remoteId,creatorHoldCode:null});return output(job,'CONTINUE');}
  await confirmCreated(core,job,proof);await donor.releaseSlugObservation(await core.view('creator-tab:'+job.id));return output(job,'COMPLETE');
 }
