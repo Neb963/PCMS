@@ -57,6 +57,22 @@ export async function buildRestoreDonorPlan({source,current,mappings,destination
  for(const [area,values]of Object.entries({local,sync}))for(const [key,value]of Object.entries(values).sort(([a],[b])=>a<b?-1:a>b?1:0)){const has=Object.hasOwn(current.storage[area],key),before=has?current.storage[area][key]:null;if(previous){const oldHas=Object.hasOwn(previous.storage[area],key);need(has===oldHas&&(!has||same(before,previous.storage[area][key])),'RESTORE_STORAGE_CHANGED');}if(!has||!same(before,value))writes.push({area,key,beforePresent:has,before:has?clone(before):null,after:clone(value)});}
  return {format:1,restoreId,beforeState:stateData(current.state),state:stateData(normalized),beforeStateHash:await digest(stateData(current.state)),stateHash:await digest(stateData(normalized)),writes,routeMap:Object.fromEntries(sourceRouteIds),scriptMap:Object.fromEntries(sourceScriptIds),workflowMap:Object.fromEntries(sourceWorkflowIds),inactive,sourceToDestination:Object.fromEntries(sourceToDestination)};
 }
+export async function advanceRestoreDonorPlan({plan,current,scope,operationId,stage,disposition='APPLIED'}){
+ const state=stateData(current.state),expected=stateData(plan.state),old=expected.profiles[scope.containerId],p=state.profiles[scope.containerId],fields=['pcmsOperation'];
+ need(old&&p&&p.managed&&p.pcmsAccountId===scope.accountId&&p.personaUid===scope.personaUid&&p.killSwitch===true&&p.blockLocalNetwork===true&&p.pcmsOperation?.operationId===operationId&&p.pcmsOperation.stage===stage,'RESTORE_TRANSITION_UNVERIFIED');
+ need(['RESTORE_ROUTE_PLAN','ASSIGN','VERIFY','RESTORE_BLANK'].includes(stage)&&['APPLIED','REJECTED'].includes(disposition),'RESTORE_TRANSITION_UNVERIFIED');
+ if(await digest(state)===plan.stateHash)return plan;
+ if(stage==='RESTORE_ROUTE_PLAN'){need(p.routeId===old.routeId&&p.pcmsPreparation?.id===scope.preparationId&&p.pcmsPreparation.routeId===scope.routeId&&p.pcmsPreparation.candidate?.routeId===scope.routeId,'RESTORE_TRANSITION_UNVERIFIED');fields.push('pcmsPreparation');}
+ if(stage==='ASSIGN'){need(p.routeId===(disposition==='REJECTED'?old.routeId:scope.routeId)&&same(p.pcmsPreparation,old.pcmsPreparation),'RESTORE_TRANSITION_UNVERIFIED');fields.push('routeId','updatedAt');}
+ if(stage==='VERIFY')need(p.routeId===scope.routeId,'RESTORE_TRANSITION_UNVERIFIED');
+ if(stage==='RESTORE_BLANK'){
+  need(Number.isSafeInteger(p.pcmsOperation.tabId)||disposition==='REJECTED','RESTORE_TRANSITION_UNVERIFIED');
+  const opens=(old.statistics?.opens??0)+(disposition==='REJECTED'?0:1);need(p.statistics?.opens===opens&&p.statistics?.clones===old.statistics?.clones,'RESTORE_TRANSITION_UNVERIFIED');fields.push('lastUsedAt','updatedAt','statistics');
+ }
+ for(const field of fields)expected.profiles[scope.containerId][field]=clone(p[field]);
+ need(same(expected,state),'RESTORE_DONOR_CHANGED');
+ return {...plan,state,stateHash:await digest(state)};
+}
 export function createRestoreDonor({api,stateManager,personaPlatform,initialize,getState,localMutationFence,allPersonaUids,snapshotRestore}){
  const hold=code=>({ok:false,code}),knownError=e=>e?.code==='STATE_CONFLICT'?'RESTORE_DONOR_CHANGED':'RESTORE_DONOR_UNAVAILABLE';
  const cleanSnapshot=async()=>{const r=await snapshotRestore();need(r?.ok,r?.code??'RESTORE_DONOR_UNAVAILABLE');return r.data;};
@@ -78,6 +94,10 @@ export function createRestoreDonor({api,stateManager,personaPlatform,initialize,
   const orphan=containers.filter(c=>!mapping.baseline.includes(c.cookieStoreId)&&c.name===mapping.name);
   return orphan.length?{...hold(orphan.length===1?'RESTORE_ALLOCATION_ORPHAN':'RESTORE_ALLOCATION_AMBIGUOUS'),containerIds:orphan.map(c=>c.cookieStoreId)}:{ok:false,code:'RESTORE_ALLOCATION_UNKNOWN'};
  }
+ async function applyState(plan,validNow,targets=allPersonaUids){
+   const before=await cleanSnapshot();need(await digest(stateData(before.state))===plan.beforeStateHash,'RESTORE_DONOR_CHANGED');need(await validNow(),'RESTORE_INTERRUPTED');
+   try{const preview=await stateManager.previewState(plan.state,{expectedRevision:before.revision,expectedBootId:before.bootId});await stateManager.authorizePreview(preview.previewId,preview.delta);need(await validNow(),'RESTORE_INTERRUPTED');await localMutationFence(targets,()=>stateManager.commitPreview(preview.previewId));return {ok:true};}catch(e){return {...hold(knownError(e)),...e?.code==='STATE_CONFLICT'?{noDispatch:true}:{}};}
+  }
  return {
   gate,
   snapshot:cleanSnapshot,
@@ -92,10 +112,16 @@ export function createRestoreDonor({api,stateManager,personaPlatform,initialize,
   validateSource:validateRestoreDonorSource,
   plan:args=>buildRestoreDonorPlan(args),
   async observeState(plan){const snapshot=await cleanSnapshot(),actual=await digest(stateData(snapshot.state));return actual===plan.stateHash?{ok:true,matched:true,revision:snapshot.revision,bootId:snapshot.bootId}:actual===plan.beforeStateHash?{...hold('RESTORE_DONOR_UNCHANGED'),before:true}:hold('RESTORE_DONOR_CHANGED');},
-  async applyState(plan,validNow){
-   const before=await cleanSnapshot();need(await digest(stateData(before.state))===plan.beforeStateHash,'RESTORE_DONOR_CHANGED');need(await validNow(),'RESTORE_INTERRUPTED');
-   try{const preview=await stateManager.previewState(plan.state,{expectedRevision:before.revision,expectedBootId:before.bootId});await stateManager.authorizePreview(preview.previewId,preview.delta);need(await validNow(),'RESTORE_INTERRUPTED');await localMutationFence(allPersonaUids,()=>stateManager.commitPreview(preview.previewId));return {ok:true};}catch(e){return {...hold(knownError(e)),...e?.code==='STATE_CONFLICT'?{noDispatch:true}:{}};}
+  applyState,
+  async assignRoute(scope,{operationId},validNow){
+   const current=await cleanSnapshot(),state=stateData(current.state),p=state.profiles[scope.containerId],route=state.routes[scope.routeId];
+   need(p?.managed&&p.personaUid===scope.personaUid&&p.pcmsAccountId===scope.accountId&&p.killSwitch===true&&p.blockLocalNetwork===true&&scope.routeId.startsWith('route-import-'+scope.restoreId+'-')&&route?.provider==='mullvad'&&route.enabled!==false,'RESTORE_CONTEXT_CHANGED');
+   if(p.routeId===scope.routeId&&p.pcmsOperation?.operationId===operationId&&p.pcmsOperation.stage==='ASSIGN')return {ok:true,operationId,stage:'ASSIGN'};
+   need(p.routeId==='__block__'&&p.pcmsPreparation?.id===scope.preparationId&&p.pcmsPreparation.routeId===scope.routeId&&p.pcmsOperation?.stage==='RESTORE_ROUTE_PLAN','RESTORE_ROUTE_PLAN_CHANGED');
+   const before=stateData(state);p.routeId=scope.routeId;p.updatedAt=new Date().toISOString();p.pcmsOperation={operationId,stage:'ASSIGN',phase:'COMPLETE',value:{ok:true,operationId,stage:'ASSIGN',personaUid:p.personaUid,containerId:p.containerId,routeId:p.routeId}};
+   const result=await applyState({beforeStateHash:await digest(before),stateHash:await digest(state),state},validNow,scope.containerId);return {...result,operationId,stage:'ASSIGN'};
   },
+  async checkpoint(args){return advanceRestoreDonorPlan({...args,current:await cleanSnapshot()});},
   async observeStorage(write){const values=await api.storage[write.area].get(write.key),present=Object.hasOwn(values,write.key);return present&&same(values[write.key],write.after)?{ok:true,matched:true}:present===write.beforePresent&&(!present||same(values[write.key],write.before))?{...hold('RESTORE_STORAGE_UNCHANGED'),before:true}:hold('RESTORE_STORAGE_CHANGED');},
   async applyStorage(write,validNow){const current=await api.storage[write.area].get(write.key),present=Object.hasOwn(current,write.key);need(present===write.beforePresent&&(!present||same(current[write.key],write.before)),'RESTORE_STORAGE_CHANGED');need(await validNow(),'RESTORE_INTERRUPTED');await api.storage[write.area].set({[write.key]:clone(write.after)});return {ok:true};},
   async rollbackPlan({previous,plan}){

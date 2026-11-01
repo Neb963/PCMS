@@ -26,6 +26,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
  const scope=a=>({accountId:a.id,label:a.label,rejectedRouteId:a.flow?.rejectedRouteId,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,preparationId:a.preparationId,tabId:a.tabId,exitAddresses:a.exitAddresses,expectedPrincipal:a.expectedPrincipal});
  const result=async(job,state,code=null)=>({value:{state,code,accountId:job.accountId},jobRevision:(await core.read('jobs',job.id)).rev});
  async function hold(a,job,code){if(a.admission&&a.flow.jobId!==job.id)return result(job,'HELD','ACCOUNT_ADMISSION_HELD');if(a.holdCode!==code||a.state!=='HELD')await save(a,{state:lifecycleStates[a.admission]??'HELD',holdCode:code},'ACCOUNT_HOLD','HELD');return result(job,'HELD',code);}
+ async function restoredPending(a){const c=await core.restore?.read(),r=await core.status(),map=c?.mappings?.find(m=>m.accountId===a.id);return a.restoreValidation?.state==='LOGIN_REQUIRED'&&a.restoreValidation.restoreId===c?.id&&a.restoreValidation.dataset===r.dataset&&c.newDataset===r.dataset&&map?.personaUid===a.personaUid&&map.destinationContainerId===a.containerId;}
  async function apply(a,job,stage,value){
   check(value?.ok===true&&value.stage===stage&&value.operationId===job.id+'-'+stage,'ACCOUNT_OPERATION_UNVERIFIED');
   check(!a.admission||['REACTIVATING','ARCHIVED'].includes(a.admission),'ACCOUNT_ADMISSION_HELD');
@@ -40,7 +41,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    const binding=await bindingObservation(value.binding);check(binding.personaUid===a.personaUid&&binding.containerId===a.containerId&&binding.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');
    check(binding.routeObservedAt>=flow.startedAt&&binding.routeObservedAt<=clock(),'ACCOUNT_ROUTE_STALE');
    // A verified existing account never silently acquires a different exit.
-   if(a.expectedPrincipal)check(JSON.stringify(binding.exitAddresses)===JSON.stringify(a.exitAddresses),'ACCOUNT_EXIT_CHANGED');
+   if(a.expectedPrincipal&&!await restoredPending(a))check(JSON.stringify(binding.exitAddresses)===JSON.stringify(a.exitAddresses),'ACCOUNT_EXIT_CHANGED');
    Object.assign(patch,binding);flow.stage=['LOGIN','OPEN'].includes(flow.purpose)?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
   }else if(stage==='OPEN'){
    check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.openedAt=clock();flow.stage=flow.purpose==='OPEN'?'IDENTITY':flow.purpose==='LOGIN'?'LOGIN_REQUIRED':flow.wasReady?'READY':'LOGIN_REQUIRED';
@@ -70,7 +71,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
   if(a.expectedPrincipal)check(a.expectedPrincipal===p.principalFingerprint,'ACCOUNT_PRINCIPAL_CHANGED');
   const latest=await core.read('accounts',a.id);check(latest.rev===a.rev&&latest.flow.requestId===job.input.requestId,'STALE_REVISION');const next='READY';
   if(a.admission==='REACTIVATING'){const jobs=await accountRows('jobs',a.id);check(!jobs.some(j=>j.id!==job.id&&j.effect?.boundary==='POSSIBLE'),'ACCOUNT_WORK_UNRESOLVED');}
-  await save(a,{admission:null,archive:null,tabId:value.tabId??a.tabId,expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
+  await save(a,{...a.restoreValidation?{restoreValidation:{...a.restoreValidation,state:'VALIDATED'}}:{},admission:null,archive:null,tabId:value.tabId??a.tabId,expectedPrincipal:p.principalFingerprint,principalLabel:p.principalLabel,identityObservedAt:p.observedAt,observedAt:clock(),state:next==='READY'?'READY':'PREPARING',holdCode:null,flow:{...a.flow,stage:next},confirmedAt:a.flow.confirmationAt??a.confirmedAt},'ACCOUNT_IDENTITY','COMPLETE',null,{moduleId:MODULE,generation:job.generation,jobId:job.id,jobRevision:finalJob.rev});
   if(a.admission==='REACTIVATING'&&next==='READY'){core.queue.unfenceAccount(a.id);await resumeArchivedJobs(a.id,job.id);}
   return result(job,next==='READY'?'COMPLETE':'CONTINUE');
  }

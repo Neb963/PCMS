@@ -17,7 +17,7 @@ export function sanitizeMarkup(html,document) {
 }
 export function sanitizeStyle(css){return /@import|url\s*\(|expression\s*\(|-moz-binding|\\/i.test(css)?'':css;}
 export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},journalEffect=null,accountEffect=null,gitEffect=null,discoverEffect=null,discoverPage=null,creatorEffect=null,sourceEffect=null,backupEffect=null}) {
- const frames=new Set(),backgrounds=new Map(),pageBindings=new Map(),bootId=crypto.randomUUID();let running=null;const reconciled=new Set();
+ const frames=new Set(),backgrounds=new Map(),pageBindings=new Map(),bootId=crypto.randomUUID();let running=null,activeDataset=null;const reconciled=new Set();
  const manifestCap=(m,group)=>m.manifest?.capabilities?.find(c=>c.startsWith(group+'.'));
  async function current(binding){return core.read('modules',binding.moduleId);}
  async function load(module,path){
@@ -137,6 +137,9 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   catch(error){frames.delete(binding);iframe.remove();throw error;}finally{clearTimeout(timer);}
  }
  async function start(){
+  const dataset=(await core.status()).dataset;
+  if(activeDataset!==dataset){for(const b of [...frames]){remove(b);for(const p of b.pending.values()){clearTimeout(p.timer);p.reject(Error('STALE_GENERATION'));}}for(const token of pageBindings.keys())notify({type:'stopModulePage',token});pageBindings.clear();reconciled.clear();activeDataset=dataset;}
+  for(const [id,b]of backgrounds){const m=await core.read('modules',id);if(!m?.enabled||m.lifecycle||m.generation!==b.generation||m.packageHash!==b.hash)remove(b);}
   let cursor=null;do{const page=await core.list({table:'modules',cursor});for(const projection of page.rows){const module=await core.read('modules',projection.id);if(module.enabled&&module.manifest?.entries?.background&&!backgrounds.has(module.id))try{backgrounds.set(module.id,await frame(module,'background'));await core.record({step:'START_MODULE',result:'COMPLETE',moduleId:module.id});}catch{await core.record({step:'START_MODULE',result:'FAILED',moduleId:module.id,code:'MODULE_START_FAILED'});}}cursor=page.cursor;}while(cursor);
  }
  async function turn(){
@@ -150,6 +153,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
     const patch={checkpoint:result.checkpoint??null,state:result.kind==='complete'?'COMPLETE':result.kind==='hold'?'HELD':'WAITING',step:result.kind==='complete'?'COMPLETE':'CHECKPOINT'};
     if(result.kind==='wait')patch.dueAt=result.dueAt;if(result.kind==='hold')patch.recovery={action:result.recovery?.action??'OPEN_MODULES',code:result.reason};
     const latest=await core.read('jobs',job.id);if(latest.rev!==runner.expectedRevision||latest.state==='FAILED')return;
+    if(latest.runtimeInvalidated&&latest.effect?.boundary!=='POSSIBLE'){patch.state='HELD';patch.recovery={action:'OPEN_BACKUP',code:latest.kind==='DEVELOP'?'RESTORE_SAME_CHAT_INSPECTION_REQUIRED':'RESTORED_WORK_REVIEW_REQUIRED'};}
     if(latest.effect?.boundary==='POSSIBLE')await core.queue.reconciliationCheckpoint(job.id,latest.rev,result.checkpoint??null);else await core.queue.transition(job.id,latest.rev,patch);
    }catch(error){const latest=await core.read('jobs',job.id),m=await core.read('modules',job.moduleId);if(error.message!=='STALE_REVISION'&&m?.enabled&&!m.lifecycle&&latest?.generation===runner.generation&&latest?.effect?.boundary!=='POSSIBLE'&&latest?.state!=='FAILED')await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
    finally{runner.targetId=null;runner.accountId=null;runner.reconciling=false;runner.jobId=null;await onDue();}

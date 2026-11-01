@@ -13,6 +13,7 @@ export function createWebsiteScripts({core,api,load,context}) {
  async function status(m,code){const current=await core.read('modules',m.id);if(current.scriptCode===code)return;await core.mutate([{table:'modules',id:m.id,expectedRev:current.rev,refs:current.refs,value:{...current,scriptCode:code}}],{step:'MODULE_SCRIPT_SETUP',result:code?'HELD':'COMPLETE',moduleId:m.id,...code?{code}:{}});}
  async function inject(details){
   if(details.frameId!==0||typeof details.documentId!=='string'||!/^https:\/\/perchance\.org\//.test(details.url))return;
+  if((await core.status()).restoreHold)return;
   const tab=await api.tabs.get(details.tabId),selected=await context(tab);
   if(!selected?.protected||selected.containerId!==tab.cookieStoreId||tab.url!==details.url)return;
   for(let m of await modules())if(m.enabled&&!m.lifecycle&&!revoked.has(m.id)&&m.manifest?.entries.userscript&&userScriptMatches(m.manifest.userscript,details.url)){

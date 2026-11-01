@@ -1,0 +1,27 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createRestoreParticipants} from '../src/host/restore-participants.mjs';
+const cookie={name:'session',value:'private',domain:'perchance.org',hostOnly:true,path:'/',secure:true,httpOnly:true,sameSite:'strict',session:true,expirationDate:null,firstPartyDomain:'',partitionKey:null};
+function fixture(){
+ const id='12345678-1234-4234-8234-123456789abc',scope={restoreId:id,accountId:id,personaUid:id,containerId:'firefox-container-8',routeId:'route-import-'+id+'-0',preparationId:'one-route-plan'},profile={managed:true,pcmsAccountId:id,personaUid:id,containerId:scope.containerId,killSwitch:true,blockLocalNetwork:true,routeId:'__block__',pcmsOperation:null},state={profiles:{[scope.containerId]:profile},routes:{[scope.routeId]:{provider:'mullvad',host:'10.124.0.1',port:1080,enabled:true}}},cookies=[],tabs=[],tags=new Map();let cookieCalls=0,opens=0;
+ const service=createRestoreParticipants({api:{tabs:{query:async()=>structuredClone(tabs),get:async id=>structuredClone(tabs.find(t=>t.id===id)),update:async()=>{throw Error('UNEXPECTED_NAVIGATION');}},sessions:{getTabValue:async(id,key)=>tags.get(id+':'+key),setTabValue:async(id,key,value)=>tags.set(id+':'+key,value)}},bound:async s=>s.containerId===scope.containerId?{state,profile}:{code:'ACCOUNT_CONTEXT_CHANGED'},patch:async(s,value)=>Object.assign(profile,structuredClone(value)),prerequisites:async()=>({ok:true}),preparePersona:async()=>{throw Error('NO_ROUTE_CALL_EXPECTED');},checkBinding:async()=>({ok:false}),protectedProfile:async()=>({code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'}),personaPlatform:{open:async(store,url)=>{opens++;const tab={id:7,cookieStoreId:store,url};tabs.push(tab);return tab;}},cookieService:{list:async()=>structuredClone(cookies),set:async(store,row)=>{assert.equal(store,scope.containerId);cookieCalls++;cookies.push(structuredClone(row));}},localMutationFence:async(store,fn)=>{assert.equal(store,scope.containerId);return fn();},currentTest:()=>null,bootstrap:{stop:async()=>{}}});
+ return {scope,profile,state,cookies,tabs,tags,service,cookieCalls:()=>cookieCalls,opens:()=>opens};
+}
+test('local cookie import is fresh-store scoped, exact readback handles lost ACK, conflicts never overwrite and stale leases perform zero writes',async()=>{
+ const f=fixture();await assert.rejects(f.service.setCookie({...f.scope,containerId:'firefox-container-90'},{cookie},async()=>true));await assert.rejects(f.service.setCookie(f.scope,{cookie},async()=>false),e=>e.code==='RESTORE_INTERRUPTED');assert.equal(f.cookieCalls(),0);
+ await f.service.setCookie(f.scope,{cookie},async()=>true);assert.equal((await f.service.observeCookie(f.scope,{cookie})).ok,true);await f.service.setCookie(f.scope,{cookie},async()=>true);assert.equal(f.cookieCalls(),1);
+ await assert.rejects(f.service.setCookie(f.scope,{cookie:{...cookie,value:'new'}},async()=>true),e=>e.code==='RESTORE_COOKIE_CONFLICT');assert.equal(f.cookies[0].value,'private');assert.equal((await f.service.cookies(f.scope,{expected:[cookie]})).ok,true);
+ const expired={...cookie,name:'old',session:false,expirationDate:1};assert.equal((await f.service.setCookie(f.scope,{cookie:expired},async()=>true)).expired,true);assert.equal(f.cookieCalls(),1);
+});
+test('route planning selects only its imported route through existing state mutation and records an exact readback',async()=>{
+ const f=fixture();await f.service.planRoute(f.scope,{operationId:'plan'},async()=>true);assert.equal(f.profile.routeId,'__block__');assert.equal(f.profile.pcmsPreparation.routeId,f.scope.routeId);assert.equal((await f.service.observePlan(f.scope,{operationId:'plan'})).ok,true);
+ await assert.rejects(f.service.planRoute({...f.scope,routeId:'unrelated-route'},{operationId:'other'},async()=>true),e=>e.code==='RESTORE_PARTICIPANT_SCOPE');assert.equal(f.profile.pcmsOperation.operationId,'plan');
+});
+test('owned blank contexts reuse their exact operation tag; unknown untagged tabs hold instead of duplicate allocation',async()=>{
+ const f=fixture();const first=await f.service.openBlank(f.scope,{operationId:'blank'},async()=>true),again=await f.service.openBlank(f.scope,{operationId:'blank'},async()=>true);assert.equal(first.tabId,again.tabId);assert.equal(f.opens(),1);f.tags.clear();assert.equal((await f.service.observeBlank(f.scope,{operationId:'blank'})).code,'RESTORE_CONTEXT_INSPECTION_REQUIRED');assert.equal(f.opens(),1);
+});
+
+test('logical account and Persona IDs remain independent while exact native ownership is checked',async()=>{
+ const f=fixture();f.scope.accountId='independent-account';f.profile.pcmsAccountId=f.scope.accountId;assert.equal((await f.service.target(f.scope)).profile.personaUid,f.scope.personaUid);
+ await assert.rejects(f.service.target({...f.scope,personaUid:'aaaaaaaa-1234-4234-8234-123456789abc'}),e=>e.code==='RESTORE_CONTEXT_CHANGED');
+});
