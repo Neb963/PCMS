@@ -32,7 +32,12 @@ def complete(sid):
  def inspect():
   v=restore(sid);c=v['control']
   if c['state']=='COMPLETE':return v
-  if v['job']['state'] in ['HELD','FAILED']:raise AssertionError(('RESTORE_HELD',c['state'],c.get('code'),v['job'].get('recovery')))
+  if v['job']['state'] in ['HELD','FAILED']:
+   p=(c.get('participants') or [{}])[0]
+   try:
+    detail=asyncjs(sid,"""const tabId=arguments[0],op=arguments[1],bg=await browser.runtime.getBackgroundPage(),c=await import(browser.runtime.getURL('core/records.mjs')).then(m=>m.openCore()),j=await c.read('jobs',arguments[2]),m=await c.read('modules','pcms-backup'),r=await c.status(),tab=tabId!=null?await browser.tabs.get(tabId).catch(e=>({error:String(e)})):null,scripts=await browser.userScripts.getScripts(),frames=tabId!=null?await browser.webNavigation.getAllFrames({tabId}).catch(e=>({error:String(e)})):null;const out={tab:{url:tab?.url,status:tab?.status,cookieStoreId:tab?.cookieStoreId,error:tab?.error},frames:frames?.map?.(f=>({url:f.url,documentId:f.documentId,frameId:f.frameId}))??frames,script:scripts.filter(s=>s.id.includes('restore')).map(s=>({id:s.id,world:s.world,runAt:s.runAt,worldId:s.worldId})),hold:r.restoreHold,activeDataset:r.dataset,job:{rev:j?.rev,generation:j?.generation,effect:j?.effect},module:{generation:m?.generation,enabled:m?.enabled,lifecycle:m?.lifecycle},registered:!!op};c.close();return out;""",[p.get('tabId'),(p.get('bootstrap') or {}).get('operationId'),c.get('jobId')])
+   except Exception as error:detail={'diagnosticError':str(error)}
+   raise AssertionError(('RESTORE_HELD',c['state'],c.get('code'),v['job'].get('recovery'),detail))
  return wait(inspect,240)
 
 def main():
