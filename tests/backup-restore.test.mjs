@@ -85,3 +85,9 @@ test('checked local import activates only its remapped cut, preserves Pause/hist
   assert.deepEqual(calls,['PLAN','ASSIGN','VERIFY','COOKIE','COOKIE','BLANK','REGISTER','NAVIGATE','UNREGISTER']);assert.equal(c.git.state,'HELD');assert.equal((await service.status()).current.dataRestored,true);
  }
 });
+
+test('new restore holds unresolved destination writes before allocation and does not invent their completion',async t=>{
+ const f=await fixture(t),p=await f.service.preview({file:new File([f.encoded.blob],'prior-write.pcms.zip')}),id='previous-unknown';await f.c.mutate([{table:'jobs',id,value:{moduleId:'pcms-deployer',targetId:'g',kind:'SAVE',state:'HELD',generation:1,effect:{boundary:'POSSIBLE',operationId:'previous-exact-write',write:true},recovery:{action:'RECONCILE',code:'OUTCOME_UNKNOWN'}}}],event);await f.service.confirm({id:p.id,revision:p.revision,confirmed:true});await f.drain();const c=await f.c.restore.read();
+ assert.equal(c.state,'DRAIN');assert.equal(c.code,'RESTORE_PREVIOUS_WRITE_UNRESOLVED');assert.equal(c.previousWork[0].id,id);assert.equal(f.native.creates(),0);assert.equal((await f.c.read('jobs',id)).effect.operationId,'previous-exact-write');assert.equal((await f.c.read('jobs',id)).effect.boundary,'POSSIBLE');
+ await f.service.rollback({id:p.id});await f.drain();assert.equal((await f.c.restore.read()).state,'CANCELLED');assert.equal((await f.c.read('jobs',id)).effect.boundary,'POSSIBLE');
+});
