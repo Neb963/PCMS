@@ -1,18 +1,24 @@
 # Current implementation checkpoint
 
-## P23 — DEVELOP instruction staging
+## P24 — native chat and exact one-shot prompt
 
-P22 merged [PR29](https://github.com/Neb963/PCMS/pull/29) as a8a7a3b4ded082eba432edffa6fdc643b581f917; tree176595e0aba86153d7e203928433573ce643aa93 equals verified9c2156e1. [41352857908](https://github.com/Neb963/PCMS/actions/runs/41352857908):187T/build+B PASS. Firefox155.0/build20260817142839/sandbox6; tested XPI3eb47f201a33a285efdd97d01270626e4d6313d0e2fd170dc0b3e1ccc3c07516 (834073bytes). Independent fixture proved full DEPLOY, source/listing/pool/DONE, exactly3 native saves/1 Git ref, publication interruption and Git response loss with two forced restarts, no replay and intact unrelated files. Earlier failures/fixes remain in learned.md and Git history.
+P23 merged [PR30](https://github.com/Neb963/PCMS/pull/30) as 0db87e7945b799644dde3361468e10d24710dfe3; remote main tree9a6d0f5895ecf1b75532bad84fcbd6f6db162885 equals tested b1a962da. [41353318368](https://github.com/Neb963/PCMS/actions/runs/41353318368):193T/build + required installed B PASS. Firefox155.0/build20260817142839/sandbox6; XPI499da05004e1b5658d02f3e3b20fd7ca390d9b4e00b727e07fda82862ee0977f. Independent complete source/Git byte oracles and two native saves proved exact staging and cold readback without replay. No AI or live mutations were tested.
 
 ### Plan before implementation
 
-Base actual main a8a7a3b4; branch p23-develop-staging. Preserve P20–P22 and P28–P33.
+Base actual main0db87e79; branch p24-native-chat. Preserve all existing verified phase receipts.
 
-- Resume prepared DEVELOP on its existing job/writer. Recheck immutable four distinct root inputs, current READY/owner, full admitted unlisted source and every editor.
-- Compose a complete candidate from the saved baseline, replacing only src/specification.md, src/ui.md and src/agents.md with exact original bytes. Preserve roots and every other asset. Do not stage prompt.md automatically.
-- Use the shared guarded source writer with its own STAGE operation/purpose. Retain original previous-good, unlist and staging receipts. Recover preparation gaps/readback without restaging an uncertain save.
-- Show verified staging/contextual held state in Generators/Work. No AI chat/send or publication in this phase.
-- Focused production T covers distinct Unicode/newline instructions, existing binary assets, changed Git roots, dirty/conflicting edits, interruption/restart and original-file preservation. Targeted installed B drives real automatic DEVELOP intake through the native save, kills Firefox after staging application/before ACK, and independently checks every byte and untouched Git originals.
-- Push/verify checkpoints; merge after required T/B, verify main, then continue P24. Existing transport probes are accepted and are not rerun. Live P3 remains NOT TESTED/unauthorized until P46.
+- Add one fixed native AI adapter through existing protected donor scope; feature-detect editor/input/send/new-chat/session controls. Reuse accepted historical mechanism evidence; do not repeat live probes or implement streaming transport.
+- Resume the staged DEVELOP job. Persist distinct new-chat and send possible boundaries, independently verify fresh transition, exact raw input and UTF-8 digest, and retain exact account/Persona/remote/document/chat binding. No automatic repeat after unknown effects or lost document continuity.
+- Preserve protected tabs with dashboard closed; account for at most two actively automated DEVELOP jobs separately from later parked review. Never reuse another job's review tab.
+- Verify native input behavior against captured evidence before enabling dispatch. Known native transformation, unsupported context or ambiguous transition must hold before Send, with precise diagnostics; no silent prompt rewriting.
+- Add Work/Generator context and same-operation Check. Record sanitized digests, not prompt/chat capabilities.
+- Focused T checks exact Unicode/newline bytes, duplicate calls, stale document/binding, pause/module fences, unsupported native behavior and restart/no replay. Required installed B uses production adapter and independent native new-chat/send counts, dashboard closure and forced Firefox restart. Merge only when full bounded outcome and required evidence are satisfied; preserve any genuine external hold and continue independent eligible phases.
 
-Exact three-file candidate composition, same-job STAGE save/readback, prepared-operation recovery and contextual UI are implemented. Focused T/build and required installed B are in progress. CI retains its existing two jobs/triggers and replaces only the affected journey with installed_develop_stage.py; unchanged source/Git invariants stay selected.
+P24 fixed donor/native adapter, staged-job continuation, separate chat/send effects, document/tab reservation, exact-input guards and inspection-only restart behavior are implemented. Local focused73T PASS; build and required installed B pending. Edge whitespace/CRLF that native controls transform hold before Send; no silent trim. A native-disabled initial New Chat also holds rather than inventing a fresh transition. Existing transport evidence is reused; actual provider compatibility remains P46. Live integrated native acceptance remains NOT TESTED/unauthorized (P46).
+
+Checkpoint00a0cb5e/run41354256306: focused T/build PASS; installed B failed in fixture navigation (duplicate dashboard closure), before its AI oracle. Corrected observer selection; required B remains pending.
+
+Checkpoint35c8665e/run41354353859: focused T/build PASS; installed B exposed missing private-bootstrap AI forwarding at NEW_CHAT. Fixed that boundary with a direct regression. Added delayed native-confirmation readback, intervening manual-reset fencing and sanitized prompt/chat hash evidence. Required installed B is pending on this corrected candidate.
+
+Cold initialize now explicitly persists AI_INSPECTION_REQUIRED for already-held and waiting AI work, rather than retaining a stale pre-restart review label; two direct cold-open regressions cover both. New installed candidate pending.

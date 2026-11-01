@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: node --test tests/deployer.test.mjs tests/git-writer.test.mjs tests/git-plan.test.mjs tests/records.test.mjs tests/source-save-native.test.mjs tests/source-writer.test.mjs tests/donor-accounts.test.mjs tests/accounts.test.mjs tests/host.test.mjs tests/source-inspection.test.mjs tests/source-observations.test.mjs tests/source-set.test.mjs tests/queue.test.mjs tests/seed.test.mjs tests/packages.test.mjs
+      - run: node --test tests/ai-native.test.mjs tests/deployer.test.mjs tests/git-writer.test.mjs tests/git-plan.test.mjs tests/records.test.mjs tests/source-save-native.test.mjs tests/source-writer.test.mjs tests/donor-accounts.test.mjs tests/accounts.test.mjs tests/host.test.mjs tests/source-inspection.test.mjs tests/source-observations.test.mjs tests/source-set.test.mjs tests/queue.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}
@@ -53,8 +53,8 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Verify exact DEVELOP instruction staging and recovery (normal sandbox)
-        run: python3 tests/installed_develop_stage.py build/pcms-dev.xpi
+      - name: Verify one-shot native chat and exact prompt (normal sandbox)
+        run: python3 tests/installed_develop_chat.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
