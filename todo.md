@@ -1,54 +1,27 @@
 # Current work
 
-**P28 — scoped authentication and cookie collectors. Implementation plan before code.**
+**P28 implemented and verified. Merge/postverify, then P29.**
 
-P01–P18 merged and verified. P18 PR18 mainb04c3b7ce8a48f5c15009b03cf3a3a09fffa6877/tree279e292a54914a9a3a5e027d60b9c754b041fe0a, post41302307395 PASS. Bounded P17 payload correction [PR19](https://github.com/Neb963/PCMS/pull/19) merged as `db61deab2168fb12cc4eb9b9f910291b383b9416`, exact tree `f1cb79dbf1acfe91f885dec00052c708873ff679`. Source375ec1afeb46a2102e3834bb3f1a782d25300b85 passed212 T/build + required B41303250000; XPI866cae23b72583fc2345ab8b655acaff80b2782e58ea1d54b3af535fbf86d8b8. Postmerge41303419331 in progress; verify before completing this phase.
+P01–P18 merged and verified. P17 private payload correction PR19 merged main `db61deab2168fb12cc4eb9b9f910291b383b9416`, tree `f1cb79dbf1acfe91f885dec00052c708873ff679`; post41303419331 PASS. P19 remains held for the exact source-grounded native provider revision mechanism; P20–P27/P35/P37/P38 and descendants remain dependency-blocked. P28 is independently eligible from completed P11.
 
-## P19 hold and dependency selection
+## P28 outcome and evidence
 
-P19 requires a shared native source save with actual provider revision conflict handling. Available pinned Alpha code calls app.saveGenerator() but supplies no qualified revision/precondition recipe. P18 providerRevision is null; sourceStamp is a fingerprint only. The accepted discovery-v3.zip is located in the user's files, but the current execution environment is unavailable and cannot extract it. Text retrieval supplied no primary revision fields. No new historical/live investigation, invented provider facade or force-save is authorized. P19 is unimplemented/held for access to that exact source evidence; P20–P27, P35/P37/P38 and their descendants remain dependency-blocked. P28 depends only on completed P11; select it next. P36 is also independent but follows P28–P34 when eligible.
+[PR20](https://github.com/Neb963/PCMS/pull/20), verified source `07df68f89fb9fd53699ea095bc679d79f4edbe2b`, tree `e71027260425271a1597168a70a4ca3ff5abe724`. [41304693540](https://github.com/Neb963/PCMS/actions/runs/41304693540):225 T/build and full required installed B PASS. XPI `adba318b49fb40ebf709ab16046c3da838cfe2a814e3d6a35e0a17a1ea5d2f14`, Firefox155.0/build20260817142839, normal sandbox6 and real process restart.
 
-## P28 implementation plan
+Backup0.2 uses the existing Core queue/module host for finite CAPTURE coverage turns. The fixed perchance-auth-1 collector reads only top-level app-storage.user's established authentication fields plus session-change guard. Unknown schema, missing logged-in guard, changed principal/document, unavailable managed context and continuous rotation remain explicit incomplete coverage. The donor reuses cookieService.list with exact store/partition/FPI dimensions and preserves attributes/session/expiry. Authentication is checked before/after cookie collection and cookie changes are observed; retries are bounded.
 
-1. Add fixed packaged perchance-auth-1 isolated-world read of the top-level origin's schema-checked app-storage.user authentication fields and sessionTokenLastChangeTime. Preserve exact strings; reject unknown schema, rotation, wrong principal/document/origin. Report absent separately from unavailable. Never read arbitrary origin data, sessionStorage, IDB, OPFS, src or AI workspace.
-2. Reuse the donor's existing cookieService.list for the exact managed Persona store, including firstPartyDomain:null and partitionKey:{}. Preserve normalized identity and all cookie attributes/session/expiry. Stage auth before/after cookie reads, detect cookie/session changes and bound retries. Reuse an attributable protected top-level context or open a separate read-only collection context; never replace a development/review editor.
-3. Add one finite Backup CAPTURE coverage job on the existing Core queue/module host. Retain private capture bytes in Core blobs and references; return only secret-safe completeness/context/times/counts. Recheck module generation/account revision at admission; unavailable/archived/changed contexts are explicit incomplete coverage. Global Pause permits enabled Backup maintenance; disabling Backup stops new collection. Preserve previous valid/stale evidence and exact retry diagnostics across restart.
-4. Settings → Backup gets actual Check session coverage/progress/results, per-account cause and exact Accounts recovery links. Explain known adapter coverage and exclusions. No successful Back up now/disk-export control before P31. Existing installations require explicit compatible Backup0.2 update; no reseed.
-5. T covers exact Unicode/secret bytes, absent/unknown/rotation, cookie isolation/expiry identity, persistence, stale account/module and safe projections. Affected B clicks packaged coverage against real protected fixture localStorage and Firefox cookies in two containers, checks private bytes independently, unrelated stores untouched, negative schema/rotation and secret-safe UI, Pause/Disable and actual restart. Reuse unchanged research and P18 evidence. No live login portability claim.
-6. Push meaningful code+todo checkpoints, verify exact remote commits/trees/files, run focused T/build and affected installed B through existing two jobs, merge verified outcome and verify postmerge main. Then P29 and all independent eligible work.
+Private capsules live in the existing account-scoped Core credential store. The same atomic module/job/account guard prevents stale writes and account-removal resurrection; existing Remove local data deletes those secrets. Jobs/Journal/dashboard/module projections receive no token, cookie value or raw surrounding app/AI store. Previous complete coverage is labeled stale after a failed later collection; removed capsule data becomes incomplete.
 
-## Holds
+Settings → Backup provides actual Check session coverage/progress, contextual per-account causes, exact Accounts links, search/pages and retained search state. Pause permits enabled Backup maintenance and Journal disable does not disable it; Backup Disable prevents new collection, Enable does not automatically capture. No successful Back up now/disk-export action exists before P31; login qualification is explicitly false.
 
-H/G/P1–P5 NOT TESTED/unauthorized. P42–P49 require named disposable targets/effects. P48 must qualify current login inventory and operational sessions. Cookie/auth bytes are synthetic evidence, never proof of live login/route portability. Local execution remains unavailable; only actually completed remote Actions checks will be claimed.
+T covers exact NUL/Unicode/newline secret strings, absent versus unknown/malformed schema, wrong principal/document/frame, session guard/rotation, cookie identity/attributes/partitions/expiry/duplicates, dedup, Pause, stale account, Disable, restart between participants and actual scoped local-removal cleanup. B independently reopened private records and checked real protected origin storage and actual Firefox partitioned/FPI/session/persistent cookies in two containers. Unrelated default-container cookie and human unsaved editor were preserved; secret-safe UI/search/navigation/narrow view, unknown schema, continuously changing session, prior-good preservation, repair, Disable/Enable and real restart all passed.
 
-## Collector checkpoint
+Earlier failed runs remain failed: initial new validator escaping/fixture errors were corrected; an older Creator polling helper now waits for asynchronous job linkage; initial rotation fault used a background-throttled timer and was moved into a visible fixture window. Final41304693540 is the passing current artifact. No historical feasibility or live provider test was repeated.
 
-Added the fixed top-level auth read and strict privileged session/cookie validation. The donor reuses cookieService.list in the exact managed store, observes cookie-change epochs and compares guarded auth before/after, preserving the original tab. No broad storage/AI collector or new native protocol exists. Code is not yet integrated into Backup UI/runtime; T/build/B pending.
+## Next action and holds
 
-## Runtime checkpoint
+Publish evidence, merge PR20, verify exact main tree and postmerge CI. Then write P29's actual plan for immutable complete Core/donor/auth capture, keeping slow per-account collection outside the short cut barrier, checking revisions/reference closure and never reporting disk success before P31. Continue eligible phases without stopping at this boundary.
 
-Backup0.2 now runs finite CAPTURE coverage turns through the existing sandbox/module host/Core queue. Raw capsules are hashed/pinned private Core blobs; projected progress contains no secret fields. Account/module guards, bounded rotation retries, missing account/Persona diagnostics, previous complete coverage and disabled read settlement are implemented. No archive/export success path is exposed. PR19 postmerge41303419331 passed both jobs. Focused T and required B remain pending.
+P19: pinned accessible Alpha establishes app.saveGenerator() but no qualified revision/precondition recipe. P18 providerRevision remains null and sourceStamp is not CAS. Accepted discovery-v3.zip is located but cannot be extracted while the local runtime is unavailable. Do not invent a provider facade or claim a local lease protects other devices. Source writes remain unimplemented/held.
 
-## Primary UI checkpoint
-
-Settings → Backup now provides actual queued session coverage, progress, per-account causes/context/times and exact Accounts recovery links, search and ten-account pages. The query projection excludes capsule/blob IDs, tokens, emails and cookie values. Search/page state persists; polling keeps the search control stable. No disk-export control is present. Verification is pending.
-
-## Focused verification added
-
-New T exercises exact scoped auth bytes, unknown/absent/schema distinctions, wrong principal/document/frame and session rotation; full cookie identity/attributes, duplicate/schema/expiry rejection; finite maintenance collection, private blob closure, dedup, Pause, bounded rotation, previous good, stale account/Disable and restart between participants. These checks have been written but not yet run.
-
-Initial P28 T41304038004 failed (215/222): the newly written auth regex had an extra escape, a seeded-version assertion used the wrong loop variable, and a two-account fixture reused a unique principal. Correcting those exact defects; none of that run is passing evidence. Installed P28 journey is being added before completion.
-
-## Installed verification checkpoint
-
-Source2f3d6ddc passed222 T/build in41304132324. The older Creator B selected by the prior workflow failed in its polling helper before Creator intake linked a newly visible folder (KeyError creatorJobId); the helper now waits safely for that link. Required P28 B is now selected: actual protected localStorage, real Firefox cookie partitions/FPI/attributes, two accounts, private-byte reopen, unrelated/human-edit sentinels, secret-safe UI, unknown/rotating sessions, Pause/Journal-disabled/Backup Disable and actual restart. Its result is pending.
-
-Collector review tightened the known required guard: a logged-in authentication record with missing session-change key is incomplete, not an absent login. Cookie partition origin validation preserves ports permitted by the existing donor service. Added the focused missing-guard case; B remains pending.
-
-First affected B41304294997 reached and passed real scoped auth/cookie/private-byte, unrelated/human-editor, Pause/Journal-disabled and negative schema assertions, then failed the changing-session fault assertion. A hidden fixture tab's timers are throttled; the rotation fixture now keeps that document visible in a separate window and reports the exact secret-safe observed coverage on failure. The full required journey is still unpassed.
-
-## Local removal contract correction
-
-Review found that keeping raw collected sessions in historical source-style blobs would retain usable secrets after Remove local account. Capsules now use the existing account-scoped privileged credential store, whose P11 removal transaction deletes them. Jobs retain only a private capsule key/hash and public coverage. Status marks a deleted capsule incomplete; a focused actual Remove local data regression verifies deletion. No new store or cleanup authority was added. The affected installed journey independently reopens these private records; required B will rerun.
-
-The credential write now uses the same atomic module/job/account guard as source admission, inside the credential transaction. An account removal between read and persistence cannot resurrect session secrets. Added the negative scoped-write regression; focused and installed checks pending on the new source.
+H/G/P1–P5 NOT TESTED and unauthorized; P42–P49 require named disposable resources/effects. P48 must qualify actual login inventory/portability; synthetic captured bytes are not operational session/route proof. Local execution is unavailable; all checks claimed here ran in remote Actions.
