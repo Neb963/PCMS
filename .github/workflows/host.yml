@@ -53,8 +53,8 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Verify one-shot native chat and exact prompt (normal sandbox)
-        run: python3 tests/installed_develop_chat.py build/pcms-dev.xpi
+      - name: Verify same-chat review, readiness and parked tabs (normal sandbox)
+        run: python3 tests/installed_develop_review.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

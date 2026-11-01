@@ -80,6 +80,9 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'backup.captureCheck':result=await backup.checkCapture({id:message.id});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'backup.status':result=await backup.status();break;
         case 'backup.coverage':result=await backup.enqueue({requestId:message.requestId});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'deployment.aiCheck':result=await deployer.checkAi(message);break;
+        case 'deployment.review':result=await deployer.reviewAi(message);break;
+        case 'deployment.cancel':result=await deployer.cancelAi(message);break;
         case 'deployment.get':result=await deployer.get(message.id);break;
         case 'deployment.check':result=await deployer.check(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.saveGet':result=await sourceWriter.get(message.id);break;
