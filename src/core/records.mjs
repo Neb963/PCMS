@@ -35,7 +35,7 @@ export function safeEvent(event) {
 }
 const fields={
   accounts:['accountId','label','state','principalLabel','personaUid','observedAt','holdCode'],
-  generators:['generatorId','slug','accountId','repositoryId','folder','listing','state','observedAt','holdCode','gitState','gitHoldCode','markerVersion','markerAction','markerStatus','folderPresent','folderTreeSha','markerSha','catalogHead','catalogObservedAt','remoteId','ownerObservedAt','creatorState','creatorHoldCode','creatorJobId','allocationAccountId'],
+  generators:['generatorId','slug','accountId','repositoryId','folder','listing','state','observedAt','holdCode','gitState','gitHoldCode','markerVersion','markerAction','markerStatus','folderPresent','folderTreeSha','markerSha','catalogHead','catalogObservedAt','remoteId','ownerObservedAt','creatorState','creatorHoldCode','creatorJobId','allocationAccountId','deploymentJobId','deploymentState','deploymentCode'],
   jobs:['jobId','logicalKey','moduleId','targetId','accountId','state','step','dueAt','recovery','batchId','kind','effect'],
   modules:['moduleId','name','version','enabled','generation','state'],
   files:['captureId','type','automatic','filename','bytes','sha256','state','completedAt'],

@@ -55,7 +55,7 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
     j=await save(j,{accountId:a.id,step:'PREPARE',input:{...j.input,slug:g.slug,remoteId:g.remoteId,principalFingerprint:a.expectedPrincipal,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId},deployment:{...j.deployment,phase:'PREPARE'}},'RESOLVE_DEPLOYMENT_OWNER',{deploymentState:'PREPARE',deploymentCode:null});return output(j,'CONTINUE');
    }
    if(j.deployment.phase==='PREPARE'){
-    j=await core.queue.claim(j.id,j.rev);const a=await core.read('accounts',j.accountId),opened=await donor.openSourceEditor(scope(a),j.input);check(opened?.ok,opened?.code??'EDITOR_NOT_OPEN');
+    j=await core.queue.claim(j.id,j.rev);if(!j.deployment.editorRequestedAt){j=await save(j,{deployment:{...j.deployment,editorRequestedAt:clock()}},'OPEN_DEPLOYMENT_EDITOR');const a=await core.read('accounts',j.accountId),opened=await donor.openSourceEditor(scope(a),j.input);check(opened?.ok,opened?.code??'EDITOR_NOT_OPEN');return output(j,'WAITING');}const a=await core.read('accounts',j.accountId),opened=await donor.openSourceEditor(scope(a),j.input);check(opened?.ok,opened?.code??'EDITOR_NOT_OPEN');
     const snapshot=await writer.capture(j);
     try{
      const all=await donor.inspectSourceEditors(scope(a),j.input);check(all?.ok&&all.editors?.length,'EDITOR_NOT_OPEN');
@@ -70,9 +70,9 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
    }
    if(j.deployment.phase==='PREPARED')return hold(j,j.kind==='DEPLOY'?'DEPLOY_SOURCE_PENDING':'DEVELOP_STAGING_PENDING');
    return hold(j,'DEPLOYMENT_STATE_UNSUPPORTED');
-  }catch(error){if(error.code==='STALE_REVISION')throw error;return hold(j,error.code??publicError(error));}
+  }catch(error){if(error.code==='STALE_REVISION')throw error;const latest=await core.read('jobs',j.id);if(latest.deployment.phase==='PREPARE'&&clock()-latest.deployment.editorRequestedAt<20000&&['EDITOR_NOT_OPEN','EDITOR_CONTRACT_UNVERIFIED','EDITOR_OBSERVATION_UNKNOWN','SOURCE_CONTEXT_MISSING'].includes(error.code))return output(latest,'WAITING',error.code);return hold(latest,error.code??publicError(error));}
  }
- return {validate,initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
+ return {validate,recover:()=>run(async()=>{for(const j of await rows('jobs'))if(j.moduleId===id&&j.deployment&&j.save?.phase!=='COMPLETE'&&(j.effect?.boundary==='POSSIBLE'||j.effect?.disposition==='APPLIED'))await effect(j,true);}),initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
   async get(targetId){const g=await core.read('generators',targetId);check(g,'TARGET_MISSING');const j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;return {jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',possible:j?.effect?.boundary==='POSSIBLE'};},
   check:args=>run(async()=>{const g=await core.read('generators',args.id);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);check(!terminal(j),'JOB_FINISHED');if(j.effect?.boundary==='POSSIBLE')return effect(j,true);await validate(j);await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {state:'WAITING'};})
  };
