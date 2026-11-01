@@ -1,25 +1,18 @@
 # Current implementation checkpoint
 
-## P20 — READY intake and safe update preparation
+## P21 — DEPLOY selected complete source
 
-Base main `efd84eaaba651a9fa78789ba1de1d08fb8171e7c`, tree `59835227893ac8a69f0023114c1ccdc18cb03c50`. Remote inspected 1 November 2026: P01–P19 and P28–P33 merged; no open PR. P19 postmerge T/B evidence remains valid and is not repeated. This invocation continues sequentially through all eligible phases.
+P20 merged as [a17cb4d](https://github.com/Neb963/PCMS/commit/a17cb4df65fbd8e2ea5f43782767a20361e5a06c), tree39a50442c1ac457a65f5c2b6bfd1cedac9bbf5be, identical to verified PR27 HEAD882c68d. [41350798299](https://github.com/Neb963/PCMS/actions/runs/41350798299) focused109T/build and required installed B PASS. The normal-sandbox Firefox155.0/build20260817142839 test proved automatic READY-before-Creator without a Deployer source lock, protected adoption, exact byte-preserving unlisting and one-effect readback after process death. Prior failed runs and corrections remain in Git history/learned.md. Main tree verified independently through GitHub and fetch.
 
 ### Plan before implementation
 
-- Read immutable Git objects from the current catalog; pin action/version/commit, exact required bytes and input digest in the existing Core blobs/jobs. Reject changed input under the same version and external unverified DONE.
-- Automatically intake READY once. Persist WAIT_CREATOR with its existing dependency job, without a Deployer writer hold. Never clear Creator uncertainty or steal its creation fence.
-- Supersede only before effects; withdrawals and relevant input changes fence subsequent writes. Preserve every old candidate and receipt.
-- After verified owner/remote identity, acquire the existing writer hold, inspect every editor and preserve complete previous-good. Verify unlisted before preparation completes; use the native guarded save mechanism for listing, with independent source/listing readback and no replay after possible effects.
-- Wire finite module steps and contextual Generators/Work status/recovery into the packaged runtime. No manual Start and no second queue/controller.
-- Run focused T/build checks, then targeted normal-sandbox installed B against independent Git/provider fixtures: READY-before-Creator, Creator Unknown, source-lock ordering, unlist-before-edit, withdrawal/version conflict and restart. Record B as open until actually run.
-- Push meaningful checkpoints, verify remote commit/tree, merge only completed verified work, then select P21 automatically. If a genuine boundary blocks P20, retain its exact state and select safe independent P34 or P36.
+Base is actual main a17cb4d; branch p21-pinned-deploy-source. Preserve P20 and P28–P33.
 
-### Evidence and holds
+- Continue a prepared DEPLOY on the same durable job and persistent writer; retain its original previous-good and unlist receipt. No approval or manual Save.
+- Read the complete pinned input manifest (roots, binary src and exact paths). Recheck current READY inputs, owner, unlisted baseline and every editor through the existing shared source writer.
+- Start a distinct source effect identity while preserving the observed unlist history. Reset only the completed current-effect pointer; never erase POSSIBLE or old receipts.
+- Independently verify the complete stored set, including deletions. Show Saved — publication pending in Generators/Work. Do not publish or mark DONE in P21.
+- Add focused production T for exact pinned bytes, relevant Git/source drift, dirty editors, Pause, stale revision, lost ACK and cold recovery. Extend only the affected installed B journey: actual Git intake → protected native full-source save, dashboard closed, process death after application, exact independent bytes/counts and no other-generator/Git writes.
+- Push meaningful checkpoints; merge after required T/B, verify postmerge main and automatically proceed to P22. G/P2 remain deferred to P43/P45, NOT TESTED/unauthorized.
 
-Checkpoint: immutable input reader, automatic version/Creator intake, same-job source preparation and contextual UI are implemented but unverified. Existing source/native focused regression: 46 T PASS before runtime wiring. P20-specific 10 T PASS; combined selected T result is recorded in the next checkpoint. Required B is pending the targeted installed_deployer.py journey. Local qualifying Firefox download failed with proxy CONNECT timeout; use existing hosted Firefox setup without changing security settings. CI selection replaces the prior P19 journey, adds only P20 tests, and retains the same two jobs/cache/trigger frequency. No broad suite is added. G/H/P1–P5 remain NOT TESTED and unauthorized, except existing supplied P19 source evidence. No live provider mutation is authorized. Required installed evidence may use controlled fixtures. Accepted specification/design/PHASES remain unchanged.
-
-P20 verification: local 97 focused T/build passed before additional shared-RPC verification. Installed run [41350275482](https://github.com/Neb963/PCMS/actions/runs/41350275482) failed at Core startup (default input-reader factory options), before any READY/provider effect. The same failure was reproduced by `records.test.mjs` and corrected; this failed run remains FAIL. Input-object caching also avoids rereads for unchanged READY folders. B remains open.
-
-Run [41350428870](https://github.com/Neb963/PCMS/actions/runs/41350428870): focused CI passed; installed fixture reached real READY/WAIT_CREATOR with no writer/effects, then failed its human-status-text assertion. The UI now renders the actual dependency phase in plain language. Waiting uses catalog observations and a bounded dependency wake instead of rereading remote input objects each second. Missing Git inputs now appear at the affected generator; its negative/recovery test passes.
-
-Installed [41350601412](https://github.com/Neb963/PCMS/actions/runs/41350601412) PASS on source0030ed7c: actual READY-before-Creator, no Deployer source lock while waiting, protected adoption, exactly one native listing-only save, complete byte preservation, forced Firefox death before ACK, same-operation readback, contextual Work/Generator controls and new-version reconciliation hold. Firefox155.0/build20260817142839, sandbox6; XPI291f7068eedaa735b0b63344217280ecdd8bf86bbfb399104a7014ba31b158e9 (832004 bytes). Final long-version identity change has local regression coverage; final candidate CI/postmerge still pending.
+Implementation not started. P21 T/B NOT TESTED. No live provider effect is authorized.
