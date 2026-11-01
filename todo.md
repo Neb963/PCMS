@@ -17,7 +17,7 @@ P01–P15 are merged. P15 [PR #15](https://github.com/Neb963/PCMS/pull/15), main
 
 ## Next action and holds
 
-P16 code is not yet written. Next implement atomic local ownership/reservation primitives and the fixed read-only provider observation, then finite intake and actual Generators controls.
+P16 finite ownership/adoption/allocation and packaged controls are implemented in the current branch. Next complete affected installed Firefox evidence, resolve actual findings, and merge only after required B passes.
 
 The runtime is restored at `/workspace/scratch/a60548e2a34d/PCMS`; clean checkout matches verified main. Dependencies installed with npm ci --ignore-scripts. P13–P15 evidence remains its original GitHub CI identity; no unavailable historical local command is claimed run.
 
@@ -28,3 +28,5 @@ Atomic allocation/adoption checkpoint: a narrow Core transaction supplies curren
 Protected observation checkpoint: the fixed ownership adapter returns only attributable owner/ID/slug/listing facts and never source/session payloads. The existing queue now admits a saved candidate account only for read-only observations, with exact revision/account fences and ordinary global/per-account budgets; reads gain no maintenance exemption. Twenty-seven focused local tests PASS across allocation, observer and queue, including wrong scope, archive race and Pause after intent. Finite Creator intake/UI/required installed evidence remain OPEN.
 
 Finite Creator checkpoint: automatic valid-folder intake, bounded per-account ownership reads, affirmative cache plus fresh owner confirmation, conflict/foreign holds and allocation without a negative-ownership veto are drafted. Same-operation read recovery survives restart/fenced safe stop without new writes; reservations and source stay intact. Thirty-four focused local tests PASS. Packaged host/bundle/Generators UI and required final installed B remain OPEN.
+
+Packaged integration checkpoint: Creator0.2 runs through the existing sandboxed module host and one queue. Generators shows live owner/remote identity/listing, reservation, account observations, Work/account links, ownership recheck and persisted pre-dispatch account selection. Full local T:177 PASS; production build succeeds. Required P16 installed B remains OPEN; no provider create is implemented or claimed.
