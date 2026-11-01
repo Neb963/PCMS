@@ -5,3 +5,8 @@
 .global-control{display:flex;align-items:center;gap:12px;margin-left:auto}select{font:inherit;padding:9px;border:1px solid #bac5d0;border-radius:5px;background:white}#work-list{padding:0;list-style:none}#work-list li{padding:12px 0;border-bottom:1px solid #dfe4ea}#work-list a{color:#163b64;text-decoration:none}@media(max-width:600px){header{flex-wrap:wrap}.global-control{width:100%;margin-left:0}}
 
 .module-frame{display:block;width:100%;min-height:460px;border:1px solid #dfe4ea;border-radius:8px;background:white;margin-top:20px}input.module-pin{display:inline;width:auto;margin:0 6px 0 0}#records section{padding:12px 0;border-bottom:1px solid #dfe4ea}
+#source-detail { margin-top: 2rem; }
+#source-detail button, #creator-detail button { margin: .25rem; }
+.source-file-path { overflow-wrap: anywhere; text-align: left; max-width: 100%; }
+#source-file-content { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 32rem; overflow: auto; }
+#source-file-state { overflow-wrap: anywhere; }

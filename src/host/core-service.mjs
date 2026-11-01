@@ -6,6 +6,7 @@ import {createLifecycle} from '../modules/lifecycle.mjs';
 import {createWebsiteScripts} from './website-scripts.mjs';
 import {createGitWriter} from '../core/git-writer.mjs';
 import {createGitCatalog} from '../core/git-catalog.mjs';
+import {createSourceInspection} from '../modules/source-inspection.mjs';
 import {createCreator} from '../modules/creator.mjs';
 import {createDiscover} from '../modules/discover.mjs';
 import {createAccounts} from '../modules/accounts.mjs';
@@ -18,7 +19,7 @@ import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -33,10 +34,10 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     accounts=createAccounts({core:value,donor:accountAdapter,pins:refreshAccountPins});await accounts.initialize();
     downloads=api?.downloads?createDownloads({core:value,api,profileId:(await value.status()).profileId}):null;
     discover=createDiscover({core:value,donor:accountAdapter,downloads,gitWriter,catalog:git});await discover.initialize();
-    creator=createCreator({core:value,donor:accountAdapter});await creator.initialize();
+    creator=createCreator({core:value,donor:accountAdapter});await creator.initialize();source=createSourceInspection({core:value,donor:accountAdapter});
     journal=createJournal({core:value,downloads,retention:api?.downloads?createRetention({core:value,api,profileId:(await value.status()).profileId}):null});await journal.initialize();if(downloads)await journal.changed();await discover.changed();await journal.tick();
     if(globalThis.document&&api){
-      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect,discoverEffect:discover.effect,creatorEffect:creator.effect,discoverPage:(name,args)=>name==='discover.list'?discover.list(args):name==='discover.get'?discover.get(args.id):name==='discover.import'?discover.import(args):name==='discover.command'?discover.command(args):name==='discover.export'?discover.export(args):name==='discover.preparations'?discover.checkPreparations(args.id):name==='discover.retryPreparation'?discover.retryPreparation(args):name==='discover.navigate'?discover.navigation(args):discover.changed(),gitEffect:(job,reconcile)=>job.moduleId==='pcms-discover'?discover.prepareEffect(job,reconcile):gitWriter.step(job,{kind:'PREPARE',slug:job.input.slug},reconcile)});
+      modules=createModuleHost({core:value,api,notify,onDue:()=>schedule(value),journalEffect:journal.effect,accountEffect:accounts.effect,discoverEffect:discover.effect,creatorEffect:creator.effect,sourceEffect:source.effect,discoverPage:(name,args)=>name==='discover.list'?discover.list(args):name==='discover.get'?discover.get(args.id):name==='discover.import'?discover.import(args):name==='discover.command'?discover.command(args):name==='discover.export'?discover.export(args):name==='discover.preparations'?discover.checkPreparations(args.id):name==='discover.retryPreparation'?discover.retryPreparation(args):name==='discover.navigate'?discover.navigation(args):discover.changed(),gitEffect:(job,reconcile)=>job.moduleId==='pcms-discover'?discover.prepareEffect(job,reconcile):gitWriter.step(job,{kind:'PREPARE',slug:job.input.slug},reconcile)});
       scripts=createWebsiteScripts({core:value,api,load:modules.load,context:websiteContext});
       const host=modules.lifecycle;
       lifecycle=createLifecycle({core:value,host:{...host,
@@ -54,7 +55,13 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     try {
       const value=await core();let result;
       switch(message?.operation) {
-        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};let m=await lifecycle.request(message.id,message.kind,message.requestId);if(message.id==='pcms-discover'){await discover.changed();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-creator'){await creator.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}await journal.tick();await accounts.initialize();await discover.initialize();await creator.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};let m=await lifecycle.request(message.id,message.kind,message.requestId);if(message.id==='pcms-discover'){await discover.changed();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-creator'){await creator.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-deployer'){await source.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}await journal.tick();await accounts.initialize();await discover.initialize();await creator.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'source.get':{const {current,previous,changes,...summary}=await source.get(message.id);result={...summary,currentFiles:current.length,previousFiles:previous.length};break;}
+        case 'source.files':result=await source.list(message);break;
+        case 'source.file':result=await source.file(message);break;
+        case 'source.open':result=await source.open(message);break;
+        case 'source.inspect':{const s=await source.inspect(message);result={state:s.state,code:s.code,jobId:s.jobId};}if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.check':{const s=await source.check(message);result={state:s.state,code:s.code,jobId:s.jobId};}if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'creator.inspect':result=await creator.inspect(message);break;
         case 'creator.status':result=await creator.status();break;
         case 'creator.get':result=await creator.get(message.id);break;
@@ -109,7 +116,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'view.get':result=await value.view('shell-view');break;
         case 'view.save': {
           const v=message.value;
-          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
+          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount','sourceSelection','sourceSearch','sourceVersions'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
           result=await value.saveView('shell-view',v,message.requestId);break;
         }
         default:return {ok:false,code:'OPERATION_DENIED'};

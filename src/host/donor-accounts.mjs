@@ -345,9 +345,9 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   const run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('ACCOUNT_DOCUMENT_CHANGED');return rows[0].result;};
   try{const witness=await run(accountDocumentWitness),result=await run(observeSavedSource,[{...request,principalFingerprint:scope.expectedPrincipal,documentWitness:witness}]),after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url||final.code)return fail(final.code??'ACCOUNT_DOCUMENT_CHANGED');return result;}catch{return fail('SOURCE_CONTEXT_UNKNOWN');}
  }
- async function openSourceEditor(scope,{slug,remoteId}){
+ async function openSourceEditor(scope,{slug,remoteId,tabId=null}){
   if(nativeSlug(slug)!==slug||!/^public_[A-Za-z0-9_-]{1,100}$/.test(remoteId??''))return fail('SOURCE_REQUEST_INVALID');const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);
-  const url=PERCHANCE+slug+'#edit',tabs=await api.tabs.query({cookieStoreId:scope.containerId}),selected=tabs.find(t=>t.url===url);if(selected){await api.tabs.update(selected.id,{active:true});await api.windows.update(selected.windowId,{focused:true});return {ok:true,tabId:selected.id};}
+  const url=PERCHANCE+slug+'#edit',tabs=await api.tabs.query({cookieStoreId:scope.containerId}),selected=tabs.find(t=>t.url===url&&(tabId===null||t.id===tabId));if(tabId!==null&&!selected)return fail('EDITOR_DOCUMENT_MISSING');if(selected){await api.tabs.update(selected.id,{active:true});await api.windows.update(selected.windowId,{focused:true});return {ok:true,tabId:selected.id};}
   const tab=await personaPlatform.open(scope.containerId,url,true);await api.sessions.setTabValue(tab.id,'pcmsSourceEditor',{accountId:scope.accountId,slug,remoteId});return {ok:true,tabId:tab.id};
  }
  async function inspectSourceEditors(scope,{slug,remoteId}){
