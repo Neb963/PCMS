@@ -18,7 +18,7 @@ export function createBackup({core,donor,clock=Date.now}){
  async function enqueue({requestId}){
   const m=await admit();check(typeof requestId==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(requestId),'INVALID_REQUEST');
   let j=(await rows('jobs')).find(j=>j.moduleId===id&&j.kind==='CAPTURE'&&j.input.coverageOnly===true&&!['COMPLETE','FAILED'].includes(j.state));
-  if(j){if(j.state==='HELD'&&j.effect?.boundary!=='POSSIBLE')j=await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {jobId:j.id,state:'COLLECTING'};}
+  if(j){if(j.effect?.boundary==='POSSIBLE'){await effect(j,true);j=await core.read('jobs',j.id);}if(j.state==='HELD'&&j.effect?.boundary!=='POSSIBLE')j=await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {jobId:j.id,state:'COLLECTING'};}
   const participants=(await rows('accounts')).filter(a=>a.state!=='REMOVED').map(a=>({id:a.id,label:a.label??a.id,personaUid:a.personaUid??null,containerId:a.containerId??null}));
   j=await core.queue.enqueue({requestId:'backup-'+requestId,logicalKey:'backup:coverage:'+requestId,moduleId:id,targetId:id,kind:'CAPTURE',jobSchema:m.manifest.jobSchema,input:{coverageOnly:true,participants},dueAt:clock()});
   const current=await module();await core.mutate([{table:'modules',id,expectedRev:current.rev,refs:current.refs,value:{...current,backup:{...current.backup,lastCoverageJobId:j.id}}}],{moduleId:id,step:'BACKUP_COVERAGE_START',result:'COMPLETE'},null,guard(j));

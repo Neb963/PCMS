@@ -37,3 +37,8 @@ test('atomic scoped secret admission rejects account removal or module disable b
  await f.c.mutate([{table:'accounts',id:a.id,expectedRev:a.rev,value:{...a,state:'ARCHIVED'}}],event);
  await assert.rejects(f.c.credentials.set('must-not-resurrect','private',a.id,guard),e=>e.code==='STALE_ACCOUNT');assert.equal(await f.c.credentials.get('must-not-resurrect'),null);
 });
+
+test('explicit coverage recheck reconciles a missing pure-read receipt without a second job',async t=>{
+ const f=await fixture(t),saveView=f.c.saveView;let lost=false;f.c.saveView=async(...args)=>{if(!lost&&args[0].startsWith('backup-session:')){lost=true;throw Error('fixture receipt loss');}return saveView(...args);};
+ const first=await f.s.enqueue({requestId:'lost-read'});await f.turn();await f.turn();let job=await f.c.read('jobs',first.jobId);assert.equal(job.effect.boundary,'POSSIBLE');assert.equal((await f.s.enqueue({requestId:'check-read'})).jobId,first.jobId);await f.drain();assert.equal((await f.s.status()).coverage.complete,true);job=await f.c.read('jobs',first.jobId);assert.equal(job.effects.length,1);assert.equal(f.calls,2);
+});
