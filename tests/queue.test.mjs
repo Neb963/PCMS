@@ -150,3 +150,11 @@ test('global Pause after durable intent cancels an ordinary readonly call withou
  try{await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('readonly-paused',async()=>calls++,{write:false,accountScopeId:'a'})),/PAUSED/);}finally{proto.put=put;}
  await pause;assert.equal(calls,0);assert.equal((await core.read('jobs',job.id)).effect.boundary,'BEFORE');assert.equal((await core.queue.status()).paused,true);
 });
+
+test('imported work remains read-only after exact reconciliation, with no writer/Git claim, automatic selection or wake loop',async t=>{
+ const {core}=await fixture(t);await core.queue.resume();let j=await core.queue.enqueue(input('restored'));const chosen=await core.queue.next();assert.equal(chosen.id,j.id);
+ await core.mutate([{table:'jobs',id:j.id,expectedRev:chosen.rev,refs:chosen.refs,value:{...chosen,runtimeInvalidated:true,effect:{operationId:'old-original',kind:'SAVE',boundary:'POSSIBLE'},state:'HELD'}}],event);j=await core.read('jobs',j.id);
+ assert.equal((await core.queue.reconciliation()).some(row=>row.id===j.id),true);await core.queue.reconcile(j.id,j.rev,'old-original',{matched:true,operationId:'old-original'});j=await core.read('jobs',j.id);
+ assert.equal(await core.queue.next(),null);assert.equal(await core.queue.deadline(),null);await assert.rejects(core.queue.claim(j.id,j.rev),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');await assert.rejects(core.queue.claimGit(j.id,j.rev,'repository'),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');
+ let calls=0;await assert.rejects(core.queue.dispatch(j.id,j.rev,effect('new-write',()=>calls++)),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');assert.equal(calls,0);assert.equal((await core.read('jobs',j.id)).effect.operationId,'old-original');
+});

@@ -24,9 +24,10 @@ export function stageRecords(data,{dataset,profileId,mappings,routeMap={}}){
    if(out.effect){out.effect.sourceBootId=out.effect.bootId??null;out.effect.bootId=null;out.effect.epoch=null;}
    // Saved input/checkpoints are evidence only; future adapters must derive
    // live binding from the checked restored account, never imported tab IDs.
+   if(out.git){out.restoredGit=structuredClone(out.git);out.git.locked=out.effect?.boundary==='POSSIBLE';}
    out.runtimeInvalidated=true;
   }
-  if(table==='modules'){out.generation=(out.generation??0)+1;out.restoredLifecycle=out.lifecycle??null;out.lifecycle=null;}
+  if(table==='modules'){out.generation=(out.generation??0)+1;out.restoredLifecycle=out.lifecycle??null;out.lifecycle=null;out.restoredInstances=out.instances??[];out.instances=[];}
   if(table==='files'){delete out.downloadId;delete out.sourceUrl;delete out.absolutePath;out.sourceProfileId=out.profileId??null;out.profileId=null;out.automatic=false;out.restoredReceipt=true;out.cleanup=null;delete out.payloadId;out.payloadAvailable=false;out.refs=[];}
   if(table==='pins')out.refs=(out.refs??[]).filter(hashId);
   return out;
