@@ -30,7 +30,7 @@ def inspect_creator(sid):
  return asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();let cursor=null,rows=[],jobs=[];do{const p=await c.list({table:'generators',cursor});for(const r of p.rows)rows.push(await c.read('generators',r.id));cursor=p.cursor;}while(cursor);for(const g of rows)if(g.creatorJobId)jobs.push(await c.read('jobs',g.creatorJobId));const status=await c.queue.status();c.close();return {rows,jobs,status};""")
 def target(sid,slug):return next((g for g in inspect_creator(sid)['rows'] if g['slug']==slug),None)
 def detail(sid,slug):
- generators(sid);set_input(sid,'#catalog-search',slug);wait(lambda:script(sid,"return document.querySelectorAll('#generator-list a').length===1"));click(sid,'#generator-list a');wait(lambda:script(sid,"return !!document.getElementById('creator-detail')"))
+ generators(sid);set_input(sid,'#catalog-search',slug);wait(lambda:script(sid,"const rows=[...document.querySelectorAll('#generator-list a')];return rows.length===1&&rows[0].textContent.startsWith(arguments[0]+' ·')",[slug]));click(sid,'#generator-list a');wait(lambda:script(sid,"return document.querySelector('#records h2')?.textContent===arguments[0]&&!!document.getElementById('creator-state')?.textContent",[slug]))
 def add_pending(remote):
  old=head(remote.root);c=commit(remote.root,old);entries=tree(remote.root,c['tree']['sha']);gens=next(e for e in entries if e['path']=='generators');folders=tree(remote.root,gens['sha'])
  for slug in ['pending-one','pending-unknown']:
