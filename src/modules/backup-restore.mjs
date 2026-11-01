@@ -39,7 +39,7 @@ export function createBackupRestore({core,donor,clock=Date.now}){
   if(latest.effect?.boundary==='POSSIBLE'){
    check(latest.effect.operationId===op,'RESTORE_OPERATION_SCOPE');const result=await observation();
    if(result.matched||result.resolved)await core.queue.reconcile(j.id,latest.rev,op,result);
-   else if(c.wantRollback&&!inflight.has(op)&&(observed?.before||c.state==='ALLOCATE'&&observed?.code==='RESTORE_ALLOCATION_UNKNOWN'))await core.queue.reconcile(j.id,latest.rev,op,{matched:true,operationId:op,disposition:'ROLLBACK_READBACK'});
+   else if(c.wantRollback&&!inflight.has(op)&&(observed?.before||c.state==='ALLOCATE'&&observed?.code==='RESTORE_ALLOCATION_UNKNOWN'))await core.queue.reconcile(j.id,latest.rev,op,{matched:true,operationId:op,disposition:'REJECTED'});
    else return {done:false,code:inflight.has(op)?'RESTORE_EFFECT_PENDING':observed?.code??'RESTORE_EFFECT_UNKNOWN'};
   }else if(latest.effects?.some(e=>e.operationId===op)){
    await observation();if(!observed?.ok)return {done:false,code:observed?.code??'RESTORE_EFFECT_CHANGED'};

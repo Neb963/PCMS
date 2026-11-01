@@ -37,3 +37,24 @@ test('corrupt file, missing confirmation and disabled Backup cannot change donor
  await f.service.confirm({id:p.id,revision:p.revision,confirmed:true});await f.service.rollback({id:p.id});await f.drain();assert.equal((await f.c.restore.read()).state,'CANCELLED');assert.equal(f.native.creates(),0);
  const m=await f.c.read('modules','pcms-backup');await f.c.mutate([{table:'modules',id:m.id,expectedRev:m.rev,refs:m.refs,value:{...m,enabled:false}}],event);await assert.rejects(f.service.preview({file:new File([f.encoded.blob],'source.pcms.zip')}),e=>e.code==='BACKUP_DISABLED');assert.equal(f.native.creates(),0);
 });
+
+test('lost donor state and storage receipts cold-reconcile the same writes without invoking either mutation twice',async t=>{
+ const f=await fixture(t),native=f.native.donor,applyState=native.applyState,applyStorage=native.applyStorage,calls=new Map();let stateCalls=0;
+ native.applyState=async(...args)=>{stateCalls++;return applyState(...args);};
+ native.applyStorage=async(write,...args)=>{const key=write.area+':'+write.key;calls.set(key,(calls.get(key)??0)+1);return applyStorage(write,...args);};
+ const p=await f.service.preview({file:new File([f.encoded.blob],'donor-ack.pcms.zip')}),j=await f.service.confirm({id:p.id,revision:p.revision,confirmed:true});
+ const lose=suffix=>{const save=f.c.saveView;let lost=false;f.c.saveView=async(key,...args)=>{if(!lost&&key.endsWith(suffix)){lost=true;throw new DOMException('synthetic durable receipt loss','AbortError');}return save(key,...args);};};
+ lose('-donor-state');await f.drain();assert.equal((await f.c.read('jobs',j.jobId)).effect.boundary,'POSSIBLE');assert.equal((await f.c.restore.read()).state,'DONOR_STATE');assert.equal(stateCalls,1);
+ await f.restart();lose('-donor-storage-0');await f.service.check({id:p.id});await f.drain();assert.equal((await f.c.read('jobs',j.jobId)).effect.boundary,'POSSIBLE');assert.equal((await f.c.restore.read()).state,'DONOR_STORAGE');assert.equal(stateCalls,1);assert.equal([...calls.values()][0],1);
+ await f.restart();await f.service.check({id:p.id});await f.drain();assert.equal((await f.c.restore.read()).state,'STAGED');assert.equal(stateCalls,1);assert.ok([...calls.values()].every(n=>n===1));assert.equal(f.native.creates(),1);
+});
+
+test('an Unknown local before-value never replays; explicit rollback uses the existing rejected readback disposition',async t=>{
+ const f=await fixture(t),before=await f.c.status(),old=f.native.local.fixtureDonorOwned.exact;let attempts=0;
+ f.native.donor.applyStorage=async()=>{attempts++;throw Error('synthetic local failure before mutation');};
+ const p=await f.service.preview({file:new File([f.encoded.blob],'before-value.pcms.zip')}),j=await f.service.confirm({id:p.id,revision:p.revision,confirmed:true});await f.drain();
+ let held=await f.c.read('jobs',j.jobId);assert.equal(held.effect.boundary,'POSSIBLE');assert.match(held.effect.operationId,/-donor-storage-0$/);const op=held.effect.operationId;assert.equal(attempts,1);
+ await f.restart();for(let i=0;i<2;i++){await f.service.check({id:p.id});held=await f.c.read('jobs',j.jobId);assert.equal(held.effect.operationId,op);assert.equal(held.effect.boundary,'POSSIBLE');assert.equal(attempts,1);assert.equal(f.native.local.fixtureDonorOwned.exact,old);}
+ await f.service.rollback({id:p.id});await f.drain();assert.equal((await f.c.restore.read()).state,'ROLLED_BACK');assert.equal((await f.c.status()).dataset,before.dataset);assert.equal((await f.c.status()).restoreHold,undefined);assert.equal(attempts,1);assert.equal(f.native.local.fixtureDonorOwned.exact,old);assert.equal(f.native.creates(),1);
+ assert.equal((await f.c.read('jobs',j.jobId)).effects.find(e=>e.operationId===op).disposition,'REJECTED');
+});

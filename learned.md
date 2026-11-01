@@ -93,3 +93,5 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 
 - P32 installed41328125038: a phase reducer can pass direct tests while the packaged background emits undefined checkpoint fields rejected by the strict host ABI. Exercise the actual bundled background through validateStep; optional fields must be explicit JSON values.
 - P32 installed41328838186: cross-process cookie preservation needs a persistent sentinel with explicit expiry. A session-only cookie may correctly disappear when Firefox terminates. Keep the independent oracle faithful to the browser lifetime being tested; view rows also retain a value envelope distinct from core.view().
+
+- P32 installed41329820144: exact before-value Unknown is a hold, not retry permission. Explicit rollback still must use the existing queue readback vocabulary (REJECTED/APPLIED); inventing a disposition caused recovery itself to remain held. A source regression now drives the full coordinator/queue path, including two Checks and verified rollback.
