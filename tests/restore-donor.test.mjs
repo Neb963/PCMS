@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createRestoreDonor,buildRestoreDonorPlan,stateData,validateRestoreDonorSource} from '../build/xpi-root/host/restore-donor.mjs';
+import {createRestoreDonor,buildRestoreDonorPlan,stateData,validateRestoreDonorSource,advanceRestoreDonorPlan} from '../build/xpi-root/host/restore-donor.mjs';
 import {createBackupDonor} from '../build/xpi-root/host/backup-donor.mjs';
 import {createStateManager} from '../build/xpi-root/lib/state-manager.js';
 import {makeDefaultState,normalizeProfile,normalizeRoute} from '../build/xpi-root/lib/storage.js';
@@ -34,4 +34,14 @@ test('historical native runtime references never adopt an unrelated destination 
  f.source.storage.local.automationJobs=history;
  const plan=await f.donor.plan({source:f.source,current:await f.donor.snapshot(),previous:f.previous,mappings:[m],destinationAccounts:f.destinationAccounts,restoreId:crypto.randomUUID()}),job=plan.writes.find(w=>w.key==='automationJobs').after[0];
  assert.equal(job.state,'interrupted');assert.equal(job.profileId,m.destinationContainerId);assert.equal(job.sourceProfileId,f.sourceId);assert.equal(job.workflowId,null);assert.equal(job.sourceWorkflowId,'unmapped-workflow');assert.equal(job.tabId,null);assert.equal(job.documentId,null);assert.equal(job.lease,null);assert.equal(job.prompt,history[0].prompt);assert.equal(job.tasks[0].profileId,null);assert.equal(job.tasks[0].sourceProfileId,f.unrelated);assert.equal(job.tasks[0].tabId,null);assert.equal(job.stepProgress[0].profileId,m.destinationContainerId);assert.equal(job.stepProgress[0].frameId,null);assert.equal(history[0].tabId,47);
+});
+
+test('restore route assignment uses the existing revision-checked state service without tab reload; checkpoints reject unrelated or newer human changes',async()=>{
+ const f=await fixture(),m=await f.allocate(),restoreId=crypto.randomUUID();f.source.state.routes['source-route'].provider='mullvad';
+ const plan=await f.donor.plan({source:f.source,current:await f.donor.snapshot(),previous:f.previous,mappings:[m],destinationAccounts:f.destinationAccounts,restoreId});await f.donor.applyState(plan,async()=>true);
+ const scope={restoreId,accountId:f.sourceUid,personaUid:f.sourceUid,containerId:m.destinationContainerId,routeId:plan.routeMap['source-route'],preparationId:'one-plan'},operationId='route-plan-one';
+ await f.manager.mutate(state=>{state.profiles[scope.containerId].pcmsPreparation={id:scope.preparationId,candidate:{kind:'ROUTE',routeId:scope.routeId},routeId:scope.routeId,tried:[]};state.profiles[scope.containerId].pcmsOperation={operationId,stage:'RESTORE_ROUTE_PLAN',phase:'COMPLETE'};});
+ const planned=await advanceRestoreDonorPlan({plan,current:await f.donor.snapshot(),scope,operationId,stage:'RESTORE_ROUTE_PLAN'});assert.equal((await f.donor.assignRoute(scope,{operationId:'assign-one'},async()=>true)).ok,true);
+ const assigned=await advanceRestoreDonorPlan({plan:planned,current:await f.donor.snapshot(),scope,operationId:'assign-one',stage:'ASSIGN'});assert.equal(assigned.state.profiles[scope.containerId].routeId,scope.routeId);assert.equal(f.tabs.length,0);
+ await f.manager.mutate(state=>{state.profiles[f.unrelated].notes='new human edit';});await assert.rejects(advanceRestoreDonorPlan({plan:planned,current:await f.donor.snapshot(),scope,operationId:'assign-one',stage:'ASSIGN'}),e=>e.code==='RESTORE_DONOR_CHANGED');assert.equal((await f.manager.getState()).profiles[f.unrelated].notes,'new human edit');
 });

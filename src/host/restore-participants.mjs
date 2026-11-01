@@ -3,7 +3,7 @@ import {same,canonical} from '../core/backup-format.mjs';
 import {restoreCookiePlan,restoredCookieReadback} from '../modules/restore-import.mjs';
 const direct=new Set(['direct','block','__direct__','__block__']);
 const identity=c=>canonical([c.domain,c.path,c.name,c.firstPartyDomain,c.partitionKey]);
-export function createRestoreParticipants({api,bound,patch,prerequisites,preparePersona,checkBinding,protectedProfile,personaPlatform,cookieService,localMutationFence,currentTest,bootstrap}){
+export function createRestoreParticipants({api,bound,patch,prerequisites,preparePersona,assignRoute,checkBinding,protectedProfile,personaPlatform,cookieService,localMutationFence,currentTest,bootstrap}){
  async function target(scope){
   check(typeof scope?.restoreId==='string'&&/^[a-f0-9-]{36}$/i.test(scope.restoreId)&&typeof scope.accountId==='string'&&/^[a-zA-Z0-9][a-zA-Z0-9._:@/-]{0,199}$/.test(scope.accountId)&&typeof scope.personaUid==='string'&&/^[a-f0-9-]{36}$/i.test(scope.personaUid)&&typeof scope.containerId==='string'&&typeof scope.routeId==='string'&&scope.routeId.startsWith('route-import-'+scope.restoreId+'-')&&!direct.has(scope.routeId),'RESTORE_PARTICIPANT_SCOPE');
   const found=await bound(scope);check(!found.code,found.code??'RESTORE_CONTEXT_CHANGED');const p=found.profile;
@@ -27,7 +27,7 @@ export function createRestoreParticipants({api,bound,patch,prerequisites,prepare
    await patch(scope,{pcmsPreparation:{id:scope.preparationId,candidate:{kind:'ROUTE',routeId:scope.routeId},routeId:scope.routeId,tried:[]},pcmsOperation:{operationId,stage:'RESTORE_ROUTE_PLAN',phase:'COMPLETE'}});return {ok:true,operationId};
   },
   async observePlan(scope,{operationId}){const {profile:p}=await target(scope);return op(p,operationId,'RESTORE_ROUTE_PLAN')&&p.pcmsPreparation?.id===scope.preparationId&&p.pcmsPreparation.routeId===scope.routeId?{ok:true,operationId}:{ok:false,code:'RESTORE_ROUTE_PLAN_UNKNOWN',before:p.routeId==='__block__'&&!p.pcmsOperation};},
-  async route(scope,{operationId,stage},validNow){check(['ASSIGN','VERIFY'].includes(stage),'RESTORE_ROUTE_STAGE');await ready(scope);check(await validNow(),'RESTORE_INTERRUPTED');return preparePersona(scope,{operationId,stage});},
+  async route(scope,{operationId,stage},validNow){check(['ASSIGN','VERIFY'].includes(stage),'RESTORE_ROUTE_STAGE');await ready(scope);if(stage==='ASSIGN')check(!(await api.tabs.query({cookieStoreId:scope.containerId})).length,'RESTORE_CONTEXT_INSPECTION_REQUIRED');check(await validNow(),'RESTORE_INTERRUPTED');return stage==='ASSIGN'?assignRoute(scope,{operationId},validNow):preparePersona(scope,{operationId,stage});},
   async observeRoute(scope,{operationId,stage}){
    const found=await target(scope),value=await checkBinding(scope,{operationId,stage,readOnly:true});if(!value?.ok)return value;
    if(stage==='VERIFY'){const verified=currentTest(found.state,scope.containerId);return {...value,fresh:verified?.ok===true&&verified.data?.ip===value.binding?.evidence?.ipv4?.address};}
