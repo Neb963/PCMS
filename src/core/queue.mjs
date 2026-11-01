@@ -79,7 +79,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   // One Core-owned repository resource. Unknown effects retain ownership;
   // disabled known-safe owners can yield it without discarding their job.
   claimGit:(jobId,expectedRev,repositoryId)=>tx(async(s,r)=>{
-    check(valid(repositoryId),'GIT_REPOSITORY_INVALID');const job=await read(s,r,'jobs',jobId);check(job?.rev===expectedRev,'STALE_REVISION');check(!job.runtimeInvalidated,'RESTORED_WORK_REVIEW_REQUIRED');check(!job.git||job.git.repositoryId===repositoryId,'GIT_REPOSITORY_CHANGED');
+    check(valid(repositoryId),'GIT_REPOSITORY_INVALID');const job=await read(s,r,'jobs',jobId);check(job?.rev===expectedRev,'STALE_REVISION');if(job.runtimeInvalidated){check(job.git?.locked&&job.git.repositoryId===repositoryId&&job.effect?.boundary==='POSSIBLE','RESTORED_WORK_REVIEW_REQUIRED');return job;}check(!job.git||job.git.repositoryId===repositoryId,'GIT_REPOSITORY_CHANGED');
     for(const other of await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))))if(other.id!==jobId&&other.git?.locked&&other.git.repositoryId===repositoryId){const m=await read(s,r,'modules',other.moduleId);const ownerMissing=other.ownerMissing===true||other.accountId&&!await read(s,r,'accounts',other.accountId);if(other.effect?.boundary==='POSSIBLE'||m?.enabled&&!m.lifecycle&&!ownerMissing)check(false,'GIT_REPOSITORY_BUSY');await save(s,r,other,{git:{...other.git,locked:false}},'YIELD_GIT_RESOURCE','COMPLETE');}
     return save(s,r,job,{git:{schema:1,...job.git,repositoryId,locked:true}},'CLAIM_GIT_RESOURCE','COMPLETE');
   }),

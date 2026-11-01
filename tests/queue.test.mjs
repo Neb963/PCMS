@@ -153,8 +153,14 @@ test('global Pause after durable intent cancels an ordinary readonly call withou
 
 test('imported work remains read-only after exact reconciliation, with no writer/Git claim, automatic selection or wake loop',async t=>{
  const {core}=await fixture(t);await core.queue.resume();let j=await core.queue.enqueue(input('restored'));const chosen=await core.queue.next();assert.equal(chosen.id,j.id);
- await core.mutate([{table:'jobs',id:j.id,expectedRev:chosen.rev,refs:chosen.refs,value:{...chosen,runtimeInvalidated:true,effect:{operationId:'old-original',kind:'SAVE',boundary:'POSSIBLE'},state:'HELD'}}],event);j=await core.read('jobs',j.id);
+ await core.mutate([{table:'jobs',id:j.id,expectedRev:chosen.rev,refs:chosen.refs,value:{...chosen,runtimeInvalidated:true,effect:{operationId:'old-original',kind:'SAVE',boundary:'POSSIBLE'},state:'HELD',recovery:{action:'RECONCILE',code:'OUTCOME_UNKNOWN'}}}],event);j=await core.read('jobs',j.id);
  assert.equal((await core.queue.reconciliation()).some(row=>row.id===j.id),true);await core.queue.reconcile(j.id,j.rev,'old-original',{matched:true,operationId:'old-original'});j=await core.read('jobs',j.id);
  assert.equal(await core.queue.next(),null);assert.equal(await core.queue.deadline(),null);await assert.rejects(core.queue.claim(j.id,j.rev),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');await assert.rejects(core.queue.claimGit(j.id,j.rev,'repository'),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');
  let calls=0;await assert.rejects(core.queue.dispatch(j.id,j.rev,effect('new-write',()=>calls++)),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');assert.equal(calls,0);assert.equal((await core.read('jobs',j.id)).effect.operationId,'old-original');
+});
+
+test('read-only reconciliation may retain its existing uncertain Git lock without acquiring another resource or enabling writes',async t=>{
+ const {core}=await fixture(t);await core.queue.resume();let j=await core.queue.enqueue(input('restored-git'));await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:j.refs,value:{...j,runtimeInvalidated:true,state:'HELD',git:{repositoryId:'repo',locked:true},effect:{operationId:'same-ref',kind:'GIT_REF',boundary:'POSSIBLE'},recovery:{action:'RECONCILE',code:'OUTCOME_UNKNOWN'}}}],event);j=await core.read('jobs',j.id);
+ const observed=await core.queue.claimGit(j.id,j.rev,'repo');assert.equal(observed.rev,j.rev);assert.equal(observed.git.locked,true);await assert.rejects(core.queue.claimGit(j.id,j.rev,'other'),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');
+ await core.queue.reconcile(j.id,j.rev,'same-ref',{matched:true,operationId:'same-ref'});j=await core.read('jobs',j.id);assert.equal(await core.queue.next(),null);await assert.rejects(core.queue.claimGit(j.id,j.rev,'repo'),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');
 });

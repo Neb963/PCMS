@@ -38,7 +38,7 @@ export function createRestoreBootstrap({api}){
   registered,
   async observe(input){
    const target=restoreBootstrapTarget(input),tab=await api.tabs.get(target.tabId);check(tab.cookieStoreId===target.containerId,'RESTORE_BOOTSTRAP_CONTEXT');
-   if(tab.status!=='complete')return {ok:false,code:'RESTORE_BOOTSTRAP_LOADING'};
+   if(tab.status!=='complete'||tab.url==='about:blank')return {ok:false,code:'RESTORE_BOOTSTRAP_LOADING'};
    check(tab.url===ORIGIN+'/'||tab.url===target.url,'RESTORE_BOOTSTRAP_CONTEXT');
    const frames=await api.webNavigation.getAllFrames({tabId:target.tabId}),frame=frames?.find(f=>f.frameId===0&&f.url===tab.url);check(typeof frame?.documentId==='string','RESTORE_BOOTSTRAP_DOCUMENT_CHANGED');
    const rows=await api.userScripts.execute({target:{tabId:target.tabId,documentIds:[frame.documentId]},world:'USER_SCRIPT',worldId:target.worldId,js:[{code:'globalThis.__PCMS_RESTORE_AUTH_1 ?? null'}]});
