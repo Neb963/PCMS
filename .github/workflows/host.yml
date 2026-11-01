@@ -52,12 +52,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Targeted scoped authentication and cookies (normal sandbox)
-        run: python3 tests/installed_backup_sessions.py build/pcms-dev.xpi
+      - name: Targeted immutable Core, donor and session capture (normal sandbox)
+        run: python3 tests/installed_capture.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-backup-sessions-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-capture-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json
