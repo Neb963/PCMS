@@ -50,3 +50,5 @@ First affected B41304294997 reached and passed real scoped auth/cookie/private-b
 ## Local removal contract correction
 
 Review found that keeping raw collected sessions in historical source-style blobs would retain usable secrets after Remove local account. Capsules now use the existing account-scoped privileged credential store, whose P11 removal transaction deletes them. Jobs retain only a private capsule key/hash and public coverage. Status marks a deleted capsule incomplete; a focused actual Remove local data regression verifies deletion. No new store or cleanup authority was added. The affected installed journey independently reopens these private records; required B will rerun.
+
+The credential write now uses the same atomic module/job/account guard as source admission, inside the credential transaction. An account removal between read and persistence cannot resurrect session secrets. Added the negative scoped-write regression; focused and installed checks pending on the new source.

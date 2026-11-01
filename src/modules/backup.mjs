@@ -29,7 +29,7 @@ export function createBackup({core,donor,clock=Date.now}){
     check(packet?.ok===true,typeof packet?.code==='string'&&/^[A-Z][A-Z0-9_]*$/.test(packet.code)?packet.code:'AUTH_COLLECTION_UNAVAILABLE');
     check(latest?.rev===a.rev&&latest.state==='READY'&&!latest.admission&&latest.expectedPrincipal===a.expectedPrincipal,'STALE_ACCOUNT');
     const captured=await checkedSession(packet,a),raw=JSON.stringify(captured.data),capsuleId='backup-session-'+j.id+'-'+a.id,capsuleHash=await sha256(new TextEncoder().encode(raw));
-    await core.credentials.set(capsuleId,raw,a.id);report={...captured.report,capsuleId,capsuleHash,accountRevision:a.rev};
+    await core.credentials.set(capsuleId,raw,a.id,guard(await core.read('jobs',j.id),a));report={...captured.report,capsuleId,capsuleHash,accountRevision:a.rev};
    }catch(error){report={accountId:a.id,state:'INCOMPLETE',code:publicError(error),observedAt:clock()};}
    await core.saveView(receiptKey,report,crypto.randomUUID());return report;
   };

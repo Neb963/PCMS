@@ -31,3 +31,9 @@ test('Remove local account data clears private collected sessions through the ex
  await f.c.mutate([{table:'modules',id:'pcms-accounts',value:{enabled:true,generation:1}},{table:'jobs',id:'remove-job',value:{moduleId:'pcms-accounts',generation:1,state:'RUNNING'}},{table:'accounts',id:a.id,expectedRev:a.rev,value:{...a,admission:'REMOVING',flow:{jobId:'remove-job',stage:'REMOVE_DATA'}}}],event);
  await f.c.removeAccountData({accountId:a.id,jobId:'remove-job',expectedRev:(await f.c.read('accounts',a.id)).rev});assert.equal(await f.c.credentials.get(capsule),null);const s=await f.s.status();assert.equal(s.coverage.complete,false);assert.equal(s.coverage.rows[0].code,'BACKUP_SESSION_REMOVED');
 });
+
+test('atomic scoped secret admission rejects account removal or module disable before storage',async t=>{
+ const f=await fixture(t),j=await f.s.enqueue({requestId:'credential-guard'}),job=await f.c.read('jobs',j.jobId),a=await f.c.read('accounts','a'),guard={moduleId:'pcms-backup',generation:job.generation,jobId:job.id,jobRevision:job.rev,accountId:a.id,accountRevision:a.rev,principalFingerprint:a.expectedPrincipal};
+ await f.c.mutate([{table:'accounts',id:a.id,expectedRev:a.rev,value:{...a,state:'ARCHIVED'}}],event);
+ await assert.rejects(f.c.credentials.set('must-not-resurrect','private',a.id,guard),e=>e.code==='STALE_ACCOUNT');assert.equal(await f.c.credentials.get('must-not-resurrect'),null);
+});
