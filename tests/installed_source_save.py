@@ -65,7 +65,15 @@ def write_candidate(root,name,files):
  for p,b in files.items():target=directory/p;target.parent.mkdir(parents=True,exist_ok=True);target.write_bytes(b)
  return directory
 def choose_source(sid,directory):
- element=call('POST',f'/session/{sid}/element',{'using':'css selector','value':'#source-save-input'})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/element/{element}/value',{'text':str(directory)});wait(lambda:script(sid,"return !document.getElementById('source-save-submit').disabled"));click(sid,'#source-save-submit')
+ # Marionette's uploadFiles accepts files, not folders. Supply the native
+ # picker result, then click the real label and let Firefox build FileList.
+ context(sid,'chrome')
+ script(sid,"""const {classes:Cc,interfaces:Ci,manager:Cm}=Components,reg=Cm.QueryInterface(Ci.nsIComponentRegistrar),contract='@mozilla.org/filepicker;1',oldCid=reg.contractIDToCID(contract),oldFactory=Cm.getClassObject(oldCid,Ci.nsIFactory),cid=Components.ID('{7b7ffdd8-8a75-43c7-8bac-86e5ca819019}'),file=Cc['@mozilla.org/file/local;1'].createInstance(Ci.nsIFile);file.initWithPath(arguments[0]);if(!file.isDirectory())throw Error('FOLDER_MISSING');const factory={QueryInterface:ChromeUtils.generateQI(['nsIFactory']),createInstance(){return {QueryInterface:ChromeUtils.generateQI(['nsIFilePicker']),init(){},appendFilters(){},appendFilter(){},open(callback){callback.done(Ci.nsIFilePicker.returnOK);},get file(){return file;},get files(){let used=false;return {QueryInterface:ChromeUtils.generateQI(['nsISimpleEnumerator']),hasMoreElements:()=>!used,getNext(){used=true;return file;}};},get domFileOrDirectoryEnumerator(){return this.files;},get fileURL(){return Services.io.newFileURI(file);}};}};reg.registerFactory(cid,'P19 controlled native folder picker',contract,factory);window.__p19Picker={reg,contract,oldCid,oldFactory,cid,factory};return true;""",[str(directory)])
+ context(sid,'content')
+ try:click(sid,'label[for="source-save-input"]');wait(lambda:script(sid,"return document.getElementById('source-save-input').files.length>0"),15)
+ finally:
+  context(sid,'chrome');script(sid,"const p=window.__p19Picker;p.reg.unregisterFactory(p.cid,p.factory);p.reg.registerFactory(p.oldCid,'Original native picker',p.contract,p.oldFactory);delete window.__p19Picker;return true;");context(sid,'content')
+ wait(lambda:script(sid,"return !document.getElementById('source-save-submit').disabled"));click(sid,'#source-save-submit')
 def save_state(sid):
  return asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();let p=await c.list({table:'generators'}),g=null;for(const r of p.rows)if(r.slug==='existing-sentinel')g=await c.read('generators',r.id);const j=g?.sourceSaveJobId?await c.read('jobs',g.sourceSaveJobId):null;c.close();return {g,j};")
 def wait_save(sid,state='COMPLETE'):

@@ -373,16 +373,17 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
   const tab=await personaPlatform.open(scope.containerId,url,true);await api.sessions.setTabValue(tab.id,'pcmsSourceEditor',{accountId:scope.accountId,slug,remoteId});return {ok:true,tabId:tab.id};
  }
  async function inspectSourceEditors(scope,{slug,remoteId}){
-  const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);const tabs=await api.tabs.query({cookieStoreId:scope.containerId}),editors=[];
-  for(const tab of tabs){let url;try{url=new URL(tab.url);}catch{continue;}if(url.origin!=='https://perchance.org'||url.pathname!=='/'+slug||url.hash!=='#edit')continue;
-   if(url.search){editors.push({tabId:tab.id,ok:false,code:'EDITOR_URL_UNSUPPORTED'});continue;}
+  const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);const tabs=await api.tabs.query({}),editors=[];
+  for(const tab of tabs){let url;try{url=new URL(tab.url);}catch{continue;}if(url.origin!=='https://perchance.org'||url.pathname!=='/'+slug||!/^#edit(?:$|:)/.test(url.hash))continue;
+   if(tab.cookieStoreId!==scope.containerId){editors.push({tabId:tab.id,ok:false,code:'EDITOR_OUTSIDE_ACCOUNT_CONTEXT'});continue;}
+   if(url.search||url.hash!=='#edit'){editors.push({tabId:tab.id,ok:false,code:'EDITOR_URL_UNSUPPORTED'});continue;}
    const run=async(func,args=[],world='ISOLATED')=>{const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world,func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('EDITOR_DOCUMENT_CHANGED');return rows[0].result;};
    try{const witness=await run(accountDocumentWitness),identity=await run(observePerchanceIdentity,[witness]);if(!identity?.ok||identity.principalFingerprint!==scope.expectedPrincipal){editors.push({tabId:tab.id,ok:false,code:'ACCOUNT_PRINCIPAL_CHANGED'});continue;}
     const observation=await run(observeNativeEditor,[{slug,remoteId}],'MAIN'),after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);editors.push(witness===after&&current.cookieStoreId===scope.containerId&&current.url===tab.url&&!final.code?{...observation,tabId:tab.id,witness}:{ok:false,code:final.code??'EDITOR_DOCUMENT_CHANGED',tabId:tab.id});
    }catch{editors.push({tabId:tab.id,ok:false,code:'EDITOR_OBSERVATION_UNKNOWN'});}
   }
   // A second tab opened during inspection cannot be silently called clean.
-  const after=await api.tabs.query({cookieStoreId:scope.containerId}),beforeIds=tabs.filter(t=>t.url===PERCHANCE+slug+'#edit').map(t=>t.id).sort(),afterIds=after.filter(t=>t.url===PERCHANCE+slug+'#edit').map(t=>t.id).sort();if(JSON.stringify(beforeIds)!==JSON.stringify(afterIds))return fail('EDITOR_SET_CHANGED');
+  const after=await api.tabs.query({}),beforeIds=tabs.filter(t=>t.url?.startsWith(PERCHANCE+slug+'#edit')).map(t=>t.id).sort(),afterIds=after.filter(t=>t.url?.startsWith(PERCHANCE+slug+'#edit')).map(t=>t.id).sort();if(JSON.stringify(beforeIds)!==JSON.stringify(afterIds))return fail('EDITOR_SET_CHANGED');
   return {ok:true,source:'PCMS_EDITOR_DOCUMENT_SET_1',slug,remoteId,principalFingerprint:scope.expectedPrincipal,editors,observedAt:Date.now()};
  }
  async function sourceCheckpoint(scope,{slug,remoteId,tabId,witness}){
