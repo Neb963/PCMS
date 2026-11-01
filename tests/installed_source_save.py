@@ -40,13 +40,13 @@ class Provider(ReadProvider):
    if self.path=='/fixture/upload':
     data=base64.b64decode(b['base64']);key=hashlib.md5(data).hexdigest()+'.bin';f.bytes[key]=data;f.uploads.append({'path':b['path'],'hash':hashlib.sha256(data).hexdigest(),'route':self.route});return self.send({'key':key,'size':len(data)})
    user=f.logins.get(self.route);valid=user and b.get('email')==user['email'] and b.get('sessionToken')==user['sessionToken'];f.save_requests.append({'route':self.route,'valid':bool(valid),'time':b.get('lastKnownSaveTime'),'count':b.get('lastKnownSaveCount'),'forced':b.get('forceSaveDespiteStaleness') is not None,'topManifest':'srcManifest' in b,'nestedManifest':'srcManifest' in b.get('generator',{}),'paths':sorted(b.get('srcManifest',{}))})
-   assert valid and user['email']=='source@fixture.test';assert b.get('forceSaveDespiteStaleness') is None and 'srcManifest' not in b['generator'];assert b['generator']['name']==SLUG and b['generator']['isPrivate']==f.generator['isPrivate']
+   assert valid and user['email']=='source@fixture.test';assert b.get('forceSaveDespiteStaleness') is None and 'srcManifest' not in b['generator'];assert b['generator']['name']==SLUG and isinstance(b['generator']['isPrivate'],bool)
    if f.race:
     f.race=False;f.generator['modelText']='Independent external editor changed source\n';f.version={'time':f.version['time']+1,'saveCount':f.version['saveCount']+1}
    if b.get('lastKnownSaveTime')!=f.version['time'] or b.get('lastKnownSaveCount')!=f.version['saveCount']:return self.send({'status':'stale',**f.version,'sourceRevision':hashlib.sha256(json.dumps(f.generator,sort_keys=True).encode()).hexdigest()})
    manifest=b['srcManifest'];assert isinstance(manifest,dict)
    for p,e in manifest.items():assert isinstance(p,str) and e['key'] in f.bytes and e['size']==len(f.bytes[e['key']])
-   f.assets=manifest;f.generator.update(modelText=b['generator']['modelText'],outputTemplate=b['generator']['outputTemplate'],srcManifest=manifest);f.version={'time':f.version['time']+1,'saveCount':f.version['saveCount']+1};reply={'status':'saved',**f.version,'sourceRevision':hashlib.sha256(json.dumps(f.generator,sort_keys=True).encode()).hexdigest()};delay=f.delay_after_apply
+   f.assets=manifest;f.generator.update(isPrivate=b['generator']['isPrivate'],modelText=b['generator']['modelText'],outputTemplate=b['generator']['outputTemplate'],srcManifest=manifest);f.version={'time':f.version['time']+1,'saveCount':f.version['saveCount']+1};reply={'status':'saved',**f.version,'sourceRevision':hashlib.sha256(json.dumps(f.generator,sort_keys=True).encode()).hexdigest()};delay=f.delay_after_apply
    if delay:f.applied.set()
   if delay:f.release_ack.wait(40)
   try:return self.send(reply)
