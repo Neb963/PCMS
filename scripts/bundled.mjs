@@ -61,7 +61,7 @@ const backup=`PCMS.defineModule({
  start(){},
  async runStep(job,api){return this.outcome(await api.action({name:job.kind==='RESTORE'?'backup.restore':job.kind==='EXPORT'?'backup.export':job.input.coverageOnly?'backup.collect':'backup.capture'}));},
  async reconcile(job,api){const result=await api.query({name:job.kind==='RESTORE'?'backup.restoreStatus':job.kind==='EXPORT'?'backup.exportStatus':job.input.coverageOnly?'backup.collectStatus':'backup.captureStatus'});if(result.state==='NOT_STARTED')return {kind:'checkpoint',checkpoint:job.checkpoint};return this.outcome(result);},
- outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{captureId:result.captureId??null,fileId:result.fileId??null,coverageComplete:result.coverageComplete??null}};if(result.state==='CONTINUE')return {kind:'checkpoint',checkpoint:{captureId:result.captureId}};if(result.state==='WAITING')return {kind:'wait',dueAt:result.dueAt,checkpoint:{captureId:result.captureId,fileId:result.fileId}};return {kind:'hold',reason:result.code||'BACKUP_PENDING',recovery:{action:'OPEN_BACKUP'}};},
+ outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{captureId:result.captureId??null,fileId:result.fileId??null,coverageComplete:result.coverageComplete??null}};if(result.state==='CONTINUE')return {kind:'checkpoint',checkpoint:{captureId:result.captureId??null,restoreId:result.restoreId??null}};if(result.state==='WAITING')return {kind:'wait',dueAt:result.dueAt,checkpoint:{captureId:result.captureId??null,fileId:result.fileId??null,restoreId:result.restoreId??null}};return {kind:'hold',reason:result.code||'BACKUP_PENDING',recovery:{action:'OPEN_BACKUP'}};},
  stop(){}
 });\n`;
 const stamp=new Date('1980-01-01T00:00:00.000Z');

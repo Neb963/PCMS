@@ -35,6 +35,11 @@ def arm_stop(sid,phase):
  # Pause the next actual donor storage read only after the preceding durable
  # control checkpoint. The native allocation/commit has already happened.
  return asyncjs(sid,"""const bg=await browser.runtime.getBackgroundPage(),put=bg.IDBObjectStore.prototype.put,get=bg.browser.storage.local.get;bg.__P32_POINT=false;bg.__P32_BLOCKED=false;const phase=arguments[0];bg.IDBObjectStore.prototype.put=function(row){const r=put.call(this,row);if(this.name==='meta'&&row.key==='restore-control'&&row.state===phase)bg.__P32_POINT=true;return r;};bg.browser.storage.local.get=function(...args){if(bg.__P32_POINT){bg.__P32_BLOCKED=true;return new Promise(()=>{});}return get.apply(this,args);};return true;""",[phase])
+def reached_stop(sid):
+ if asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__P32_BLOCKED;"):return True
+ v=restore(sid)
+ if v['job'] and v['job']['state'] in ['HELD','FAILED']:raise AssertionError(('PRE_INTERRUPTION_HOLD',v['control']['state'],v['control'].get('code'),v['job'].get('recovery')))
+ return False
 def unrelated(sid,label):
  return asyncjs(sid,"const c=await browser.contextualIdentities.create({name:arguments[0],color:'purple',icon:'circle'});await browser.cookies.set({storeId:c.cookieStoreId,url:'https://example.org/',name:'sentinel',value:'unrelated-exact',secure:true});return c.cookieStoreId;",[label])
 def assert_unrelated(sid,id):
@@ -87,13 +92,13 @@ def main():
     unrelated_id=unrelated(sid,'Unrelated '+label);baseline=census(sid);old_state=donor_state(sid);arm_stop(sid,phase)
     if label=='same':check_restore(sid)
     else:confirm(sid)
-    wait(lambda:asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__P32_BLOCKED;"),100);interrupted=restore(sid);assert interrupted['control']['state']==phase;maps=interrupted['control']['mappings'];assert len(maps)==1 and maps[0]['destinationContainerId'] not in baseline;assert interrupted['root']['dataset']==old_dataset and interrupted['root']['restoreHold'];assert len(census(sid))==len(baseline)+1
+    wait(lambda:reached_stop(sid),100);interrupted=restore(sid);assert interrupted['control']['state']==phase;maps=interrupted['control']['mappings'];assert len(maps)==1 and maps[0]['destinationContainerId'] not in baseline;assert interrupted['root']['dataset']==old_dataset and interrupted['root']['restoreHold'];assert len(census(sid))==len(baseline)+1
     if label=='fresh':
      actual=donor_state(sid);assert actual['profiles'][maps[0]['destinationContainerId']]['personaUid']==maps[0]['personaUid']
     prior=stop(sid,profile);sid=None;sid,_=account_session(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);backup_page(sid);reopened=restore(sid);assert reopened['control']['mappings']==maps and reopened['root']['dataset']==old_dataset
     if reopened['job']['state'] in ['HELD','FAILED']:check_restore(sid)
     v=staged(sid);assert v['control']['code']=='RESTORE_AUTH_IMPORT_PENDING';result=inspect_staged(sid,source_id,model,baseline,old_dataset);assert result['active']==old_dataset and result['hold'] and result['fresh'] and result['bytes']==1048601 and result['digest']==model['binary'] and result['accountHeld'] and result['source'] and result['jobHeld'] and result['modules']==7 and result['draft'] and result['native'],result;assert census(sid).count(maps[0]['destinationContainerId'])==1 and len(census(sid))==len(baseline)+1;assert_unrelated(sid,unrelated_id)
-    assert script(sid,"return document.getElementById('backup-export').disabled");assert 'are staged' in script(sid,"return document.getElementById('backup-restore-state').textContent");assert 'sessionToken' not in script(sid,"return document.getElementById('records').textContent")
+    assert asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{await c.queue.resume(crypto.randomUUID());return false;}catch(e){return e.code==='RESTORE_MAINTENANCE';}finally{c.close();}");assert script(sid,"return document.getElementById('backup-export').disabled");assert 'are staged' in script(sid,"return document.getElementById('backup-restore-state').textContent");assert 'sessionToken' not in script(sid,"return document.getElementById('records').textContent")
     rollback(sid,old_state,old_dataset,unrelated_id);assert len(census(sid))==len(baseline)+1
     if label=='same':
      assert account(sid,source_id)['state']=='HELD' and account(sid,source_id)['holdCode']=='RESTORE_ROLLBACK_ROUTE_RECHECK'
