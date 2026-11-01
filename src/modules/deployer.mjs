@@ -23,6 +23,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
  async function initialize(){
   const m=await module(),connection=(await core.view('git-catalog'))?.connection,status=await core.status();if(!enabled(m)||!connection||status.restoreHold)return;
   const jobs=(await rows('jobs')).filter(j=>j.moduleId===id&&j.deployment);
+  for(let i=0;i<jobs.length;i++){const j=jobs[i];if(j.deployment.ai&&['NEW_CHAT','SEND','AI_RUNNING'].includes(j.deployment.phase)&&j.deployment.ai.bootId!==(await core.queue.status()).bootId&&j.recovery?.code!=='AI_INSPECTION_REQUIRED'){await hold(j,'AI_INSPECTION_REQUIRED');jobs[i]=await core.read('jobs',j.id);}}
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
    const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);

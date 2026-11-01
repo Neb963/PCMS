@@ -20,3 +20,5 @@ P24 fixed donor/native adapter, staged-job continuation, separate chat/send effe
 Checkpoint00a0cb5e/run41354256306: focused T/build PASS; installed B failed in fixture navigation (duplicate dashboard closure), before its AI oracle. Corrected observer selection; required B remains pending.
 
 Checkpoint35c8665e/run41354353859: focused T/build PASS; installed B exposed missing private-bootstrap AI forwarding at NEW_CHAT. Fixed that boundary with a direct regression. Added delayed native-confirmation readback, intervening manual-reset fencing and sanitized prompt/chat hash evidence. Required installed B is pending on this corrected candidate.
+
+Cold initialize now explicitly persists AI_INSPECTION_REQUIRED for already-held and waiting AI work, rather than retaining a stale pre-restart review label; two direct cold-open regressions cover both. New installed candidate pending.
