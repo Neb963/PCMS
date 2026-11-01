@@ -13,7 +13,9 @@ export function attachCaptureCut(core,{transact,root,checkedRefs,append,req,chec
   const records={};for(const table of tables)records[table]=await all(table);
   for(const expected of accounts){const a=records.accounts.find(a=>a.id===expected.id);check(a&&a.state==='READY'&&!a.admission&&a.rev===expected.revision&&a.expectedPrincipal===expected.principalFingerprint&&a.personaUid===expected.personaUid&&a.containerId===expected.containerId,'CAPTURE_ACCOUNT_CHANGED');}
   check(records.accounts.filter(a=>a.personaUid).every(a=>accounts.some(e=>e.id===a.id&&e.personaUid===a.personaUid&&e.containerId===a.containerId)),'CAPTURE_AUTH_COVERAGE_MISSING');
+  records.jobs=records.jobs.map(job=>({...job,lease:null}));
   const versions=await all('versions'),pins=await all('pins'),views=await all('views'),commands=await all('commands'),credentials=await all('credentials'),events=await all('events');
+  for(let i=0;i<versions.length;i++)if(versions[i].table==='jobs')versions[i]={...versions[i],lease:null};
   const downloadPayloads=new Set([...records.files,...versions.filter(v=>v.table==='files')].filter(f=>['journal','discover','backup'].includes(f.type)).map(f=>f.payloadId).filter(Boolean));
   const stripFile=f=>{const copy={...f,refs:(f.refs??[]).filter(id=>id!==f.payloadId)};if(copy.payloadId){delete copy.payloadId;copy.payloadAvailable=false;}return copy;};
   records.files=records.files.map(stripFile);for(let i=0;i<versions.length;i++)if(versions[i].table==='files')versions[i]=stripFile(versions[i]);
