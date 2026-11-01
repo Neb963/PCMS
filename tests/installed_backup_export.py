@@ -1,7 +1,6 @@
 """P31 B/DSK: actual Back up now, production capture/ZIP/Downloads and disk reopen.
 All provider/bridge/session data is synthetic, local and disposable.
 """
-from installed_capture import private_cut
 from installed_backup_sessions import backup_page,coverage,manage,configure_auth,inspect_paused
 from installed_accounts import account_session,add,settle,login
 from installed_lifecycle import permission_choice
@@ -15,7 +14,7 @@ def request_export(sid):
  before=(state(sid)['current'] or {}).get('jobId');click(sid,'#backup-export')
  return wait(lambda:next((s for s in [state(sid)['current']] if s and s['jobId']!=before),None),30)
 def completed(sid,id):
- return wait(lambda:next((s for s in [state(sid)['current']] if s and s['jobId']==id and s['state'] in ['COMPLETE','FAILED','UNKNOWN']),None),180)
+ return wait(lambda:next((s for s in [state(sid)['current']] if s and s['jobId']==id and s['state'] in ['COMPLETE','FAILED']),None),180)
 def read_archive(path):
  with zipfile.ZipFile(path) as z:
   assert z.testzip() is None;names=z.namelist();assert len(names)==len(set(names));mraw=z.read('manifest.json');m=json.loads(mraw);end=json.loads(z.read('COMPLETE.json'))

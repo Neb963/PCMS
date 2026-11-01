@@ -37,3 +37,5 @@ Run41316836023 passed33/35 focused checks, including production archive/Blob del
 ## Installed disk verification checkpoint
 
 Focused run41316995432 PASS (35T/build). Added targeted B/DSK using actual Settings controls, protected synthetic sessions, full production capture/codec/Downloads and independent physical ZIP reopen/all declared CRC/size/SHA/sections. It covers source/history/1MiB binary/secrets/donor/current+staged packages, Pause with Journal disabled, bad auth schema, actual process stop mid-durable staging and Check recovery, actual Downloads cancellation, destination error, Disable and manual/unrelated/prior-good sentinels. Required B/DSK is pending; no disk success claimed yet.
+
+Run41317240806:35T/build PASS; installed fixture failed before export because importing an unused P29 helper replaced the provider handler with its witness-race subclass, without that fixture's initialization. Removed the unused import/side effect; no product/test requirement changed. Also wait for terminal completion/failure rather than returning a transient Unknown status. Required B/DSK remains unpassed.
