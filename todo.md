@@ -1,18 +1,18 @@
 # Current implementation checkpoint
 
-## P21 — DEPLOY selected complete source
+## P22 — Publication, Refresh Pool and DONE
 
-P20 merged as [a17cb4d](https://github.com/Neb963/PCMS/commit/a17cb4df65fbd8e2ea5f43782767a20361e5a06c), tree39a50442c1ac457a65f5c2b6bfd1cedac9bbf5be, identical to verified PR27 HEAD882c68d. [41350798299](https://github.com/Neb963/PCMS/actions/runs/41350798299) focused109T/build and required installed B PASS. The normal-sandbox Firefox155.0/build20260817142839 test proved automatic READY-before-Creator without a Deployer source lock, protected adoption, exact byte-preserving unlisting and one-effect readback after process death. Prior failed runs and corrections remain in Git history/learned.md. Main tree verified independently through GitHub and fetch.
+P21 merged PR28 as6db6939ce938efd088db7fc48be9f7140207754a, tree4b0379afbd19c5912d0cdcc01ba63b21012eecf1, identical to verified6a2d6fac. [41351214740](https://github.com/Neb963/PCMS/actions/runs/41351214740) T/build+B PASS (local107 focused tests; hosted adds unchanged host/package checks). Firefox155.0/build20260817142839/sandbox6; XPI3a185e7dd5288c72583f5c17094cf561c1dafdfddab7792f35fa2c5a9d0f18a3,832331bytes. Real packaged catalog/native complete-source/deletion/binary save and process-death recovery had exactly one unlist and one source save. Git stayed read-only. P20 PR27/evidence remains in history.
 
 ### Plan before implementation
 
-Base is actual main a17cb4d; branch p21-pinned-deploy-source. Preserve P20 and P28–P33.
+Base actual main6db6939c; branch p22-publication-pool-done. Preserve the accepted specification/design and prior phases.
 
-- Continue a prepared DEPLOY on the same durable job and persistent writer; retain its original previous-good and unlist receipt. No approval or manual Save.
-- Read the complete pinned input manifest (roots, binary src and exact paths). Recheck current READY inputs, owner, unlisted baseline and every editor through the existing shared source writer.
-- Start a distinct source effect identity while preserving the observed unlist history. Reset only the completed current-effect pointer; never erase POSSIBLE or old receipts.
-- Independently verify the complete stored set, including deletions. Show Saved — publication pending in Generators/Work. Do not publish or mark DONE in P21.
-- Add focused production T for exact pinned bytes, relevant Git/source drift, dirty editors, Pause, stale revision, lost ACK and cold recovery. Extend only the affected installed B journey: actual Git intake → protected native full-source save, dashboard closed, process death after application, exact independent bytes/counts and no other-generator/Git writes.
-- Push meaningful checkpoints; merge after required T/B, verify postmerge main and automatically proceed to P22. G/P2 remain deferred to P43/P45, NOT TESTED/unauthorized.
+- Recheck the same READY identity and exact independently saved candidate. Use the shared guarded native save for a distinct listing-only PUBLIC effect. Verify complete source, owner and listing from the protected provider, never public-page availability alone.
+- Add/upsert Refresh Pool membership atomically with the publication/source receipt. Preserve an existing cycle; a new member starts pending for P35. Do not republish to repair a local pool transaction.
+- Use the existing scoped Git writer for a separate matching-version DONE commit/readback. Recheck admission/relevant READY inputs before each Git effect. Preserve root instructions/unrelated files, and retain Published — Git completion pending after denial/loss.
+- Reconcile possible publication/Git effects before any retry; only known rejected Git writes may safely rebuild the same logical operation. Complete/release the generator writer only after all receipts are verified.
+- Wire honest Generators/Work states and same-job Check. Test failures at publication/pool/DONE, withdrawal, duplicate completion, cold recovery and no READY loop. Targeted installed B independently checks source/listing/pool and bare Git history; restart after publication must not publish again.
+- Push/verify checkpoints, merge after required T/B, verify postmerge main, then continue to P23 automatically. Live G/P2 remains NOT TESTED/unauthorized until P43/P45.
 
-Same-job pinned-source continuation and contextual Saved — publication pending UI implemented. Focused T and targeted installed B are in progress. CI retains the same two jobs/triggers and replaces only the affected journey with installed_deploy_source.py; local Firefox remains unavailable. No live provider effect is authorized.
+Implementation not started. P22 T/B NOT TESTED.
