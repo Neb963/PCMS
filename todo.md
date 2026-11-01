@@ -15,4 +15,4 @@ Base actual main6db6939c; branch p22-publication-pool-done. Preserve the accepte
 - Wire honest Generators/Work states and same-job Check. Test failures at publication/pool/DONE, withdrawal, duplicate completion, cold recovery and no READY loop. Targeted installed B independently checks source/listing/pool and bare Git history; restart after publication must not publish again.
 - Push/verify checkpoints, merge after required T/B, verify postmerge main, then continue to P23 automatically. Live G/P2 remains NOT TESTED/unauthorized until P43/P45.
 
-Implementation not started. P22 T/B NOT TESTED.
+Publication/pool/DONE continuation, distinct prepared-operation recovery and same-job contextual status are implemented. 39 selected Deployer/Git production T PASS, including denied DONE access followed by corrected Git-only completion, lost publication response, pool transaction failure, source drift, version withdrawal, update/cycle preservation and preparation crash gaps. Required installed B remains pending. Existing CI jobs/triggers are unchanged; only the targeted journey/test selection changes for the affected source/Git boundary.
