@@ -17,3 +17,5 @@ Base actual mainfd32636e; branch p25-ai-review.
 - Push checkpoints; merge only after required T/B, verify main and continue P26. P46 remains NOT TESTED/unauthorized.
 
 Same-chat protected inspection, native active/settled facts, two-sample human readiness, automatic drift revocation, Cancel fencing and separate active/review budgets are implemented. Local83 selectedT PASS before final Cancel-settlement addition; focused recheck and required installed B pending. The native contract supplies no reliable terminal receipt, so this adapter always retains Unknown and uses only the bounded explicit fallback. The three-tab B case starts two additional actual native editor tabs from explicitly seeded prior review checkpoints; P24 intake/send evidence is reused, not claimed again for those seeded jobs.
+
+Checkpoint25a46ca7: local84 selectedT/build PASS. Required installed review journey running. Added local paused-attestation/module-fence revocation and between-sample late-write cases; fixed the fixture observer to treat persisted null readiness as not ready while checks are in flight.
