@@ -5,7 +5,7 @@ import {createHash,webcrypto} from 'node:crypto';
 import {observePerchanceAuth} from '../src/modules/auth-observations.mjs';
 const principal=createHash('sha256').update('owner@fixture.test').digest('hex');
 function fixture(){
- const user={loggedIn:true,email:'Owner@fixture.test',sessionToken:'secret\\0雪😀\\r\\n'},storage=new Map([['app-storage',JSON.stringify({user,AI:{never:'copy me'}})],['sessionTokenLastChangeTime','0000123']]);let rotate=false;
+ const user={loggedIn:true,email:'Owner@fixture.test',sessionToken:'secret\0雪😀\r\n'},storage=new Map([['app-storage',JSON.stringify({user,AI:{never:'copy me'}})],['sessionTokenLastChangeTime','0000123']]);let rotate=false;
  const context=vm.createContext({Date,TextEncoder,Uint8Array,document:{querySelector:()=>null},location:{origin:'https://perchance.org'},localStorage:{getItem:k=>{assert.ok(['app-storage','sessionTokenLastChangeTime'].includes(k),'arbitrary origin read');return storage.get(k)??null;}},__PCMS_ACCOUNT_DOCUMENT_1:'document',crypto:{subtle:{digest:async(...args)=>{if(rotate)storage.set('sessionTokenLastChangeTime','rotated');return webcrypto.subtle.digest(...args);}}}});
  vm.runInContext('window=globalThis;window.top=window',context);
  return {user,storage,context,rotate:()=>rotate=true,run:async(extra={})=>JSON.parse(JSON.stringify(await vm.runInContext('('+observePerchanceAuth.toString()+')',context)({documentWitness:'document',principalFingerprint:principal,...extra})))};

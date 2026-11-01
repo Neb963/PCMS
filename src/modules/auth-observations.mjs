@@ -11,7 +11,7 @@ export async function observePerchanceAuth(request){
   if(store!==null&&(!store||typeof store!=='object'||Array.isArray(store)))return hold('AUTH_SCHEMA_UNVERIFIED');
   const present=!!store&&Object.prototype.hasOwnProperty.call(store,'user'),user=present?store.user:null;
   if(present&&(!user||typeof user!=='object'||Array.isArray(user)||Object.keys(user).some(k=>!['loggedIn','email','sessionToken'].includes(k))||typeof user.loggedIn!=='boolean'||'email' in user&&typeof user.email!=='string'||'sessionToken' in user&&typeof user.sessionToken!=='string'))return hold('AUTH_SCHEMA_UNVERIFIED');
-  if(user?.loggedIn===true&&(typeof user.email!=='string'||!/^\\S+@\\S+$/.test(user.email.trim())||typeof user.sessionToken!=='string'||!user.sessionToken))return hold('AUTH_SCHEMA_UNVERIFIED');
+  if(user?.loggedIn===true&&(typeof user.email!=='string'||!/^\S+@\S+$/.test(user.email.trim())||typeof user.sessionToken!=='string'||!user.sessionToken))return hold('AUTH_SCHEMA_UNVERIFIED');
   const hash=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(x=>x.toString(16).padStart(2,'0')).join('');
   const principal=user?.loggedIn===true?await hash(user.email.trim().toLowerCase()):null;
   if(principal&&principal!==request.principalFingerprint)return hold('ACCOUNT_PRINCIPAL_CHANGED');

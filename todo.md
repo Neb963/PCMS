@@ -36,3 +36,5 @@ Settings → Backup now provides actual queued session coverage, progress, per-a
 ## Focused verification added
 
 New T exercises exact scoped auth bytes, unknown/absent/schema distinctions, wrong principal/document/frame and session rotation; full cookie identity/attributes, duplicate/schema/expiry rejection; finite maintenance collection, private blob closure, dedup, Pause, bounded rotation, previous good, stale account/Disable and restart between participants. These checks have been written but not yet run.
+
+Initial P28 T41304038004 failed (215/222): the newly written auth regex had an extra escape, a seeded-version assertion used the wrong loop variable, and a two-account fixture reused a unique principal. Correcting those exact defects; none of that run is passing evidence. Installed P28 journey is being added before completion.
