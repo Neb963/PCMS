@@ -29,10 +29,17 @@ class RestoreProvider(OriginalProvider):
 af.Provider=RestoreProvider
 
 def complete(sid):
+ # A queued read-only reconciliation can transition POSSIBLE -> OBSERVED
+ # between WebDriver snapshots. A transient HELD is not terminal evidence.
+ held={'key':None,'since':time.monotonic()}
  def inspect():
   v=restore(sid);c=v['control']
   if c['state']=='COMPLETE':return v
-  if v['job']['state'] in ['HELD','FAILED']:
+  j=v['job']
+  if j['state'] in ['HELD','FAILED']:
+   key=(j['state'],j['rev'],(j.get('effect') or {}).get('operationId'),(j.get('effect') or {}).get('boundary'),c['state'])
+   if held['key']!=key:held.update(key=key,since=time.monotonic())
+   if j['state']!='FAILED' and time.monotonic()-held['since']<20:return None
    p=(c.get('participants') or [{}])[0]
    try:
     detail=asyncjs(sid,"""const tabId=arguments[0],op=arguments[1],bg=await browser.runtime.getBackgroundPage(),c=await import(browser.runtime.getURL('core/records.mjs')).then(m=>m.openCore()),j=await c.read('jobs',arguments[2]),m=await c.read('modules','pcms-backup'),r=await c.status(),tab=tabId!=null?await browser.tabs.get(tabId).catch(e=>({error:String(e)})):null,scripts=await browser.userScripts.getScripts(),frames=tabId!=null?await browser.webNavigation.getAllFrames({tabId}).catch(e=>({error:String(e)})):null;const out={tab:{url:tab?.url,status:tab?.status,cookieStoreId:tab?.cookieStoreId,error:tab?.error},frames:frames?.map?.(f=>({url:f.url,documentId:f.documentId,frameId:f.frameId}))??frames,script:scripts.filter(s=>s.id.includes('restore')).map(s=>({id:s.id,world:s.world,runAt:s.runAt,worldId:s.worldId})),hold:r.restoreHold,activeDataset:r.dataset,job:{rev:j?.rev,generation:j?.generation,effect:j?.effect},module:{generation:m?.generation,enabled:m?.enabled,lifecycle:m?.lifecycle},registered:!!op};c.close();return out;""",[p.get('tabId'),(p.get('bootstrap') or {}).get('operationId'),c.get('jobId')])
