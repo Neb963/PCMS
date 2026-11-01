@@ -1,4 +1,5 @@
 import {requireCore as check} from '../core/records.mjs';
+import {nativeSlug} from './slug-observations.mjs';
 
 // Creator owns policy; Core supplies one atomic snapshot/commit on its stores.
 export const eligibleAccount=a=>a?.state==='READY'&&!a.admission&&/^[a-f0-9]{64}$/.test(a.expectedPrincipal??'')&&/^[a-f0-9-]{36}$/i.test(a.personaUid??'')&&/^firefox-container-[1-9][0-9]*$/.test(a.containerId??'')&&typeof a.routeId==='string'&&!['','direct','block','__direct__','__block__'].includes(a.routeId);
@@ -6,6 +7,7 @@ export const creationDispatched=job=>job.effect?.boundary==='POSSIBLE'||job.crea
 export function validCreatorTarget(g){return !!g?.folderPresent&&!!g.markerVersion&&!g.gitHoldCode&&!g.ownerMissing;}
 function target(c){
  const {job,generator:g,connection}=c;
+ check(nativeSlug(g.slug)===g.slug,'CREATOR_SLUG_INVALID');
  check(validCreatorTarget(g)&&g.slug===job.input.slug&&g.folder===job.input.folder&&g.repositoryId===job.input.repositoryId,'CREATOR_FOLDER_CHANGED');
  check(connection?.repositoryId===g.repositoryId,'GIT_REPOSITORY_CHANGED');
  check(g.creatorJobId===job.id,'CREATOR_TARGET_SCOPE');
@@ -22,7 +24,7 @@ export function reserveCreator(core,job,{accountId=null,requestId=null}={}){
  return core.creatorTransaction({jobId:job.id,expectedRev:job.rev,command},c=>{
   target(c);const {generator:g,job:current,accounts,generators,now}=c;
   check(!g.remoteId,'CREATOR_ALREADY_OWNED');check(!creationDispatched(current),'CREATOR_ALREADY_DISPATCHED');
-  if(g.allocation?.state==='RESERVED'&&!accountId){check(g.allocation.jobId===current.id,'CREATOR_RESERVATION_CONFLICT');return {generator:g,job:current,step:'KEEP_CREATOR_RESERVATION',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:g.allocation.accountId}};}
+  if(g.allocation?.state==='RESERVED'&&!accountId){check(g.allocation.jobId===current.id,'CREATOR_RESERVATION_CONFLICT');return {generator:{...g,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,accountId:g.allocation.accountId,creator:{...current.creator,phase:'RESERVED'},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:'KEEP_CREATOR_RESERVATION',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:g.allocation.accountId}};}
   const loads=accountLoads(generators,g.id),candidates=accounts.filter(eligibleAccount).sort((a,b)=>(loads.get(a.id)??0)-(loads.get(b.id)??0)||(a.id<b.id?-1:a.id>b.id?1:0));
   const selected=accountId?candidates.find(a=>a.id===accountId):candidates[0];check(selected,'CREATOR_NO_ELIGIBLE_ACCOUNT');
   const allocation={state:'RESERVED',jobId:current.id,accountId:selected.id,reservedAt:g.allocation?.reservedAt??now,updatedAt:now,override:accountId!==null,epoch:(g.allocation?.epoch??0)+1};
