@@ -53,6 +53,24 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
    for(const {store,value}of rows){check(allowed.includes(store)&&Array.isArray(value?.key)&&value.key[0]===c.newDataset,'RESTORE_SCOPE_DENIED');for(const ref of value.refs??[]){const b=await req(s('blobs').get([c.newDataset,ref]));check(b&&!b.staging,'RESTORE_REFERENCE_MISSING');}await req(s(store).put(structuredClone(value)));}
    return {rows:rows.length,dataset:c.newDataset};
   }),
+  staged:(id,table,recordId)=>transact([...tables],'readonly',async s=>{
+   const r=await root(s),c=await current(s);check(c?.id===id&&r.restoreHold?.id===id&&tables.includes(table),'RESTORE_SCOPE_DENIED');return req(s(table).get([c.newDataset,recordId]));
+  }),
+  account:(id,accountId,expectedRev,patch,guard)=>transact(['accounts','modules','jobs','events','versions','blobs','chunks'],'readwrite',async s=>{
+   const r=await root(s),c=await own(s,r,id,guard),map=c.mappings.find(m=>m.accountId===accountId),a=await req(s('accounts').get([c.newDataset,accountId]));
+   check(map&&a&&a.rev===expectedRev&&a.personaUid===map.personaUid&&a.containerId===map.destinationContainerId&&c.stagedRoot?.dataset===c.newDataset,'RESTORE_ACCOUNT_SCOPE');
+   const fields=['state','holdCode','flow','tabId','routeId','exitAddresses','observedExit','routeObservedAt','routeEvidenceId','identityObservedAt','observedAt','principalLabel','confirmedAt','restoreValidation','restoredImport'];
+   check(patch&&Object.keys(patch).every(k=>fields.includes(k))&&(!patch.state||['HELD','READY','LOGIN_REQUIRED'].includes(patch.state)),'RESTORE_ACCOUNT_PATCH');
+   if(patch.state==='READY'){
+    const p=c.participants?.find(p=>p.accountId===accountId),proof=p?.routeProof;
+    check(p?.local?.state==='IMPORTED'&&p.login?.state==='VALIDATED'&&p.login.principalFingerprint===a.expectedPrincipal&&proof?.source==='RESTORE_ROUTE_1'&&proof.personaUid===map.personaUid&&proof.containerId===map.destinationContainerId&&p.route?.state==='VALIDATED','RESTORE_ACCOUNT_UNVERIFIED');
+   }
+   const staged=r.dataset===c.newDataset?r:{...structuredClone(c.stagedRoot),key:'restore-staged-root:'+id};
+   await writeRows(s,staged,[{table:'accounts',id:accountId,expectedRev:a.rev,refs:a.refs,value:{...a,...structuredClone(patch)}}],{moduleId:'pcms-backup',targetId:accountId,jobId:guard.jobId,step:'RESTORE_ACCOUNT_DATA',result:patch.state==='READY'?'COMPLETE':'HELD'});
+   const next={...c,rev:c.rev+1,stagedRoot:{...staged,key:'root'}};await req(s('meta').put(next));
+   if(r.dataset!==c.newDataset)await event(s,r,id,'RESTORE_STAGED_ACCOUNT','COMPLETE');
+   return {control:next,account:await req(s('accounts').get([c.newDataset,accountId]))};
+  }),
   setBlobRefs:(id,descriptors,guard)=>transact(['blobs','modules','jobs'],'readwrite',async s=>{
    const r=await root(s),c=await own(s,r,id,guard);check(Array.isArray(descriptors)&&descriptors.length<=200,'RESTORE_BATCH_INVALID');
    for(const d of descriptors){const key=[c.newDataset,d.blobId],b=await req(s('blobs').get(key));check(b&&!b.staging&&b.bytes===d.bytes,'RESTORE_REFERENCE_MISSING');for(const ref of d.refs){const child=await req(s('blobs').get([c.newDataset,ref]));check(child&&!child.staging,'RESTORE_REFERENCE_MISSING');}await req(s('blobs').put({...b,refs:[...d.refs]}));}
