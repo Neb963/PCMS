@@ -83,11 +83,14 @@ def main():
    click(sid,'#pause-core');wait(lambda:not inspect_paused(sid))
    from installed_accounts import account as account_status,page as account_page
    for id in ids:
-    account_page(sid,id);click(sid,'#account-open');settle(sid,id,'READY');dashboard(sid)
+    account_page(sid,id);before_open=account_status(sid,id)['flow']['jobId'];wait(lambda:script(sid,"return !document.getElementById('account-open').disabled"));click(sid,'#account-open');dashboard(sid);wait(lambda:account_status(sid,id)['flow']['jobId']!=before_open)
+    try:settle(sid,id,'READY')
+    except Exception:raise AssertionError({'phase':'RESTART_ACCOUNT_OPEN','account':account_status(sid,id)})
+    dashboard(sid)
    click(sid,'#pause-core');wait(lambda:inspect_paused(sid));backup_page(sid)
    # Force actual Downloads cancellation at its returned ID, then restore the
    # API. The production receipt must report interruption and retain good files.
-   asyncjs(sid,"""const bg=await browser.runtime.getBackgroundPage(),original=bg.browser.downloads.download;bg.__P31_NATIVE_DOWNLOAD=original;bg.browser.downloads.download=async options=>{const id=await original(options);await bg.browser.downloads.cancel(id);return id;};return true;""")
+   asyncjs(sid,"""const bg=await browser.runtime.getBackgroundPage(),original=bg.browser.downloads.download;bg.__P31_NATIVE_DOWNLOAD=original;bg.browser.downloads.download=async options=>{const id=await original(options);try{await bg.browser.downloads.cancel(id);}catch{}return id;};return true;""")
    cancelled=request_export(sid);cancelled_done=completed(sid,cancelled['jobId']);asyncjs(sid,"const bg=await browser.runtime.getBackgroundPage();bg.browser.downloads.download=bg.__P31_NATIVE_DOWNLOAD;return true;");assert cancelled_done['state']=='FAILED',json.dumps(cancelled_done);assert state(sid)['lastComplete']['id']==interrupted['jobId']
    receipt['checks'].append('actual-browser-download-cancel/failed-receipt/no-last-good-replacement/no-automatic-replay')
    blocked=disk/'PCMS'/'Blocked';blocked.write_text('unrelated destination sentinel');set_input(sid,'#backup-folder','PCMS/Blocked/Backup');click(sid,'#backup-save-destination');wait(lambda:state(sid)['folder']=='PCMS/Blocked/Backup');failed=request_export(sid);assert completed(sid,failed['jobId'])['state']=='FAILED';assert state(sid)['lastComplete']['id']==interrupted['jobId'];assert blocked.read_text()=='unrelated destination sentinel'
