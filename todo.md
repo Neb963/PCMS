@@ -1,32 +1,24 @@
 # Current work
 
-**P15 — Available slug to verified Git folder: implemented and verified; merge pending.**
+**P16 — Owner adoption and durable allocation: planned from verified main.**
 
-P01–P14 are merged. Base main `1e43de0c904c1c3f49e43be6546325f7bf580f82`, exact tree `31c1c2a6c73bc2319badb1d59eaba3ac2259237a`; P14 postmerge [41251682213](https://github.com/Neb963/PCMS/actions/runs/41251682213) PASS.
+P01–P15 are merged. P15 [PR #15](https://github.com/Neb963/PCMS/pull/15), main `ab3c679a76c27fc206ee0446e832890a3406248d`, exact tree `76e968bc55367426e6d036eff2c73d32011951a7`; postmerge [41291121005](https://github.com/Neb963/PCMS/actions/runs/41291121005) PASS. Final P15 source255bf35c passed159 T/build and required actual Discover→Git B in41252948395, XPI759a778741e7d544ee4145c050447104fc4d10c6e8b831305d7726ee22cb0450.
 
-## Completed P15 outcome
+## P16 implementation plan
 
-Discover0.3 automatically stages and atomically links one Git preparation per dated Available observation/repository. Core-owned proof binds slug, repository and original result/date; Taken/Unknown/rejected/collision rows enqueue nothing. Startup/reconnect recovers incomplete links without rechecking completed slugs.
-
-The existing PREPARE writer requires complete folder absence and writes only the exact PCMS-1/v1/DEVELOP/NOT_READY marker. It preserves existing folders, root instructions, source, binary bytes and modes. Same-operation readback resolves uncertainty; safe explicit retry retains failed history. Repository changes cannot retarget a job, and stale callbacks cannot alter current work.
-
-The real Discover page shows each preparation's result/cause/receipt and opens exact Work/Generators/Connections through a Core-owned route bound to that page token. Verified completion requests the existing catalog observation. Batch Pause fences every linked Git dispatch in the one Core queue, survives restart and lets one admitted call drain.
-
-## Required evidence
-
-- Final source `255bf35cb00b82f790e97f496771d0c9e58ee6be`, tree `46d22f5299db8272b4c7a2ad076ed9d802d621ce`.
-- [41252948395](https://github.com/Neb963/PCMS/actions/runs/41252948395): **159 T/build + required installed B PASS**.
-- Production XPI SHA256 `759a778741e7d544ee4145c050447104fc4d10c6e8b831305d7726ee22cb0450`.
-- Firefox155.0/build20260817142839, normal sandbox6/certificates; actual protected rendered Discover caller and independent disposable bare Git HTTPS fixture.
-- Actual Available→automatic scoped job→one attributed marker-only commit→View generator/catalog row. Batch Pause between object calls drained one admitted blob and blocked later writes.
-- Second Available: applied ref response-body loss, hidden candidate preventing early verification, real process restart, actual Work readback, no additional writes, one logical commit for that observation and unchanged Available date.
-- Two fixture preparations produced exactly two reachable PCMS commits/two nonforced ref calls. Existing-folder/source/root-instruction/binary/mode sentinels stayed unchanged; no provider create or completed-classifier recheck.
-- T additionally qualifies positive-only linkage/reconnect/dedup, distinct observation identities, target/repository denial, safe retry/history, stale callbacks and batch fences during preflight/after durable intent/before call/across restart.
+1. Implement Creator0.2 finite steps over the existing Core records/queue. The existing Git observer automatically admits each current valid folder regardless of NOT_READY/READY; preserve source/listing/history and one durable job per target. No provider creation yet and no manual Start panel.
+2. Add a fixed read-only targeted ownership operation through the existing donor-protected, currently verified account/container/document. Reuse pinned Alpha ownership/page-read primitives without its old negative-ownership creation veto. Return only exact principal/stable remote ID/slug/listing evidence. Keep tokens/source/response text inside the page. Existing login/editor contexts are observed without navigation or edits.
+3. Examine managed accounts in bounded sequential queue turns with a small affirmative evidence cache. Missing context, unavailable account or incomplete response is Unknown for that account. Adopt one affirmative matching managed owner without mapping conflict or source/listing change. Conflicting owners/IDs and positively established foreign ownership hold only this target. Absence of affirmative ownership permits local allocation; P17 separately requires fresh Available before any creation.
+4. Add narrow atomic Core data operations for adoption/reservation/override. Count confirmed ownership plus all pending reservations once, retain archived reservations and select the minimum eligible nonarchived Ready account with account-ID tie break. Persist the same reservation/job through restart. Reject override after a create/rename dispatch or possible write; preserve prior allocation on failed/stale selection.
+5. Extend the one queue only as needed for a fixed read-only observation of a saved candidate account, enforcing its exact revision, account fence and existing global/per-account budgets. No unbound write scope or second scheduler/controller. Global Pause and module Disable stop admission; same-operation readback retains uncertainty safely.
+6. Add actual Generators list/details owner/reservation/progress/cause, Work/account links, typed ownership recheck and pre-dispatch account override. Preserve selection/filter/draft/focus; no false Created/Published state. Reserved work remains explicitly awaiting the P17 implementation in this checkpoint.
+7. Focused T covers concurrent balancing, archived reservations, unique adoption/mapping conflicts, unknown inventory without a false veto, override races/dispatched rejection, readonly account scope/fences and restart/no duplicate reservation. Required B uses production XPI/real controls and protected rendered/native-protocol fixtures: adopt a remotely owned generator absent locally, independently verify unchanged source/listing, then operate account override and real restart without double allocation. Reuse completed donor/transport research and unchanged writer evidence.
+8. Publish frequent meaningful code+todo checkpoints and verify remote files/commits/trees. Run local focused checks where available and the affected installed journey in existing CI; merge verified P16, verify postmerge main and automatically continue P17.
 
 ## Next action and holds
 
-Merge [PR #15](https://github.com/Neb963/PCMS/pull/15), verify exact postmerge main tree and CI, then automatically plan and implement P16 (owner adoption and durable allocation). Do not stop between phases.
+P16 code is not yet written. Next implement atomic local ownership/reservation primitives and the fixed read-only provider observation, then finite intake and actual Generators controls.
 
-The local runtime has returned in the current session; restore a clean checkout from GitHub before local work. P13–P15 implementation checks above ran through GitHub CI; no unavailable historical local command is claimed run.
+The runtime is restored at `/workspace/scratch/a60548e2a34d/PCMS`; clean checkout matches verified main. Dependencies installed with npm ci --ignore-scripts. P13–P15 evidence remains its original GitHub CI identity; no unavailable historical local command is claimed run.
 
-G/H/P1–P5 remain NOT TESTED and unauthorized. P42–P49 need explicit disposable external targets/effects; fixture success authorizes no live provider/Git/native operation.
+H/G/P1–P5 remain NOT TESTED and unauthorized. P44 separately qualifies current provider ownership/adoption contracts. P42–P49 need explicit disposable external resources/effects; all current provider/native tests use isolated local fixtures.
