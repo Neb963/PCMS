@@ -28,6 +28,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   accountActive:id=>[...active.values()].some(a=>a.accountId===id),
   fence:moduleId=>fenced.add(moduleId),
   unfence:moduleId=>fenced.delete(moduleId),
+  rebind:async()=>{check(active.size===0,'RESTORE_EFFECT_PENDING');await tx(async(s,r)=>{blocked=r.paused===true;restoreFence=r.restoreHold??null;gateVersion++;accountFences.clear();accountEpochs.clear();batchFences.clear();batchEpochs.clear();fenced.clear();});},
   boot:async()=>{
    if(initialized)return;
    await tx(async(s,r)=>{

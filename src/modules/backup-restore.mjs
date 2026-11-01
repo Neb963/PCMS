@@ -197,11 +197,27 @@ export function createBackupRestore({core,donor,pins=async()=>{},rebuild=async()
     await core.restore.stageRows(c.id,batch,guard(await fresh(j)));await update(j,c,{progress:{...c.progress,rows:index+batch.length},code:null});return output(j,'CONTINUE');
    }
    if(c.state==='STAGED'){
-    if(reconcile)return output(j,'CONTINUE');const m=await module();check(m.manifest?.capabilities?.includes('backup.activate'),'BACKUP_UPDATE_REQUIRED');
+    if(reconcile)return output(j,'CONTINUE');const m=await module();check(/^0\.(?:[6-9]|[1-9][0-9]+)\./.test(m.manifest?.version??''),'BACKUP_UPDATE_REQUIRED');
     const checked=await archive(c),plan=await privateData(c,'plan'),participants=await restoreParticipantPlan(checked.data,c.mappings,plan.routeMap,clock());
     await update(j,c,{state:'PARTICIPANTS',participants,progress:{...c.progress,participant:0},code:null});return output(j,'CONTINUE');
    }
    if(c.state==='PARTICIPANTS')return await participant(j,c,reconcile);
+
+   if(c.state==='LOCAL_CHECK'){
+    if(reconcile)return output(j,'CONTINUE');const index=c.progress.account??0,p=c.participants[index];
+    if(p){
+     const a=await core.restore.staged(c.id,'accounts',p.accountId),valid=p.login.state==='VALIDATED'&&p.route.state==='VALIDATED',b=p.binding,flow={requestId:crypto.randomUUID(),jobId:null,purpose:'RESTORE',stage:valid?'READY':'LOGIN_REQUIRED',startedAt:c.confirmedAt,wasReady:valid,confirmationAt:null};
+     await core.restore.account(c.id,a.id,a.rev,{...b,state:valid?'READY':'LOGIN_REQUIRED',holdCode:valid?null:p.login.code,flow,tabId:p.tabId,identityObservedAt:valid?p.login.observedAt:null,observedAt:clock(),principalLabel:valid?p.login.principalLabel:a.principalLabel,restoreValidation:{restoreId:c.id,dataset:c.newDataset,state:valid?'VALIDATED':'LOGIN_REQUIRED'}},guard(await fresh(j)));
+     c=await core.restore.read();await update(j,c,{progress:{...c.progress,account:index+1}});return output(j,'CONTINUE');
+    }
+    // Validation of the selected file and guarded writes already established
+    // hashes; the Core transaction checks actual staged closure and maps.
+    await archive(c);await core.restore.activate(c.id,guard(await fresh(j)));await core.queue.rebind();return output(j,'CONTINUE');
+   }
+   if(c.state==='REBUILD'){
+    if(reconcile)return output(j,'CONTINUE');await rebuild(core);await pins(core);c=await core.restore.read();await update(j,c,{rebuilt:true});await core.restore.finish(c.id,guard(await fresh(j)));return output(j,'COMPLETE');
+   }
+
    return output(j,'HELD',c.code??'RESTORE_AUTH_IMPORT_PENDING');
   }catch(error){
    const latest=await fresh(j);if(latest.effect?.boundary==='POSSIBLE')return output(j,'HELD',code(error));const m=await module();if(enabled(m)&&latest.generation===m.generation){const current=await core.restore.read();try{await update(latest,current,{code:code(error)});}catch{}}

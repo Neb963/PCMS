@@ -1,6 +1,6 @@
 // Private staged-generation primitives on the one existing Core database.
-// No activation exists here: P32 can stage/roll back while the prior cut stays
-// active under a durable maintenance hold.
+// Staging and checked cut replacement share the existing Core transaction.
+// Native bindings must independently verify before releasing maintenance.
 export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,append,writeRows,clock,tables}){
  const controlKey='restore-control',allowed=[...tables,'versions','views','commands','credentials','pins','events'];
  const current=s=>req(s('meta').get(controlKey));
@@ -75,6 +75,31 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
    const r=await root(s),c=await own(s,r,id,guard);check(Array.isArray(descriptors)&&descriptors.length<=200,'RESTORE_BATCH_INVALID');
    for(const d of descriptors){const key=[c.newDataset,d.blobId],b=await req(s('blobs').get(key));check(b&&!b.staging&&b.bytes===d.bytes,'RESTORE_REFERENCE_MISSING');for(const ref of d.refs){const child=await req(s('blobs').get([c.newDataset,ref]));check(child&&!child.staging,'RESTORE_REFERENCE_MISSING');}await req(s('blobs').put({...b,refs:[...d.refs]}));}
   }),
+
+  activate:(id,guard)=>transact([...allowed,'blobs','chunks'],'readwrite',async s=>{
+   const r=await root(s),c=await own(s,r,id,guard);check(c.state==='LOCAL_CHECK'&&c.stagedRoot?.dataset===c.newDataset&&r.dataset===c.previousRoot.dataset,'RESTORE_SWITCH_DENIED');
+   check(c.participants?.length===c.mappings.length&&c.participants.every(p=>p.local?.state==='IMPORTED'&&p.bootstrapReceipt?.authHash===p.sourceAuthHash),'RESTORE_LOCAL_IMPORT_PENDING');
+   const oldJob=await req(s('jobs').get([r.dataset,guard.jobId]));check(oldJob.effect?.boundary!=='POSSIBLE','RECONCILE_REQUIRED');
+   const oldJobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));check(!oldJobs.some(j=>j.id!==oldJob.id&&j.effect?.boundary==='POSSIBLE'&&j.effect.write!==false),'RESTORE_PREVIOUS_WRITE_UNRESOLVED');
+   const modules=await req(s('modules').index('dataset').getAll(IDBKeyRange.only(c.newDataset))),backup=modules.find(m=>m.id==='pcms-backup');check(backup?.enabled&&!backup.lifecycle&&backup.packageClass==='bundled-backup'&&backup.manifest?.capabilities?.includes('backup.restore'),'RESTORE_BACKUP_INCOMPATIBLE');
+   for(const table of tables){
+    const records=await req(s(table).index('dataset').getAll(IDBKeyRange.only(c.newDataset)));check(records.length===c.stagedCounts[table],'RESTORE_RECORD_CLOSURE');
+    for(const row of records)for(const ref of [...row.refs??[],...table==='modules'?Object.values(row.payload??{}):[]]){const blob=await req(s('blobs').get([c.newDataset,ref]));check(blob&&!blob.staging,'RESTORE_REFERENCE_MISSING');}
+   }
+   for(const m of c.mappings){const a=await req(s('accounts').get([c.newDataset,m.accountId]));check(a?.personaUid===m.personaUid&&a.containerId===m.destinationContainerId&&a.flow,'RESTORE_ACCOUNT_SCOPE');}
+   const source=c.stagedRoot,nextRoot={key:'root',schema:r.schema,dataset:c.newDataset,profileId:r.profileId,sequence:source.sequence,revision:source.revision,paused:r.paused===true||source.paused===true,createdAt:source.createdAt,updatedAt:clock(),journalPrunedThrough:source.journalPrunedThrough??0,moduleSeed:structuredClone(r.moduleSeed),lastModule:'',lastAccounts:{},queueTurns:0,admissionEpoch:(r.admissionEpoch??0)+1,restoreHold:{id,jobId:oldJob.id}};
+   const owner={...oldJob,key:[c.newDataset,oldJob.id],dataset:c.newDataset,generation:backup.generation,state:'WAITING',dueAt:clock(),lease:null,runtimeInvalidated:false,needsCheck:true};
+   for(const name of ['previous','plan','rollback']){const old=await req(s('credentials').get([r.dataset,'restore-'+name+'-'+id]));if(old)await req(s('credentials').put({...old,key:[c.newDataset,old.key[1]]}));}
+   const next={...c,rev:c.rev+1,state:'REBUILD',switchedAt:clock(),previousRootAtSwitch:structuredClone(r),stagedRoot:nextRoot,code:null};await req(s('meta').put(next));
+   await writeRows(s,nextRoot,[{table:'jobs',id:owner.id,value:owner,refs:owner.refs??[]}],{moduleId:'pcms-backup',jobId:owner.id,targetId:id,step:'RESTORE_ACTIVATE_CUT',result:'COMPLETE'});
+   return {dataset:c.newDataset,state:'REBUILD'};
+  }),
+  finish:async(id,guard)=>{
+   const result=await transact(['modules','jobs','events'],'readwrite',async s=>{
+    const r=await root(s),c=await own(s,r,id,guard);check(r.dataset===c.newDataset&&c.state==='REBUILD'&&c.rebuilt===true,'RESTORE_REBUILD_PENDING');
+    delete r.restoreHold;const next={...c,state:'COMPLETE',rev:c.rev+1,finishedAt:clock(),code:null};await req(s('meta').put(next));await event(s,r,id,'RESTORE_MAINTENANCE_COMPLETE','COMPLETE');return {state:'COMPLETE',dataset:r.dataset};
+   });await core.queue.releaseMaintenance(guard.jobId);return result;
+  },
   async cancelUnstarted(id,guard){
    const result=await transact(['modules','jobs','events','pins'],'readwrite',async s=>{
     const r=await root(s),c=await own(s,r,id,guard),j=await req(s('jobs').get([r.dataset,guard.jobId]));check(c.state==='DRAIN'&&!j.effect&&!(j.effects??[]).length,'RESTORE_CANCEL_DENIED');
@@ -83,10 +108,15 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
   },
   async rolledBack(id,guard){
    const result=await transact(['modules','jobs','events','pins','accounts','versions','blobs','chunks'],'readwrite',async s=>{
-    const r=await root(s),c=await own(s,r,id,guard);check(c.state==='ROLLBACK_VERIFIED'&&c.rollback?.verified===true&&r.dataset===c.previousRoot.dataset,'RESTORE_ROLLBACK_UNVERIFIED');
+    const r=await root(s),c=await own(s,r,id,guard);check(c.state==='ROLLBACK_VERIFIED'&&c.rollback?.verified===true&&[c.previousRoot.dataset,c.newDataset].includes(r.dataset),'RESTORE_ROLLBACK_UNVERIFIED');
+    if(r.dataset===c.newDataset){
+     check(c.previousRootAtSwitch?.dataset===c.previousRoot.dataset,'RESTORE_ROLLBACK_UNVERIFIED');const restored=structuredClone(c.previousRootAtSwitch),owner=await req(s('jobs').get([r.dataset,guard.jobId])),old=await req(s('jobs').get([restored.dataset,guard.jobId])),m=await req(s('modules').get([restored.dataset,'pcms-backup']));
+     check(owner?.effect?.boundary!=='POSSIBLE'&&old&&m?.enabled,'RESTORE_ROLLBACK_UNVERIFIED');for(const name of ['previous','plan','rollback']){const secret=await req(s('credentials').get([r.dataset,'restore-'+name+'-'+id]));if(secret)await req(s('credentials').put({...secret,key:[restored.dataset,secret.key[1]]}));}
+     Object.assign(r,restored,{paused:r.paused===true||restored.paused===true});await writeRows(s,r,[{table:'jobs',id:owner.id,expectedRev:old.rev,refs:owner.refs??[],value:{...owner,key:old.key,dataset:r.dataset,generation:m.generation,state:'WAITING',lease:null,dueAt:clock(),runtimeInvalidated:false}}],{moduleId:'pcms-backup',jobId:owner.id,targetId:id,step:'RESTORE_PREVIOUS_CUT',result:'COMPLETE'});
+    }
     const accounts=await req(s('accounts').index('dataset').getAll(IDBKeyRange.only(r.dataset))),changes=accounts.filter(a=>a.state==='READY').map(a=>({table:'accounts',id:a.id,expectedRev:a.rev,refs:a.refs,value:{...a,state:'HELD',holdCode:'RESTORE_ROLLBACK_ROUTE_RECHECK',routeObservedAt:null,identityObservedAt:null}}));if(changes.length)await writeRows(s,r,changes,{moduleId:'pcms-backup',targetId:id,step:'RESTORE_ROLLBACK_ACCOUNT_RECHECK',result:'HELD'});
     delete r.restoreHold;await req(s('pins').delete([r.dataset,c.previousJournalPin]));await req(s('meta').put({...c,state:'ROLLED_BACK',rev:c.rev+1,finishedAt:clock()}));await event(s,r,id,'RESTORE_ROLLED_BACK','COMPLETE');return {state:'ROLLED_BACK',dataset:r.dataset};
-   });await core.queue.releaseMaintenance(guard.jobId);return result;
+   });await core.queue.rebind();await core.queue.releaseMaintenance(guard.jobId);return result;
   },
   async cancelPreview(id,generation){
    const c=await transact(['modules','files','versions','events'],'readwrite',async s=>{
