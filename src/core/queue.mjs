@@ -93,7 +93,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');check(job.step!=='WAIT_CREATOR','DEPENDENCY_HAS_NO_WRITER');
     check(accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null),'ACCOUNT_ADMISSION_HELD');
     const generator=await read(s,r,'generators',job.targetId);check(generator,'TARGET_MISSING');check(!generator.writerHold||generator.writerHold.jobId===jobId,'WRITER_HELD');
-    const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');check(restoreAllowed(job,r,!write&&maintenance(job,module)),'RESTORE_MAINTENANCE');
+    const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');check(restoreAllowed(job,r),'RESTORE_MAINTENANCE');
     const lease={bootId,generation:module.generation,jobId};
     return save(s,r,job,{lease},'CLAIM_WRITER','COMPLETE',[change('generators',generator,{...generator,writerHold:{jobId,reason:job.kind}})]);
   }),
@@ -133,7 +133,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
         check(accountAllowed({...job,accountId:dispatchAccountId},dispatchAccountId?await read(s,r,'accounts',dispatchAccountId):null),'ACCOUNT_ADMISSION_HELD');
         check(batchAllowed(job,job.batchId?await read(s,r,'jobs',job.batchId):null),'BATCH_PAUSED');
         if(evidence.accountRevision!=null){const account=await read(s,r,'accounts',dispatchAccountId);check(account?.rev===evidence.accountRevision,'STALE_ACCOUNT');}
-        const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
+        const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');check(restoreAllowed(job,r,!write&&maintenance(job,module)),'RESTORE_MAINTENANCE');
         check(job.state!=='COMPLETE'&&job.state!=='FAILED','JOB_FINISHED');check(job.dueAt<=clock(),'NOT_DUE');
         check(job.effect?.boundary!=='POSSIBLE','RECONCILE_REQUIRED');
         check(!job.effects?.some(e=>e.operationId===operationId),'EFFECT_ALREADY_OBSERVED');

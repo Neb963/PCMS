@@ -44,6 +44,10 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
    const r=await root(s),c=await own(s,r,id,guard);check(c.rev===expectedRev,'STALE_RESTORE');check(!['key','id','jobId','source','previousRoot','newDataset','confirmedAt'].some(k=>k in patch),'RESTORE_SCOPE_DENIED');
    const next={...c,...structuredClone(patch),rev:c.rev+1};await req(s('meta').put(next));await event(s,r,id,'RESTORE_CHECKPOINT','COMPLETE');return next;
   }),
+  secret:(id,name,value,accountIds,guard)=>transact(['credentials','modules','jobs','events'],'readwrite',async s=>{
+   const r=await root(s);await own(s,r,id,guard);check(['previous','plan','rollback'].includes(name)&&typeof value==='string'&&Array.isArray(accountIds),'RESTORE_SCOPE_DENIED');const key=[r.dataset,'restore-'+name+'-'+id],old=await req(s('credentials').get(key));
+   await req(s('credentials').put({key,value,captureData:true,accountIds:[...new Set(accountIds)],schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));await event(s,r,id,'RESTORE_PRIVATE_CHECKPOINT','COMPLETE');return key[1];
+  }),
   stageRows:(id,rows,guard)=>transact([...allowed,'modules','jobs','blobs'],'readwrite',async s=>{
    const r=await root(s),c=await own(s,r,id,guard);check(Array.isArray(rows)&&rows.length<=200,'RESTORE_BATCH_INVALID');
    for(const {store,value}of rows){check(allowed.includes(store)&&Array.isArray(value?.key)&&value.key[0]===c.newDataset,'RESTORE_SCOPE_DENIED');for(const ref of value.refs??[]){const b=await req(s('blobs').get([c.newDataset,ref]));check(b&&!b.staging,'RESTORE_REFERENCE_MISSING');}await req(s(store).put(structuredClone(value)));}
