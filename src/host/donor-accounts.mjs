@@ -426,7 +426,7 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    const checkpoint=await sourceCheckpoint(scope,{...request,tabId,witness});if(!checkpoint?.ok)return checkpoint;return {...rows[0].result,context:after.context,checkpoint};
   }catch{return fail('EDITOR_CAPTURE_UNKNOWN');}
  }
- async function attachFinish(scope,request){const o=await aiInspect(scope,request);if(!o?.ok)return o;try{await api.scripting.executeScript({target:{tabId:o.context.tabId,frameIds:[0]},world:'ISOLATED',files:['host/editor-finish.js']});return {ok:true};}catch{return fail('FINISH_CONTROL_UNAVAILABLE');}}
+ async function attachFinish(scope,request){const o=await aiInspect(scope,request);if(!o?.ok)return o;try{await api.scripting.executeScript({target:{tabId:o.context.tabId,frameIds:[0]},world:'ISOLATED',files:['/host/editor-finish.js']});return {ok:true};}catch{return fail('FINISH_CONTROL_UNAVAILABLE');}}
  async function sourceCheckpoint(scope,{slug,remoteId,tabId,witness}){
   const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);
   try{const tab=await api.tabs.get(tabId);if(tab.cookieStoreId!==scope.containerId||tab.url!==PERCHANCE+slug+'#edit')return fail('EDITOR_DOCUMENT_CHANGED');
