@@ -32,3 +32,7 @@ Backup0.2 now runs finite CAPTURE coverage turns through the existing sandbox/mo
 ## Primary UI checkpoint
 
 Settings → Backup now provides actual queued session coverage, progress, per-account causes/context/times and exact Accounts recovery links, search and ten-account pages. The query projection excludes capsule/blob IDs, tokens, emails and cookie values. Search/page state persists; polling keeps the search control stable. No disk-export control is present. Verification is pending.
+
+## Focused verification added
+
+New T exercises exact scoped auth bytes, unknown/absent/schema distinctions, wrong principal/document/frame and session rotation; full cookie identity/attributes, duplicate/schema/expiry rejection; finite maintenance collection, private blob closure, dedup, Pause, bounded rotation, previous good, stale account/Disable and restart between participants. These checks have been written but not yet run.
