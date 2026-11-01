@@ -5,7 +5,7 @@ from installed_discover_preparation import session15
 from installed_packages import *
 from installed_accounts import add,settle,login
 from installed_lifecycle import permission_choice
-from installed_journal import set_input
+from installed_journal import set_input,close_dashboard
 from installed_git_catalog import connections,generators
 from account_fixture import Fixture
 import account_fixture

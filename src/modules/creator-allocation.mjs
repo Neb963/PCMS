@@ -28,7 +28,7 @@ export function reserveCreator(core,job,{accountId=null,requestId=null}={}){
   const loads=accountLoads(generators,g.id),candidates=accounts.filter(eligibleAccount).sort((a,b)=>(loads.get(a.id)??0)-(loads.get(b.id)??0)||(a.id<b.id?-1:a.id>b.id?1:0));
   const selected=accountId?candidates.find(a=>a.id===accountId):candidates[0];check(selected,'CREATOR_NO_ELIGIBLE_ACCOUNT');
   const allocation={state:'RESERVED',jobId:current.id,accountId:selected.id,reservedAt:g.allocation?.reservedAt??now,updatedAt:now,override:accountId!==null,epoch:(g.allocation?.epoch??0)+1};
-  return {generator:{...g,allocation,allocationAccountId:selected.id,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,accountId:selected.id,creator:{...current.creator,phase:'RESERVED'},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:accountId?'OVERRIDE_CREATOR_ACCOUNT':'RESERVE_CREATOR_ACCOUNT',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:selected.id}};
+  return {generator:{...g,allocation,allocationAccountId:selected.id,creatorState:'RESERVED',creatorHoldCode:null},job:{...current,ownerMissing:false,accountId:selected.id,creator:{...current.creator,phase:'RESERVED'},state:'HELD',recovery:{action:'OPEN_GENERATOR',code:'CREATOR_CREATE_PENDING'}},step:accountId?'OVERRIDE_CREATOR_ACCOUNT':'RESERVE_CREATOR_ACCOUNT',value:{state:'RESERVED',generatorId:g.id,jobId:current.id,accountId:selected.id}};
  });
 }
 export function adoptCreator(core,job,proof){
