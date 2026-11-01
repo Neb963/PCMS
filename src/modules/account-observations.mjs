@@ -50,7 +50,7 @@ export function accountDocumentWitness(){
  if(!Object.prototype.hasOwnProperty.call(globalThis,'__PCMS_ACCOUNT_DOCUMENT_1'))Object.defineProperty(globalThis,'__PCMS_ACCOUNT_DOCUMENT_1',{value:crypto.randomUUID()});
  return globalThis.__PCMS_ACCOUNT_DOCUMENT_1;
 }
-export async function observePerchanceIdentity(expectedDocumentWitness){
+export async function observePerchanceIdentity(expectedDocumentWitness,options={}){
  if(typeof expectedDocumentWitness!=='string'||globalThis.__PCMS_ACCOUNT_DOCUMENT_1!==expectedDocumentWitness)return {ok:false,code:'ACCOUNT_DOCUMENT_CHANGED'};
  const hold=code=>({ok:false,code});
  if(location.origin!=='https://perchance.org')return hold('WRONG_ORIGIN');
@@ -67,6 +67,7 @@ export async function observePerchanceIdentity(expectedDocumentWitness){
   if(globalThis.__PCMS_ACCOUNT_DOCUMENT_1!==expectedDocumentWitness)return hold('ACCOUNT_DOCUMENT_CHANGED');
   if(location.origin!=='https://perchance.org'||localStorage.getItem('app-storage')!==raw||localStorage.getItem('sessionTokenLastChangeTime')!==change)return hold('ACCOUNT_PRINCIPAL_CHANGED');
   const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(principal));
-  return {ok:true,documentWitness:expectedDocumentWitness,source:'PERCHANCE_AUTHENTICATED_IDENTITY',principalFingerprint:[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join(''),principalLabel:principal,observedAt:Date.now()};
+  const names=options.inventory===true?body.generators.map(g=>typeof g==='string'?g:g?.name):null,inventory=names&&names.every(n=>typeof n==='string'&&/^[a-z0-9][a-z0-9-]{0,99}$/.test(n))&&new Set(names).size===names.length?{source:'PERCHANCE_AUTHENTICATED_INVENTORY',slugs:names,observedAt:Date.now()}:null;
+  return {...inventory?{inventory}:{},ok:true,documentWitness:expectedDocumentWitness,source:'PERCHANCE_AUTHENTICATED_IDENTITY',principalFingerprint:[...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join(''),principalLabel:principal,observedAt:Date.now()};
  }catch{return hold('ACCOUNT_IDENTITY_UNKNOWN');}
 }

@@ -1,32 +1,23 @@
 # Current work
 
-**P15 — Available slug to verified Git folder: implemented and verified; merge pending.**
+**P16 — implemented and verified; prepare merge, verify postmerge, then P17.**
 
-P01–P14 are merged. Base main `1e43de0c904c1c3f49e43be6546325f7bf580f82`, exact tree `31c1c2a6c73bc2319badb1d59eaba3ac2259237a`; P14 postmerge [41251682213](https://github.com/Neb963/PCMS/actions/runs/41251682213) PASS.
+P01–P15 are merged. P15 main `ab3c679a76c27fc206ee0446e832890a3406248d`, tree `76e968bc55367426e6d036eff2c73d32011951a7`; postmerge [41291121005](https://github.com/Neb963/PCMS/actions/runs/41291121005) PASS.
 
-## Completed P15 outcome
+## P16 implementation and evidence
 
-Discover0.3 automatically stages and atomically links one Git preparation per dated Available observation/repository. Core-owned proof binds slug, repository and original result/date; Taken/Unknown/rejected/collision rows enqueue nothing. Startup/reconnect recovers incomplete links without rechecking completed slugs.
+[PR #16](https://github.com/Neb963/PCMS/pull/16), source `1e38edbca34131ed71e69f47619a19051528eb99`, tree `be37abaa41b1b999d24845f026ab187630d0741f`. [41295438880](https://github.com/Neb963/PCMS/actions/runs/41295438880):180 T/build PASS and required installed B PASS. XPI `3b6fa02d6e731a2b169be80829b76ea2ad190c3dfa7cf9360bfe74acfc3381cb`; Firefox155.0/build20260817142839, normal sandbox6, persistent install and real process restart.
 
-The existing PREPARE writer requires complete folder absence and writes only the exact PCMS-1/v1/DEVELOP/NOT_READY marker. It preserves existing folders, root instructions, source, binary bytes and modes. Same-operation readback resolves uncertainty; safe explicit retry retains failed history. Repository changes cannot retarget a job, and stale callbacks cannot alter current work.
+Creator0.2 automatically intakes valid Git folders including NOT_READY. Finite Core-queue turns perform exact protected managed-account ownership reads and fresh owner confirmation. Affirmative principal/stable-ID/slug adoption preserves source/listing; conflicts hold only the target. Incomplete observations are Unknown, not negative proof or an allocation veto. No provider creation is implemented in P16.
 
-The real Discover page shows each preparation's result/cause/receipt and opens exact Work/Generators/Connections through a Core-owned route bound to that page token. Verified completion requests the existing catalog observation. Batch Pause fences every linked Git dispatch in the one Core queue, survives restart and lets one admitted call drain.
+Atomic allocation counts the union of fresh authenticated remote inventory and known local ownership plus pending reservations once, retains archived reservations, balances eligible Ready accounts with stable ID ties, and supports explicit pre-dispatch override. Removed-account recovery preserves safe attribution and the same job; possible/observed creation cannot be reassigned. Generators provides live facts, observations, account selection/draft preservation, recheck, typed holds and actual account/Work/Modules links; Work links directly back to generator recovery. Global Pause and module Disable stop new reads; already-dispatched readback remains scoped.
 
-## Required evidence
+T covers concurrent balance, remote-only loads, archived reservations, override races, removed accounts, conflicts, unknown inventories, exact observation scope, lifecycle/Pause races, source preservation and restart. B independently observed an owned fixture generator absent locally, adopted it without source/listing changes, operated actual account override and draft/navigation/recovery controls, queued a paused recheck, restarted Firefox and retained one job/reservation without duplicate allocations. Independent provider/Git bytes and effect counts prove no create/save/rename/Git writes. Earlier B41295273245 remains its original artifact evidence; its changed inventory boundary was rerun in final41295438880. Initial test-helper import and stale-search synchronization failures were fixed, not reported as passes.
 
-- Final source `255bf35cb00b82f790e97f496771d0c9e58ee6be`, tree `46d22f5299db8272b4c7a2ad076ed9d802d621ce`.
-- [41252948395](https://github.com/Neb963/PCMS/actions/runs/41252948395): **159 T/build + required installed B PASS**.
-- Production XPI SHA256 `759a778741e7d544ee4145c050447104fc4d10c6e8b831305d7726ee22cb0450`.
-- Firefox155.0/build20260817142839, normal sandbox6/certificates; actual protected rendered Discover caller and independent disposable bare Git HTTPS fixture.
-- Actual Available→automatic scoped job→one attributed marker-only commit→View generator/catalog row. Batch Pause between object calls drained one admitted blob and blocked later writes.
-- Second Available: applied ref response-body loss, hidden candidate preventing early verification, real process restart, actual Work readback, no additional writes, one logical commit for that observation and unchanged Available date.
-- Two fixture preparations produced exactly two reachable PCMS commits/two nonforced ref calls. Existing-folder/source/root-instruction/binary/mode sentinels stayed unchanged; no provider create or completed-classifier recheck.
-- T additionally qualifies positive-only linkage/reconnect/dedup, distinct observation identities, target/repository denial, safe retry/history, stale callbacks and batch fences during preflight/after durable intent/before call/across restart.
+## Next action
 
-## Next action and holds
+Publish this evidence checkpoint, merge verified P16 through PR16, verify exact main tree and postmerge CI, then write the actual P17 implementation plan before code. Continue autonomously through every safely dependency-eligible phase. Do not stop between phases.
 
-Merge [PR #15](https://github.com/Neb963/PCMS/pull/15), verify exact postmerge main tree and CI, then automatically plan and implement P16 (owner adoption and durable allocation). Do not stop between phases.
+## Holds
 
-The local runtime has returned in the current session; restore a clean checkout from GitHub before local work. P13–P15 implementation checks above ran through GitHub CI; no unavailable historical local command is claimed run.
-
-G/H/P1–P5 remain NOT TESTED and unauthorized. P42–P49 need explicit disposable external targets/effects; fixture success authorizes no live provider/Git/native operation.
+H/G/P1–P5 remain NOT TESTED and unauthorized. P44 separately qualifies current provider ownership and creation wire contracts. P42–P49 require named disposable resources/effects. All provider/native behavior above uses isolated local fixtures. Final live/fleet acceptance is not established.

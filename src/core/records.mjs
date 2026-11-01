@@ -31,7 +31,7 @@ export function safeEvent(event) {
 }
 const fields={
   accounts:['accountId','label','state','principalLabel','personaUid','observedAt','holdCode'],
-  generators:['generatorId','slug','accountId','repositoryId','folder','listing','state','observedAt','holdCode','gitState','gitHoldCode','markerVersion','markerAction','markerStatus','folderPresent','folderTreeSha','markerSha','catalogHead','catalogObservedAt'],
+  generators:['generatorId','slug','accountId','repositoryId','folder','listing','state','observedAt','holdCode','gitState','gitHoldCode','markerVersion','markerAction','markerStatus','folderPresent','folderTreeSha','markerSha','catalogHead','catalogObservedAt','remoteId','ownerObservedAt','creatorState','creatorHoldCode','creatorJobId','allocationAccountId'],
   jobs:['jobId','logicalKey','moduleId','targetId','accountId','state','step','dueAt','recovery','batchId','kind','effect'],
   modules:['moduleId','name','version','enabled','generation','state'],
   files:['captureId','type','automatic','filename','bytes','sha256','state','completedAt'],
@@ -166,7 +166,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       const job=await req(s('jobs').get([r.dataset,jobId])),m=await req(s('modules').get([r.dataset,'pcms-accounts']));requireCore(m?.enabled&&!m.lifecycle&&m.generation===job?.generation&&!r.paused,'ACCOUNT_REMOVAL_HELD');
       const jobs=await req(s('jobs').index('accountId').getAll(IDBKeyRange.only([r.dataset,accountId]))),changes=[{table:'accounts',id:accountId,expectedRev:a.rev,value:null}];
       changes.push({table:'jobs',id:jobId,expectedRev:job.rev,value:{...job,state:'COMPLETE',step:'COMPLETE',checkpoint:{accountId,localRemoved:true},recovery:null,lease:null},refs:job.refs??[]});
-      for(const j of jobs)if(j.id!==jobId){const possible=j.effect?.boundary==='POSSIBLE',value={ownerMissing:true,jobId:j.id,logicalKey:j.logicalKey,moduleId:j.moduleId,targetId:j.targetId,accountId,kind:j.kind,jobSchema:j.jobSchema,generation:j.generation,state:possible?'HELD':['COMPLETE','FAILED'].includes(j.state)?j.state:'FAILED',step:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING',effect:j.effect,effects:j.effects??[],...(possible&&j.git?.schema===1?{git:j.git}:{}),input:{},needsCheck:false,lease:null,recovery:{action:'INSPECT_OWNER_MISSING',code:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING'},dueAt:j.dueAt};changes.push({table:'jobs',id:j.id,expectedRev:j.rev,value,refs:j.refs??[]});}
+      for(const j of jobs)if(j.id!==jobId){const possible=j.effect?.boundary==='POSSIBLE',value={ownerMissing:true,jobId:j.id,logicalKey:j.logicalKey,moduleId:j.moduleId,targetId:j.targetId,accountId,kind:j.kind,jobSchema:j.jobSchema,generation:j.generation,state:possible?'HELD':['COMPLETE','FAILED'].includes(j.state)?j.state:'FAILED',step:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING',effect:j.effect,effects:j.effects??[],...(possible&&j.git?.schema===1?{git:j.git}:{}),input:j.moduleId==='pcms-creator'&&j.creator?.schema===1?{slug:j.input?.slug,folder:j.input?.folder,repositoryId:j.input?.repositoryId}:{},...(j.moduleId==='pcms-creator'&&j.creator?.schema===1?{creator:j.creator}:{}),needsCheck:false,lease:null,recovery:{action:'INSPECT_OWNER_MISSING',code:possible?'OWNER_MISSING_UNRESOLVED':'OWNER_MISSING'},dueAt:j.dueAt};changes.push({table:'jobs',id:j.id,expectedRev:j.rev,value,refs:j.refs??[]});}
       for(const g of await req(s('generators').index('accountId').getAll(IDBKeyRange.only([r.dataset,accountId]))))changes.push({table:'generators',id:g.id,expectedRev:g.rev,value:{...g,ownerMissing:true,ownerLabel:a.label,state:'HELD',holdCode:'OWNER_MISSING'},refs:g.refs??[]});
       await writeRows(s,r,changes,{moduleId:'pcms-accounts',targetId:accountId,jobId,step:'REMOVE_ACCOUNT_DATA',result:'COMPLETE'});
       let c=await req(s('credentials').openCursor(IDBKeyRange.bound([r.dataset],[r.dataset,upper])));while(c){if(c.value.accountId===accountId)await req(c.delete());c=await req(c.continue()||c.request);}
@@ -238,6 +238,20 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }
   };
   attachBlobs(core,transact,root,checkedRefs,append,clock);
+  // A fixed privileged data boundary, never exposed to ZIP/dashboard RPC.
+  // Creator supplies a synchronous policy over this current atomic snapshot.
+  core.creatorTransaction=({jobId,expectedRev,command=null},decide)=>transact(['accounts','generators','jobs','modules','views','commands','events','versions','blobs','chunks'],'readwrite',async s=>{
+    requireCore(id(jobId)&&typeof decide==='function','CREATOR_DATA_INVALID');const r=await root(s);
+    if(command){requireCore(id(command.id)&&typeof command.signature==='string','INVALID_REQUEST');const prior=await req(s('commands').get([r.dataset,command.id]));if(prior){requireCore(prior.signature===command.signature,'REQUEST_CONFLICT');return {value:prior.result};}}
+    const job=await req(s('jobs').get([r.dataset,jobId]));requireCore(job?.rev===expectedRev,'STALE_REVISION');requireCore(job.moduleId==='pcms-creator'&&job.effect?.boundary!=='POSSIBLE','CREATOR_DATA_SCOPE');
+    const module=await req(s('modules').get([r.dataset,job.moduleId]));requireCore(module?.enabled&&!module.lifecycle&&module.generation===job.generation&&module.manifest?.capabilities?.includes('jobs.creator'),'STALE_GENERATION');
+    const generator=await req(s('generators').get([r.dataset,job.targetId]));requireCore(generator,'TARGET_MISSING');
+    const range=IDBKeyRange.only(r.dataset),accounts=await req(s('accounts').index('dataset').getAll(range)),generators=await req(s('generators').index('dataset').getAll(range)),connection=(await req(s('views').get([r.dataset,'git-catalog'])))?.value?.connection;
+    const result=decide({job,generator,accounts,generators,connection,now:clock()});requireCore(result&&typeof result.then!=='function'&&result.generator?.id===generator.id&&result.job?.id===job.id,'CREATOR_DATA_SCOPE');
+    await writeRows(s,r,[{table:'generators',id:generator.id,expectedRev:generator.rev,refs:generator.refs,value:result.generator},{table:'jobs',id:job.id,expectedRev:job.rev,refs:job.refs,value:result.job}],{step:result.step,result:'COMPLETE',moduleId:job.moduleId,jobId:job.id,targetId:generator.id});
+    if(command)await req(s('commands').put({key:[r.dataset,command.id],signature:command.signature,result:result.value}));
+    return {value:result.value,job:await req(s('jobs').get([r.dataset,job.id])),generator:await req(s('generators').get([r.dataset,generator.id]))};
+  });
   core.queue=createQueue({transact,root,writeRows,append,req,check:requireCore,clock});
   return core;
 }
