@@ -20,3 +20,5 @@ P01–P16 are merged. [PR16](https://github.com/Neb963/PCMS/pull/16), main `5683
 Implement the fixed provider preparation/readback contract and Core finite creation policy first, then package/UI and focused/installed verification. No P17 code or PASS is claimed yet.
 
 H/G/P1–P5 remain NOT TESTED and unauthorized; P42–P49 require named disposable external resources/effects. P17 fixture success does not authorize real provider writes or establish current live wire acceptance. Final live/fleet readiness remains unestablished.
+
+Fixed provider-contract checkpoint:5 focused T PASS for private-template/empty-manifest create, one stable-ID rename, unchanged existing source, create/rename ACK loss with read-only recovery, ambiguity/source/listing mismatch, changed preparation/name race, wrong principal/document and owned-template/unknown-wire rejection. The donor adapter now wraps only these fixed operations in exact protected contexts and provides a separate protected inspection view. Finite policy, packaged UI and required B remain OPEN; fixtures do not establish live wire acceptance.
