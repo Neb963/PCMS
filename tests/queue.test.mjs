@@ -128,3 +128,25 @@ test('batch fence after durable intent cancels before the external call and reta
  try{await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('batch-after-intent',async()=>calls++)),/BATCH_PAUSED/);}finally{proto.put=put;}
  assert.equal(calls,0);const current=await core.read('jobs',job.id);assert.equal(current.effect.boundary,'BEFORE');assert.equal(current.state,'WAITING');
 });
+
+test('a fixed readonly account scope rejects writes, mismatched bindings and archived admission',async t=>{
+ const {core}=await fixture(t);await core.mutate(['a','b'].map(id=>({table:'accounts',id,value:{state:'READY'}})),event);await core.queue.enqueue(input('scoped-read'));let job=await core.queue.next(),calls=0;
+ await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('scope-write',async()=>calls++,{accountScopeId:'a'})),/OBSERVATION_SCOPE_DENIED/);
+ let release;const pending=core.queue.dispatch(job.id,job.rev,effect('scope-fenced',async()=>calls++,{write:false,accountScopeId:'a',preflight:()=>new Promise(resolve=>release=resolve)}));core.queue.fenceAccount('a');release({ok:true});await assert.rejects(pending,/ACCOUNT_ADMISSION_HELD/);assert.equal(calls,0);
+ const a=await core.read('accounts','a');await core.mutate([{table:'accounts',id:a.id,expectedRev:a.rev,value:{...a,state:'ARCHIVED',admission:'ARCHIVED'}}],event);core.queue.unfenceAccount('a');await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('scope-archived',async()=>calls++,{write:false,accountScopeId:'a'})),/ACCOUNT_ADMISSION_HELD/);
+ await core.queue.transition(job.id,job.rev,{state:'COMPLETE'});await core.queue.enqueue(input('bound-read',{targetId:'g2',accountId:'b'}));job=await core.queue.next();await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('scope-mismatch',async()=>calls++,{write:false,accountScopeId:'a'})),/OBSERVATION_SCOPE_DENIED/);assert.equal(calls,0);
+});
+
+test('ordinary scoped reads consume global and per-account slots and drain for account lifecycle',async t=>{
+ const {core}=await fixture(t);await core.mutate(['a','b','c'].map(id=>({table:'accounts',id,value:{state:'READY'}})),event);for(let i=1;i<=3;i++)await core.queue.enqueue(input('reader-'+i,{targetId:'g'+i}));
+ const first=await core.queue.next();let finish1,begin1;const started1=new Promise(resolve=>begin1=resolve),wait1=new Promise(resolve=>finish1=resolve),one=core.queue.dispatch(first.id,first.rev,effect('reader-one',()=>{begin1();return wait1;},{write:false,accountScopeId:'a'}));await started1;assert.equal(core.queue.accountActive('a'),true);
+ const second=await core.queue.next();await assert.rejects(core.queue.dispatch(second.id,second.rev,effect('same-account',async()=>{}, {write:false,accountScopeId:'a'})),/TARGET_ACTIVE/);
+ let finish2,begin2;const started2=new Promise(resolve=>begin2=resolve),wait2=new Promise(resolve=>finish2=resolve),two=core.queue.dispatch(second.id,second.rev,effect('reader-two',()=>{begin2();return wait2;},{write:false,accountScopeId:'b'}));await started2;
+ const third=await core.queue.next();let calls=0;await assert.rejects(core.queue.dispatch(third.id,third.rev,effect('reader-three',async()=>calls++,{write:false,accountScopeId:'c'})),/WORK_SLOTS_FULL/);assert.equal(calls,0);finish1();finish2();await Promise.all([one,two]);assert.equal(core.queue.accountActive('a'),false);await core.queue.dispatch(third.id,third.rev,effect('reader-three',async()=>calls++,{write:false,accountScopeId:'c'}));assert.equal(calls,1);assert.equal((await core.read('jobs',first.id)).accountId,null);assert.equal((await core.read('jobs',first.id)).effect.accountId,'a');
+});
+
+test('global Pause after durable intent cancels an ordinary readonly call without granting maintenance',async t=>{
+ const {core}=await fixture(t);await core.mutate([{table:'accounts',id:'a',value:{state:'READY'}}],event);await core.queue.enqueue(input('readonly-pause'));const job=await core.queue.next();let calls=0,pause;const proto=IDBObjectStore.prototype,put=proto.put;proto.put=function(row){if(this.name==='jobs'&&row.id===job.id&&row.effect?.boundary==='POSSIBLE')pause=core.queue.pause('readonly-pause-intent');return put.call(this,row);};
+ try{await assert.rejects(core.queue.dispatch(job.id,job.rev,effect('readonly-paused',async()=>calls++,{write:false,accountScopeId:'a'})),/PAUSED/);}finally{proto.put=put;}
+ await pause;assert.equal(calls,0);assert.equal((await core.read('jobs',job.id)).effect.boundary,'BEFORE');assert.equal((await core.queue.status()).paused,true);
+});

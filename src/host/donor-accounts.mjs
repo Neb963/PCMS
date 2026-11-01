@@ -4,6 +4,7 @@
 import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
+import {observePerchanceOwnership} from '../modules/ownership-observations.mjs';
 const PERCHANCE='https://perchance.org/';
 const ownOrigin=url=>{try{return new URL(url).origin==='https://perchance.org';}catch{return false;}};
 export function createDonorAccounts({api=globalThis.browser,initialize,getState,stateManager,personaPlatform,localMutationFence,allPersonaUids,mullvadRuntime,securityState,currentTest,testProfile,fetchJsonThroughRouteTest,routeTestRequests,withRouteTestTargetLock,fetchMullvadRelays,createMullvadRoute,pcmsFetchViaExit,pcmsInspectPendingPreparation,pcmsSettleObservedPreparation}){
@@ -336,5 +337,15 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    await api.sessions.setTabValue(tab.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});
   }catch{}
  }
- return Object.freeze({releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ async function observeOwnership(scope,{slug}){
+  const ready=await prerequisites();if(!ready.ok)return {state:'UNKNOWN',code:ready.code};const protectedNow=await protectedProfile(scope);if(protectedNow.code)return {state:'UNKNOWN',code:protectedNow.code};
+  const matches=await ownedTabs(scope),selected=matches.find(x=>x.tab.id===scope.tabId)??(matches.length===1?matches[0]:null);if(!selected)return {state:'UNKNOWN',code:matches.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING'};
+  const tab=selected.tab,target={tabId:tab.id,frameIds:[0]},run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target,world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('ACCOUNT_DOCUMENT_CHANGED');return rows[0].result;};
+  try{const witness=await run(accountDocumentWitness),identity=await run(observePerchanceIdentity,[witness]);if(!identity?.ok||identity.principalFingerprint!==scope.expectedPrincipal)return {state:'UNKNOWN',code:identity?.code??'ACCOUNT_PRINCIPAL_CHANGED'};
+   const result=await run(observePerchanceOwnership,[{slug,principalFingerprint:scope.expectedPrincipal,documentWitness:witness}]),after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);
+   if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url||final.code)return {state:'UNKNOWN',code:final.code??'ACCOUNT_DOCUMENT_CHANGED'};
+   return result;
+  }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
+ }
+ return Object.freeze({observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

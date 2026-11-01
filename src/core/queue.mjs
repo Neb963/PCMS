@@ -117,15 +117,17 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   }),
   // Called only by packaged adapters after their current read-only preflight.
   // UI/module RPC never gets an adapter function or a raw write permit.
-  dispatch:async(jobId,expectedRev,{operationId,kind,write=true,sourceWrite=false,inputHash,preflight,call,observe})=>{
+  dispatch:async(jobId,expectedRev,{operationId,kind,write=true,sourceWrite=false,accountScopeId=null,inputHash,preflight,call,observe})=>{
     check(valid(operationId)&&valid(kind)&&typeof preflight==='function'&&typeof call==='function'&&typeof observe==='function','INVALID_EFFECT');
+    check(accountScopeId===null||valid(accountScopeId)&&write===false&&!sourceWrite,'OBSERVATION_SCOPE_DENIED');
     const evidence=await preflight();check(evidence?.ok===true,'PREFLIGHT_HELD');
     const admitted=await serial(async()=>{
-      let accountEpoch,batchEpoch;const job=await tx(async(s,r)=>{
+      let accountEpoch,batchEpoch,dispatchAccountId,admittedMaintenance;const job=await tx(async(s,r)=>{
         const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
-        check(accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null),'ACCOUNT_ADMISSION_HELD');
+        check(!accountScopeId||!job.accountId||accountScopeId===job.accountId,'OBSERVATION_SCOPE_DENIED');dispatchAccountId=accountScopeId??job.accountId;
+        check(accountAllowed({...job,accountId:dispatchAccountId},dispatchAccountId?await read(s,r,'accounts',dispatchAccountId):null),'ACCOUNT_ADMISSION_HELD');
         check(batchAllowed(job,job.batchId?await read(s,r,'jobs',job.batchId):null),'BATCH_PAUSED');
-        if(evidence.accountRevision!=null){const account=await read(s,r,'accounts',job.accountId);check(account?.rev===evidence.accountRevision,'STALE_ACCOUNT');}
+        if(evidence.accountRevision!=null){const account=await read(s,r,'accounts',dispatchAccountId);check(account?.rev===evidence.accountRevision,'STALE_ACCOUNT');}
         const module=await read(s,r,'modules',job.moduleId);check(module?.enabled&&!module.lifecycle&&!fenced.has(job.moduleId)&&module.generation===job.generation,'STALE_GENERATION');
         check(job.state!=='COMPLETE'&&job.state!=='FAILED','JOB_FINISHED');check(job.dueAt<=clock(),'NOT_DUE');
         check(job.effect?.boundary!=='POSSIBLE','RECONCILE_REQUIRED');
@@ -133,14 +135,15 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
         check(!blocked||!write&&maintenance(job,module),'PAUSED');check(!r.paused||!write&&maintenance(job,module),'PAUSED');
         check(job.lease?.bootId===bootId&&job.lease?.generation===module.generation,'STALE_LEASE');
         if(sourceWrite){const generator=await read(s,r,'generators',job.targetId);check(generator?.writerHold?.jobId===jobId,'WRITER_HELD');}
-        check([...active.values()].filter(a=>!a.maintenance).length<2||maintenance(job,module),'WORK_SLOTS_FULL');
-        check(![...active.values()].some(a=>a.targetId===job.targetId||job.accountId&&a.accountId===job.accountId),'TARGET_ACTIVE');
-        accountEpoch=accountEpochs.get(job.accountId)??0;batchEpoch=batchEpochs.get(job.batchId)??0;
+        admittedMaintenance=!write&&maintenance(job,module);
+        check([...active.values()].filter(a=>!a.maintenance).length<2||admittedMaintenance,'WORK_SLOTS_FULL');
+        check(![...active.values()].some(a=>a.targetId===job.targetId||dispatchAccountId&&a.accountId===dispatchAccountId),'TARGET_ACTIVE');
+        accountEpoch=accountEpochs.get(dispatchAccountId)??0;batchEpoch=batchEpochs.get(job.batchId)??0;
         // Every individual Git object/ref call comes through this boundary.
-        return save(s,r,job,{state:'RUNNING',needsCheck:false,effect:{operationId,kind,inputHash,boundary:'POSSIBLE',bootId,epoch:r.admissionEpoch??0}},'EFFECT_INTENT','POSSIBLE');
+        return save(s,r,job,{state:'RUNNING',needsCheck:false,effect:{operationId,kind,inputHash,...accountScopeId?{accountId:dispatchAccountId}:{},boundary:'POSSIBLE',bootId,epoch:r.admissionEpoch??0}},'EFFECT_INTENT','POSSIBLE');
       });
-      if(blocked&&write||fenced.has(job.moduleId)||batchFences.has(job.batchId)||(batchEpochs.get(job.batchId)??0)!==batchEpoch||(accountEpochs.get(job.accountId)??0)!==accountEpoch||job.accountId&&accountFences.has(job.accountId)&&!(job.moduleId==='pcms-accounts'&&['REMOVE','REACTIVATE'].includes(job.kind))){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,batchFences.has(job.batchId)?'BATCH_PAUSED':job.accountId&&accountFences.has(job.accountId)?'ACCOUNT_ADMISSION_HELD':'PAUSED');}
-      const marker={targetId:job.targetId,accountId:job.accountId,maintenance:!write};active.set(operationId,marker);
+      if(blocked&&!admittedMaintenance||fenced.has(job.moduleId)||batchFences.has(job.batchId)||(batchEpochs.get(job.batchId)??0)!==batchEpoch||(accountEpochs.get(dispatchAccountId)??0)!==accountEpoch||dispatchAccountId&&accountFences.has(dispatchAccountId)&&!(job.moduleId==='pcms-accounts'&&['REMOVE','REACTIVATE'].includes(job.kind))){await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);await save(s,r,current,{state:'WAITING',effect:{...current.effect,boundary:'BEFORE'},needsCheck:true},'CANCEL_BEFORE_EFFECT','WAITING');});check(false,batchFences.has(job.batchId)?'BATCH_PAUSED':dispatchAccountId&&accountFences.has(dispatchAccountId)?'ACCOUNT_ADMISSION_HELD':'PAUSED');}
+      const marker={targetId:job.targetId,accountId:dispatchAccountId,maintenance:admittedMaintenance};active.set(operationId,marker);
       let sent;try{sent=Promise.resolve(call({operationId}));}catch(error){sent=Promise.reject(error);}
       return {job,sent};
     });
