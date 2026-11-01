@@ -70,7 +70,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now,
    active={key,signature,request,operationId:'git-'+job.id+'-'+key.slice(0,24),time:clock(),attempt:0,phase:'PLAN',candidates:[]};job=await save(job,{...g,active},'ADMIT_GIT_OPERATION');job=await core.queue.claimGit(job.id,job.rev,connection.repositoryId);g=job.git;
   }
   active=g.active;
-  if(job.state==='FAILED')return hold(job,job.recovery?.code??'GIT_WRITE_DENIED');
+  if(job.state==='FAILED'||job.effect?.outcome==='FAILED'&&job.effect.operationId.startsWith(active.operationId+'-'))return hold(job,g.code??job.recovery?.code??'GIT_WRITE_DENIED');
   try{
    if(active.phase==='PLAN'){if(reconcile)return result(job,'READY');if(!g.locked){job=await core.queue.claimGit(job.id,job.rev,g.repositoryId);g=job.git;}job=await makePlan(job,g,active,await head(g));return result(job,'CONTINUE');}
    if(active.phase==='COMPLETE')return result(job,'COMPLETE');
