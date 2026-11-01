@@ -23,6 +23,7 @@ export function createRetention({core,api,profileId,clock=Date.now}){
     const job=await core.queue.enqueue({requestId:'cleanup-'+type+'-'+r.id,logicalKey:type+':cleanup:'+r.id,moduleId,targetId:r.id,kind:'CLEANUP',input:{fileId:r.id},dueAt:clock()});
     if(job.state==='WAITING'&&job.dueAt>clock()&&job.effect?.boundary!=='POSSIBLE')await core.queue.transition(job.id,job.rev,{state:'WAITING',dueAt:clock()});
     if(!r.cleanup){r=await core.read('files',r.id);await save(r,{phase:'QUEUED',jobId:job.id,afterId,code:null,checks:0},'WAITING');}
+    else if(job.state==='HELD'&&job.effect?.boundary!=='POSSIBLE'&&r.cleanup.code==='CLEANUP_NEW_EXPORT_REQUIRED'){await core.queue.transition(job.id,job.rev,{state:'WAITING',dueAt:clock(),recovery:null});await save(r,{...r.cleanup,phase:'QUEUED',afterId,code:null},'WAITING');}
    }
   },
   async effect(job,{type,afterId,retentionDays},reconcile=false){

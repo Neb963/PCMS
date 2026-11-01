@@ -6,5 +6,5 @@ export const bundledContract={
  'pcms-deployer':{version:'0.11.0',capabilities:['records.deployer','jobs.deployer','perchance.source'],packageClass:null},
  'pcms-refresher':{version:'0.1.0',capabilities:[],packageClass:null},
  'pcms-journal':{version:'0.3.0',capabilities:['journal.query','journal.export','journal.cleanup'],packageClass:'bundled-journal'},
- 'pcms-backup':{version:'0.6.0',capabilities:['backup.capture','backup.captureCut','backup.export','backup.restore'],packageClass:'bundled-backup'}
+ 'pcms-backup':{version:'0.7.0',capabilities:['backup.capture','backup.captureCut','backup.export','backup.restore','backup.cleanup'],packageClass:'bundled-backup'}
 };
