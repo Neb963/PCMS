@@ -10,6 +10,7 @@ export function registerShell(api) {
   const records=createCoreService({alarms:api.alarms,api,notify:event=>{for(const port of corePorts)try{port.postMessage({event});}catch{corePorts.delete(port);}}});
   // Register synchronously, then start durable recording without a UI.
   api.runtime.onMessage?.addListener((message,sender)=>{
+    if(message?.channel==='pcms-editor'){if(sender?.id!==api.runtime.id||sender.frameId!==0||!sender.tab)return Promise.resolve({ok:false,code:'EDITOR_SENDER_DENIED'});return records.editor(message,sender);}
     if(message?.channel!=='pcms-core')return;
     if(!trustedShell(api,sender))return Promise.resolve({ok:false,code:'SENDER_DENIED'});
     return records.handle(message,sender);
