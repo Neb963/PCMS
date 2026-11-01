@@ -11,11 +11,12 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
  async function rows(table){const out=[];let cursor=null;do{const page=await core.list({table,cursor,limit:200});for(const r of page.rows)out.push(await core.read(table,r.id));cursor=page.cursor;}while(cursor);return out;}
  const event=(j,step,result)=>({moduleId:id,targetId:j.targetId,jobId:j.id,step,result});
  async function save(j,patch,step,gpatch=null,refs=[]){const changes=[{table:'jobs',id:j.id,expectedRev:j.rev,refs:[...new Set([...j.refs,...refs])],value:{...j,...patch}}];if(gpatch){const g=await core.read('generators',j.targetId);check(g.deploymentJobId===j.id,'DEPLOYMENT_TARGET_CHANGED');changes.push({table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...refs])],value:{...g,...gpatch}});}await core.mutate(changes,event(j,step,patch.state??'IN_PROGRESS'));return core.read('jobs',j.id);}
- async function output(j,state,code=null){j=await core.read('jobs',j.id);return {jobRevision:j.rev,value:{state,code,phase:j.deployment.phase,generatorId:j.targetId,dueAt:clock()+1000}};}
+ async function output(j,state,code=null,dueAt=clock()+1000){j=await core.read('jobs',j.id);return {jobRevision:j.rev,value:{state,code,phase:j.deployment.phase,generatorId:j.targetId,dueAt}};}
  async function hold(j,code){j=await core.read('jobs',j.id);j=await save(j,{state:'HELD',recovery:{action:'OPEN_DEPLOYMENT',code}},'HOLD_DEPLOYMENT',{deploymentState:'HELD',deploymentCode:code});return output(j,'HELD',code);}
- async function validate(j){
+ async function validate(j,{fresh=true}={}){
   const g=await core.read('generators',j.targetId);check(g?.deploymentJobId===j.id&&g.repositoryId===j.deployment.repositoryId&&g.folder===j.deployment.folder,'DEPLOYMENT_TARGET_CHANGED');
-  const fresh=await inputs(g,{fresh:true});try{check(fresh.status==='READY','READY_WITHDRAWN');check(fresh.version===j.deployment.version&&fresh.action===j.kind,'READY_CHANGED');check(fresh.inputHash===j.deployment.inputHash,'VERSION_REUSED');}finally{await core.releasePin(fresh.pinId);}return g;
+  if(!fresh){check(g.folderPresent==='YES'&&g.markerStatus==='READY','READY_WITHDRAWN');check(g.markerVersion===j.deployment.version&&g.markerAction===j.kind,'READY_CHANGED');return g;}
+  const observed=await inputs(g,{fresh:true});try{check(observed.status==='READY','READY_WITHDRAWN');check(observed.version===j.deployment.version&&observed.action===j.kind,'READY_CHANGED');check(observed.inputHash===j.deployment.inputHash,'VERSION_REUSED');}finally{await core.releasePin(observed.pinId);}return g;
  }
  const hasEffects=j=>j.effect?.boundary==='POSSIBLE'||j.effects?.length>0||j.deployment?.acceptance||j.save;
  async function initialize(){
@@ -24,8 +25,8 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
    const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);
-   if(same){if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
-   let pinned;try{pinned=await inputs(g);}catch(error){await core.record({moduleId:id,targetId:g.id,step:'READ_READY_INPUTS',result:'HELD',code:error.code??publicError(error)});continue;}
+   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
+   let pinned;try{pinned=await inputs(g);}catch(error){const code=error.code??publicError(error);if(g.deploymentCode!==code)await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentState:'HELD',deploymentCode:code}}],{moduleId:id,targetId:g.id,step:'READ_READY_INPUTS',result:'HELD',code});continue;}
    try{
     const prior=jobs.find(j=>j.targetId===g.id&&j.deployment.version===pinned.version);
     if(prior){
@@ -48,11 +49,11 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
     const r=await writer.effect(j,true);j=await core.read('jobs',j.id);if(r.value.state!=='COMPLETE')return r;
    }
    const m=await module();check(enabled(m)&&m.generation===j.generation,'STALE_GENERATION');check(!j.runtimeInvalidated,'RESTORED_WORK_REVIEW_REQUIRED');
-   const g=await validate(j);
+   const g=await validate(j,{fresh:j.deployment.phase!=='WAIT_CREATOR'});
    if(j.deployment.phase==='WAIT_CREATOR'){
     const creator=g.creatorJobId?await core.read('jobs',g.creatorJobId):null;
     if(!g.remoteId||creator?.effect?.boundary==='POSSIBLE'||creator&&!terminal(creator)){
-     j=await save(j,{step:'WAIT_CREATOR',deployment:{...j.deployment,creatorJobId:g.creatorJobId??null}},'WAIT_CREATOR');return output(j,'WAITING',creator?.effect?.boundary==='POSSIBLE'?'CREATOR_OUTCOME_UNKNOWN':'WAIT_CREATOR');
+     j=await save(j,{step:'WAIT_CREATOR',deployment:{...j.deployment,creatorJobId:g.creatorJobId??null}},'WAIT_CREATOR');return output(j,'WAITING',creator?.effect?.boundary==='POSSIBLE'?'CREATOR_OUTCOME_UNKNOWN':'WAIT_CREATOR',clock()+60000);
     }
     const a=await core.read('accounts',g.accountId);check(eligibleAccount(a),'SOURCE_OWNER_REQUIRED');
     j=await save(j,{accountId:a.id,step:'PREPARE',input:{...j.input,slug:g.slug,remoteId:g.remoteId,principalFingerprint:a.expectedPrincipal,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId},deployment:{...j.deployment,phase:'PREPARE'}},'RESOLVE_DEPLOYMENT_OWNER',{deploymentState:'PREPARE',deploymentCode:null});return output(j,'CONTINUE');
