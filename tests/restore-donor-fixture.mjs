@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import {createRestoreDonor} from '../build/xpi-root/host/restore-donor.mjs';
 import {createBackupDonor} from '../build/xpi-root/host/backup-donor.mjs';
 import {createStateManager} from '../build/xpi-root/lib/state-manager.js';
