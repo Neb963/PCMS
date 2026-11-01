@@ -4,7 +4,7 @@ import {requireCore as check,CoreError,publicError} from './records.mjs';
 import {createGitReader,decodeGitBlob,gitSha,verifyGitTree,validRepository} from './git-reader.mjs';
 import {normalizeGitRequest,requestSignature,planGitWrite,createGitGraph} from './git-plan.mjs';
 const code=e=>typeof e?.code==='string'?e.code:publicError(e);
-export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}){
+export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now,validateJob=async()=>{}}){
  const read=createGitReader({transport,clock}),turns=new Map();
  const serial=(key,fn)=>{const p=(turns.get(key)??Promise.resolve()).catch(()=>{}).then(fn);turns.set(key,p);return p.finally(()=>{if(turns.get(key)===p)turns.delete(key);});};
  const current=()=>core.view('git-catalog'),credential=id=>core.credentials.get('github:'+id);
@@ -37,7 +37,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
   try{const token=await credential(g.repositoryId);check(typeof token==='string','GIT_CREDENTIAL_REQUIRED');const response=await transport('https://api.github.com/repos/'+g.repository+path,{method,credentials:'omit',cache:'no-store',redirect:'error',signal:timer.signal,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:JSON.stringify(body)});
    if(kind==='ref'&&[409,422].includes(response.status))return {rejected:true};
    if([400,401,403,404,409,422,429].includes(response.status))return {failed:response.status===429?'GIT_WRITE_RATE_LIMIT':'GIT_WRITE_DENIED'};
-   check(response.status===200||response.status===201,'GIT_WRITE_OUTCOME_UNKNOWN');await response.json();return {};
+   check(response.status===200||response.status===201,'GIT_WRITE_OUTCOME_UNKNOWN');try{await response.json();}catch{throw new CoreError('GIT_WRITE_OUTCOME_UNKNOWN');}return {};
   }finally{clearTimeout(timeout);}
  }
  async function observeObject(g,desc){try{const body=await object(g,desc.kind,desc.sha);if(desc.kind==='commits')check(body.tree?.sha===desc.body.tree&&JSON.stringify(body.parents?.map(p=>p.sha))===JSON.stringify(desc.body.parents)&&body.message===desc.body.message,'GIT_COMMIT_IDENTITY_MISMATCH');return true;}catch(error){if(error.code==='GIT_OBJECT_UNAVAILABLE')return false;throw error;}}
@@ -70,7 +70,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
    active={key,signature,request,operationId:'git-'+job.id+'-'+key.slice(0,24),time:clock(),attempt:0,phase:'PLAN',candidates:[]};job=await save(job,{...g,active},'ADMIT_GIT_OPERATION');job=await core.queue.claimGit(job.id,job.rev,connection.repositoryId);g=job.git;
   }
   active=g.active;
-  if(job.state==='FAILED')return hold(job,job.recovery?.code??'GIT_WRITE_DENIED');
+  if(job.state==='FAILED'||job.effect?.outcome==='FAILED'&&job.effect.operationId.startsWith(active.operationId+'-'))return hold(job,g.code??job.recovery?.code??'GIT_WRITE_DENIED');
   try{
    if(active.phase==='PLAN'){if(reconcile)return result(job,'READY');if(!g.locked){job=await core.queue.claimGit(job.id,job.rev,g.repositoryId);g=job.git;}job=await makePlan(job,g,active,await head(g));return result(job,'CONTINUE');}
    if(active.phase==='COMPLETE')return result(job,'COMPLETE');
@@ -89,7 +89,7 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
    else if(!observed){if(reconcile)return result(job,'READY');if(!g.locked){job=await core.queue.claimGit(job.id,job.rev,g.repositoryId);g=job.git;}
     if(request.kind!=='PREPARE'){job=await core.queue.claim(job.id,job.rev);}
     let reply;
-    await core.queue.dispatch(job.id,job.rev,{operationId,kind:'GIT_'+desc.kind.toUpperCase(),write:true,sourceWrite:request.kind!=='PREPARE',preflight:async()=>{const connection=(await current())?.connection;check(connection?.repositoryId===g.repositoryId,'GIT_REPOSITORY_CHANGED');if(desc.kind==='ref'&&await head(g)!==active.plan.baseHead)return {ok:false,headMoved:true};return {ok:true};},call:async()=>{reply=await post(g,desc);},observe:()=>observe(reply)});
+    await core.queue.dispatch(job.id,job.rev,{operationId,kind:'GIT_'+desc.kind.toUpperCase(),write:true,sourceWrite:request.kind!=='PREPARE',preflight:async()=>{await validateJob(await core.read('jobs',job.id));const connection=(await current())?.connection;check(connection?.repositoryId===g.repositoryId,'GIT_REPOSITORY_CHANGED');if(desc.kind==='ref'&&await head(g)!==active.plan.baseHead)return {ok:false,headMoved:true};return {ok:true};},call:async()=>{reply=await post(g,desc);},observe:()=>observe(reply)});
     job=await core.read('jobs',job.id);if(job.effect?.boundary==='POSSIBLE')return hold(job,'GIT_WRITE_OUTCOME_UNKNOWN');if(job.state==='FAILED')return hold(job,job.recovery.code);
    }
    job=await core.read('jobs',job.id);g=job.git;active=g.active;const effect=job.effects.find(e=>e.operationId===operationId);
@@ -107,7 +107,13 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now}
   }
  }
  const status=job=>job?.git?{folder:job.git.active?.request?.folder??null,kind:job.git.active?.request?.kind??null,repository:job.git.repository,repositoryId:job.git.repositoryId,phase:job.git.active?.phase??null,code:job.git.code??null,candidate:job.git.active?.plan?.candidate??null,receipt:job.git.active?.receipt??null,unknown:job.effect?.boundary==='POSSIBLE'}:null;
- return {step:(job,request,reconcile=false)=>serial('git',()=>step(job,request,reconcile).catch(error=>{if(['STALE_REVISION','GIT_JOB_SCOPE_DENIED'].includes(error.code))throw error;return hold(job,code(error));})),check:id=>serial('git',async()=>{const job=await core.read('jobs',id);check(job?.git?.active,'GIT_OPERATION_MISSING');return step(job,job.git.active.request,true);}),status};
+ return {
+  retryRejected:jobId=>serial('git',async()=>{
+   const job=await core.read('jobs',jobId),m=job?await core.read('modules',job.moduleId):null;
+   check(job?.git?.active&&job.effect?.boundary==='OBSERVED'&&job.effect.outcome==='FAILED'&&job.effect.kind.startsWith('GIT_')&&job.git.active.phase!=='COMPLETE'&&job.effect.operationId.startsWith(job.git.active.operationId+'-')&&!job.ownerMissing,'GIT_RETRY_NOT_REJECTED');check(m?.enabled&&!m.lifecycle&&m.generation===job.generation,'STALE_GENERATION');
+   const active={...job.git.active,attempt:job.git.active.attempt+1,phase:'PLAN'};
+   await core.mutate([{table:'jobs',id:job.id,expectedRev:job.rev,refs:job.refs,value:{...job,state:'WAITING',effect:null,recovery:null,dueAt:clock(),git:{...job.git,code:null,active}}}],{moduleId:job.moduleId,jobId:job.id,targetId:job.targetId,step:'RECHECK_REJECTED_GIT',result:'WAITING'});return core.read('jobs',job.id);
+  }),step:(job,request,reconcile=false)=>serial('git',()=>step(job,request,reconcile).catch(error=>{if(['STALE_REVISION','GIT_JOB_SCOPE_DENIED'].includes(error.code))throw error;return hold(job,code(error));})),check:id=>serial('git',async()=>{const job=await core.read('jobs',id);check(job?.git?.active,'GIT_OPERATION_MISSING');return step(job,job.git.active.request,true);}),status};
 }
 function base64(bytes){let text='';for(let i=0;i<bytes.length;i+=32768)text+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(text);}
 const sort=value=>Object.fromEntries(Object.entries(value).sort(([a],[b])=>a<b?-1:a>b?1:0));
