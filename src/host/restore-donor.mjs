@@ -61,6 +61,7 @@ export async function advanceRestoreDonorPlan({plan,current,scope,operationId,st
  const state=stateData(current.state),expected=stateData(plan.state),old=expected.profiles[scope.containerId],p=state.profiles[scope.containerId],fields=['pcmsOperation'];
  need(old&&p&&p.managed&&p.pcmsAccountId===scope.accountId&&p.personaUid===scope.personaUid&&p.killSwitch===true&&p.blockLocalNetwork===true&&p.pcmsOperation?.operationId===operationId&&p.pcmsOperation.stage===stage,'RESTORE_TRANSITION_UNVERIFIED');
  need(['RESTORE_ROUTE_PLAN','ASSIGN','VERIFY','RESTORE_BLANK'].includes(stage)&&['APPLIED','REJECTED'].includes(disposition),'RESTORE_TRANSITION_UNVERIFIED');
+ if(await digest(state)===plan.stateHash)return plan;
  if(stage==='RESTORE_ROUTE_PLAN'){need(p.routeId===old.routeId&&p.pcmsPreparation?.id===scope.preparationId&&p.pcmsPreparation.routeId===scope.routeId&&p.pcmsPreparation.candidate?.routeId===scope.routeId,'RESTORE_TRANSITION_UNVERIFIED');fields.push('pcmsPreparation');}
  if(stage==='ASSIGN'){need(p.routeId===(disposition==='REJECTED'?old.routeId:scope.routeId)&&same(p.pcmsPreparation,old.pcmsPreparation),'RESTORE_TRANSITION_UNVERIFIED');fields.push('routeId','updatedAt');}
  if(stage==='VERIFY')need(p.routeId===scope.routeId,'RESTORE_TRANSITION_UNVERIFIED');
