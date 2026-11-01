@@ -4,12 +4,13 @@
 import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
+import {observePerchanceAuth} from '../modules/auth-observations.mjs';
 import {observeSavedSource,observeNativeEditor} from '../modules/source-observations.mjs';
 import {observePerchanceCreation} from '../modules/creation-observations.mjs';
 import {observePerchanceOwnership} from '../modules/ownership-observations.mjs';
 const PERCHANCE='https://perchance.org/';
 const ownOrigin=url=>{try{return new URL(url).origin==='https://perchance.org';}catch{return false;}};
-export function createDonorAccounts({api=globalThis.browser,initialize,getState,stateManager,personaPlatform,localMutationFence,allPersonaUids,mullvadRuntime,securityState,currentTest,testProfile,fetchJsonThroughRouteTest,routeTestRequests,withRouteTestTargetLock,fetchMullvadRelays,createMullvadRoute,pcmsFetchViaExit,pcmsInspectPendingPreparation,pcmsSettleObservedPreparation}){
+export function createDonorAccounts({api=globalThis.browser,initialize,getState,stateManager,personaPlatform,cookieService,localMutationFence,allPersonaUids,mullvadRuntime,securityState,currentTest,testProfile,fetchJsonThroughRouteTest,routeTestRequests,withRouteTestTargetLock,fetchMullvadRelays,createMullvadRoute,pcmsFetchViaExit,pcmsInspectPendingPreparation,pcmsSettleObservedPreparation}){
  const MULLVAD_IPV4_CHECK_URL='https://ipv4.am.i.mullvad.net/json',PCMS_IPV6_CHECK_URL='https://ipv6.am.i.mullvad.net/json';
  const trackPcmsWork=promise=>promise;
 const PCMS_RELAY_NET=/^10\.124\.(25[0-5]|2[0-4]\d|1?\d?\d)\.(25[0-5]|2[0-4]\d|1?\d?\d)$/;
@@ -339,6 +340,22 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    await api.sessions.setTabValue(tab.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});
   }catch{}
  }
+ async function collectSession(scope){
+  const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);if(!cookieService?.list)return fail('COOKIE_COLLECTOR_UNAVAILABLE');
+  let cookieEpoch=0;const changed=event=>{if(event.cookie?.storeId===scope.containerId)cookieEpoch++;};api.cookies.onChanged.addListener(changed);
+  try{
+   const tabs=await api.tabs.query({cookieStoreId:scope.containerId});let tab=tabs.find(t=>t.id===scope.tabId&&ownOrigin(t.url));
+   if(!tab)for(const t of tabs){const tag=await api.sessions.getTabValue(t.id,'pcmsBackupContext');if(tag?.accountId===scope.accountId&&tag.personaUid===scope.personaUid&&ownOrigin(t.url)){tab=t;break;}}
+   if(!tab){tab=await personaPlatform.open(scope.containerId,PERCHANCE,false);await api.sessions.setTabValue(tab.id,'pcmsBackupContext',{accountId:scope.accountId,personaUid:scope.personaUid});}
+   const until=Date.now()+15000;for(;;){const current=await api.tabs.get(tab.id),fresh=await protectedProfile(scope);if(fresh.code)return fail(fresh.code);if(current.cookieStoreId!==scope.containerId||!ownOrigin(current.url??current.pendingUrl))return fail('AUTH_CONTEXT_UNAVAILABLE');if(current.status==='complete')break;if(Date.now()>=until)return fail('AUTH_CONTEXT_UNAVAILABLE');await new Promise(resolve=>setTimeout(resolve,200));}
+   const run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('AUTH_CONTEXT_UNAVAILABLE');return rows[0].result;};
+   const witness=await run(accountDocumentWitness),first=await run(observePerchanceAuth,[{documentWitness:witness,principalFingerprint:scope.expectedPrincipal}]);if(!first?.ok)return fail(first?.code??'AUTH_COLLECTION_UNAVAILABLE');
+   const epoch=cookieEpoch,cookies=await cookieService.list(scope.containerId),second=await run(observePerchanceAuth,[{documentWitness:witness,principalFingerprint:scope.expectedPrincipal}]);if(!second?.ok)return fail(second?.code??'AUTH_COLLECTION_UNAVAILABLE');
+   const after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);
+   if(final.code)return fail(final.code);if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url)return fail('ACCOUNT_DOCUMENT_CHANGED');if(epoch!==cookieEpoch||first.fingerprint!==second.fingerprint)return fail('AUTH_SESSION_CHANGED');
+   return {ok:true,source:'PCMS_MANAGED_SESSION_1',accountId:scope.accountId,personaUid:scope.personaUid,containerId:scope.containerId,startedAt:first.startedAt,observedAt:second.observedAt,fingerprint:second.fingerprint,auth:second.data,cookies};
+  }catch{return fail('AUTH_COLLECTION_UNAVAILABLE');}finally{api.cookies.onChanged.removeListener(changed);}
+ }
  async function sourceRead(scope,request){
   const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);
   const owned=await ownedTabs(scope),tabs=await api.tabs.query({cookieStoreId:scope.containerId}),tab=owned.find(x=>x.tab.id===scope.tabId)?.tab??owned[0]?.tab??tabs.find(t=>t.url===PERCHANCE+request.slug+'#edit');if(!tab)return fail('SOURCE_CONTEXT_MISSING');
@@ -388,5 +405,5 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    return {...result,...identity.inventory?{inventory:identity.inventory}:{}};
   }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
  }
- return Object.freeze({sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ return Object.freeze({collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

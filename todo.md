@@ -20,3 +20,7 @@ P19 requires a shared native source save with actual provider revision conflict 
 ## Holds
 
 H/G/P1–P5 NOT TESTED/unauthorized. P42–P49 require named disposable targets/effects. P48 must qualify current login inventory and operational sessions. Cookie/auth bytes are synthetic evidence, never proof of live login/route portability. Local execution remains unavailable; only actually completed remote Actions checks will be claimed.
+
+## Collector checkpoint
+
+Added the fixed top-level auth read and strict privileged session/cookie validation. The donor reuses cookieService.list in the exact managed store, observes cookie-change epochs and compares guarded auth before/after, preserving the original tab. No broad storage/AI collector or new native protocol exists. Code is not yet integrated into Backup UI/runtime; T/build/B pending.
