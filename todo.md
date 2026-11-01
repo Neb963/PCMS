@@ -52,3 +52,5 @@ Settings Backup now has native File selection/whole-archive validation through t
 ## End-to-end source-fixture verification checkpoint
 
 Added native File preview/one-confirm/fresh-map/staged binary separation/verified rollback tests using the actual production restore policy plus build-transformed donor services. Lost allocation receipt + cold Core reopen must reuse one Persona, and corrupt file/no-confirm/Disable/unstarted cancellation must cause no donor/container mutation. Source fixtures now support exact valid native donor schema/UUID scope for these tests. Archive parser errors receive safe typed diagnostics. New T/build and actual Firefox/File/B/DSK remain pending; no P32 completion claim.
+
+The restored donor cache and captured raw state now receive an explicit consistency check before any import write. Valid-native-schema source fixtures mirror that real stored-state shape; generic codec fixtures remain unchanged. This is additional consumer validation, not deferred operational login evidence. End-to-end and installed restore checks remain pending.

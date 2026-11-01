@@ -9,6 +9,7 @@ const inactiveKey=key=>key==='pcmsHostProfile'||key==='gm-tab-data'||key.startsW
 export async function validateRestoreDonorSource(data){
  const source=data.external.donor,state=source.state;
  need(state?.schemaVersion===3&&state.global&&state.profiles&&state.routes&&state.scripts&&state.workflows,'RESTORE_DONOR_SCHEMA_UNSUPPORTED');
+ need(source.storage.local.state&&same(stateData(normalizeState(source.storage.local.state)),stateData(normalizeState(state))),'RESTORE_DONOR_STORAGE_INCONSISTENT');
  const accounts=data.core.records.accounts.filter(a=>a.personaUid),profiles=Object.values(state.profiles).filter(p=>p.managed);
  need(profiles.length===accounts.length&&accounts.every(a=>profiles.some(p=>p.containerId===a.containerId&&p.personaUid===a.personaUid&&p.pcmsAccountId===a.id&&p.routeId===a.routeId&&p.killSwitch!==false&&p.blockLocalNetwork!==false)),'RESTORE_DONOR_MAP_INCOMPLETE');
  const payload=createPortableBackupPayload({state,userscriptData:source.storage.local,automationHistory:source.storage.local.automationJobs??[]});
