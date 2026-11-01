@@ -47,7 +47,7 @@ export function createSourceWriter({core,donor,clock=Date.now,recoverAccount=asy
  }
  async function reconcile(j,recovery=false){
   const op=j.save.operationId;check(j.effect?.operationId===op&&j.effect.kind==='SOURCE_SAVE'&&j.effect.boundary==='POSSIBLE','SOURCE_OPERATION_SCOPE');
-  let snapshot;try{snapshot=await capture(j);j=await retain(j,snapshot,'readback');}catch(error){return held(await core.read('jobs',j.id),error.code??publicError(error));}
+  let snapshot;try{await bound(j);j=await update(j,{state:'RUNNING',recovery:null,save:{...j.save,code:null}},'RECONCILE_SOURCE_SAVE',{sourceSaveState:'CHECKING',sourceSaveCode:null});snapshot=await capture(j);j=await retain(j,snapshot,'readback');}catch(error){return held(await core.read('jobs',j.id),error.code??publicError(error));}
   const candidate=await core.verifySource(j.save.candidateManifest),base=await core.verifySource(j.save.baselineManifest),receipt=await core.view('source-save:'+op),ack=receipt?.ack;
   const rejected=receipt?.rejected===true||receipt?.noDispatch===true||ack?.status==='stale'||receipt?.dispatched===0;
   if(rejected){await core.queue.reconcile(j.id,j.rev,op,{matched:true,operationId:op,disposition:'REJECTED'});j=await core.read('jobs',j.id);return held(j,ack?.status==='stale'?'SOURCE_STALE':receipt.code??'SOURCE_SAVE_REJECTED');}
