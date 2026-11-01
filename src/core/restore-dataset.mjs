@@ -9,13 +9,25 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
  const event=async(s,r,id,step,result)=>{await append(s,r,{moduleId:'pcms-backup',targetId:id,step,result});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));};
  core.restore={
   read:()=>transact([],'readonly',s=>current(s)),
+  prepareSource:({id,blobId,bytes,name,generation})=>transact(['modules','files','versions','events'],'readwrite',async s=>{
+   const r=await root(s);await moduleAllowed(s,r,generation);check(!r.restoreHold,'RESTORE_MAINTENANCE');
+   const prior=await req(s('files').get([r.dataset,id]));if(prior){check(prior.kind==='RESTORE_SOURCE'&&prior.sha256===blobId&&prior.bytes===bytes&&prior.state==='STAGING_SOURCE','RESTORE_SOURCE_CONFLICT');return prior;}
+   const value={type:'backup',moduleId:'pcms-backup',kind:'RESTORE_SOURCE',automatic:false,state:'STAGING_SOURCE',filename:name,bytes,sha256:blobId,payloadId:blobId,profileId:r.profileId};
+   await writeRows(s,r,[{table:'files',id,value,refs:[]}],{moduleId:'pcms-backup',operationId:id,step:'STAGE_RESTORE_SOURCE',result:'WAITING'});return req(s('files').get([r.dataset,id]));
+  }),
+  async discardSource(id,generation){
+   await transact(['modules','files','versions','events'],'readwrite',async s=>{
+    const r=await root(s);await moduleAllowed(s,r,generation);check(!r.restoreHold,'RESTORE_MAINTENANCE');const f=await req(s('files').get([r.dataset,id]));check(f?.kind==='RESTORE_SOURCE'&&f.state==='STAGING_SOURCE','RESTORE_DISCARD_DENIED');
+    const value={...f,state:'CANCELLED',payloadAvailable:false};delete value.payloadId;await writeRows(s,r,[{table:'files',id,expectedRev:f.rev,value,refs:[]}],{moduleId:'pcms-backup',targetId:id,step:'DISCARD_RESTORE_SOURCE',result:'COMPLETE'});
+   });await core.releasePin('restore-source-'+id);await core.collect();return {state:'CANCELLED'};
+  },
   async preview({id,source,summary,generation}){
    return transact(['files','versions','events','modules','blobs','chunks'],'readwrite',async s=>{
     const r=await root(s);await moduleAllowed(s,r,generation);check(!r.restoreHold,'RESTORE_MAINTENANCE');const prior=await current(s);check(!prior||['PREVIEW','CANCELLED','ROLLED_BACK','COMPLETE'].includes(prior.state),'RESTORE_MAINTENANCE');
     check(typeof id==='string'&&source?.blobId&&source?.pinId&&source.fileId===id,'RESTORE_SOURCE_INVALID');
     const blob=await req(s('blobs').get([r.dataset,source.blobId]));check(blob&&!blob.staging&&blob.bytes===source.bytes,'RESTORE_SOURCE_INVALID');
     const value={type:'backup',moduleId:'pcms-backup',kind:'RESTORE_SOURCE',automatic:false,state:'SELECTED',filename:source.name,bytes:source.bytes,sha256:source.blobId,payloadId:source.blobId,profileId:r.profileId};
-    await writeRows(s,r,[{table:'files',id,value,refs:[]}],{moduleId:'pcms-backup',operationId:id,step:'RESTORE_PREVIEW',result:'COMPLETE'});
+    const priorFile=await req(s('files').get([r.dataset,id]));await writeRows(s,r,[{table:'files',id,expectedRev:priorFile?.rev??0,value,refs:[]}],{moduleId:'pcms-backup',operationId:id,step:'RESTORE_PREVIEW',result:'COMPLETE'});
     const control={key:controlKey,rev:(prior?.rev??0)+1,id,state:'PREVIEW',source,summary,previewDataset:r.dataset,previewAt:clock(),confirmedAt:null,mappings:[],code:null};await req(s('meta').put(control));return control;
    });
   },

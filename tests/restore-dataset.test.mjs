@@ -42,3 +42,10 @@ test('synchronous restore fence closes an already-waiting external dispatch befo
  let release,entered;const ready=new Promise(r=>entered=r),gate=new Promise(r=>release=r);let calls=0;
  const pending=c.queue.dispatch(j.id,chosen.rev,{operationId:'same-op',kind:'WRITE',preflight:async()=>{entered();await gate;return {ok:true};},call:()=>calls++,observe:async()=>({matched:true,operationId:'same-op'})});await ready;c.queue.fenceMaintenance('restore-race');release();await assert.rejects(pending,e=>e.code==='RESTORE_MAINTENANCE');assert.equal(calls,0);await c.queue.releaseMaintenance('restore-race');
 });
+
+test('staged binary chunks live only in the controlled destination dataset and preserve their independent digest',async t=>{
+ const f=await prepared(t),control=await f.c.restore.begin({id:f.id,guard:f.guard}),blob=new Blob([new Uint8Array([0,255,7,128]),'exact 雪']),id=await f.c.putBlob(blob,{pinId:'restore-'+f.id,dataset:control.newDataset,guard:f.guard});
+ await assert.rejects(f.c.bytes(id),e=>e.code==='MISSING_BLOB');assert.deepEqual(new Uint8Array(await (await f.c.readBlob(id,{dataset:control.newDataset})).arrayBuffer()),new Uint8Array(await blob.arrayBuffer()));
+ await f.c.restore.setBlobRefs(f.id,[{blobId:id,bytes:blob.size,refs:[]}],f.guard);
+ await assert.rejects(f.c.putBlob(blob,{pinId:'forbidden',dataset:'unrelated-generation',guard:f.guard}),e=>e.code==='RESTORE_SCOPE_DENIED');
+});
