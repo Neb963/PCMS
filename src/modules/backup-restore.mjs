@@ -1,7 +1,8 @@
 import {requireCore as check,publicError,sha256} from '../core/records.mjs';
 import {validateBackup} from '../core/backup-archive.mjs';
 import {digestStream} from '../core/stream-hash.mjs';
-import {canonical,same} from '../core/backup-format.mjs';
+import {PackageError} from './package.mjs';
+import {ArchiveError,canonical,same} from '../core/backup-format.mjs';
 import {stageRecords} from '../core/restore-mapping.mjs';
 const terminal=new Set(['CANCELLED','ROLLED_BACK','COMPLETE']);
 export function createBackupRestore({core,donor,clock=Date.now}){
@@ -15,9 +16,10 @@ export function createBackupRestore({core,donor,clock=Date.now}){
  async function update(j,c,patch){return core.restore.update(c.id,c.rev,patch,guard(await fresh(j)));}
  async function output(j,state,reason=null,dueAt=null){return {jobRevision:(await fresh(j)).rev,value:{state,code:reason,restoreId:j.input.restoreId,...dueAt?{dueAt}:{}}};}
  async function privateData(c,name){const value=await core.credentials.get('restore-'+name+'-'+c.id);check(value,'RESTORE_CHECKPOINT_MISSING');return JSON.parse(value);}
+ async function checkedArchive(blob){try{return await validateBackup(blob);}catch(e){if(e instanceof ArchiveError||e instanceof PackageError)throw e;check(false,'RESTORE_ARCHIVE_INVALID');}}
  async function archive(c){
   if(cached?.id===c.id&&cached.hash===c.source.blobId)return cached.checked;
-  const blob=await core.readBlob(c.source.blobId),checked=await validateBackup(blob);await donor.restoreValidateSource(checked.data);
+  const blob=await core.readBlob(c.source.blobId),checked=await checkedArchive(blob);await donor.restoreValidateSource(checked.data);
   cached={id:c.id,hash:c.source.blobId,checked,image:null};return checked;
  }
  async function image(c){
@@ -135,7 +137,7 @@ export function createBackupRestore({core,donor,clock=Date.now}){
  return {
   async preview({file}){
    const m=await admit();check(file instanceof Blob&&Number.isSafeInteger(file.size),'RESTORE_FILE_INVALID');check(!(await core.status()).restoreHold,'RESTORE_MAINTENANCE');
-   const checked=await validateBackup(file);const donorCoverage=await donor.restoreValidateSource(checked.data),digest=await digestStream(file.stream()),old=await core.restore.read();
+   const checked=await checkedArchive(file);const donorCoverage=await donor.restoreValidateSource(checked.data),digest=await digestStream(file.stream()),old=await core.restore.read();
    if(old?.state==='PREVIEW')await core.restore.cancelPreview(old.id,m.generation);
    const stages=(await rows('files')).filter(f=>f.kind==='RESTORE_SOURCE'&&f.state==='STAGING_SOURCE'&&f.sha256===digest.sha256&&f.bytes===digest.bytes),id=stages[0]?.id??crypto.randomUUID(),pinId='restore-source-'+id,name=typeof file.name==='string'?file.name.slice(0,255):'selected.pcms.zip';
    await core.restore.prepareSource({id,blobId:digest.sha256,bytes:digest.bytes,name,generation:m.generation});

@@ -48,3 +48,7 @@ Backup0.5 now routes fixed RESTORE/readonly-status actions through the existing 
 ## Primary restore UI checkpoint
 
 Settings Backup now has native File selection/whole-archive validation through the existing trusted RPC, secret-safe coverage/age/prerequisite preview, one explicit replacement checkbox/Confirm, retained mapping/copy progress, current-versus-staged status, contextual editor inspection, Check/rollback/cancel and interrupted source-copy recovery. Export/capture controls are held during restore maintenance; Work has the exact restore/check link. The UI never labels STAGED as active or operational. Required end-to-end T and actual File/B/DSK tests remain pending.
+
+## End-to-end source-fixture verification checkpoint
+
+Added native File preview/one-confirm/fresh-map/staged binary separation/verified rollback tests using the actual production restore policy plus build-transformed donor services. Lost allocation receipt + cold Core reopen must reuse one Persona, and corrupt file/no-confirm/Disable/unstarted cancellation must cause no donor/container mutation. Source fixtures now support exact valid native donor schema/UUID scope for these tests. Archive parser errors receive safe typed diagnostics. New T/build and actual Firefox/File/B/DSK remain pending; no P32 completion claim.

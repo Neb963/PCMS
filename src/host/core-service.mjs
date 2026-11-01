@@ -1,5 +1,6 @@
 import {createInstaller} from '../modules/install.mjs';
 import {seedBundled} from '../modules/seed.mjs';
+import {ArchiveError} from '../core/backup-format.mjs';
 import {PackageError} from '../modules/package.mjs';
 import {createModuleHost} from './module-host.mjs';
 import {createLifecycle} from '../modules/lifecycle.mjs';
@@ -141,7 +142,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         default:return {ok:false,code:'OPERATION_DENIED'};
       }
       return {ok:true,result};
-    } catch(error){return {ok:false,code:error instanceof PackageError?error.code:/^(MODULE_[A-Z_]+|PAGE_[A-Z_]+|DOCUMENT_DENIED|CAPABILITY_DENIED|TARGET_DENIED|ACTION_DENIED)$/.test(error?.message)?error.message:publicError(error)};}
+    } catch(error){return {ok:false,code:error instanceof PackageError||error instanceof ArchiveError?error.code:/^(MODULE_[A-Z_]+|PAGE_[A-Z_]+|DOCUMENT_DENIED|CAPABILITY_DENIED|TARGET_DENIED|ACTION_DENIED)$/.test(error?.message)?error.message:publicError(error)};}
   }
   async function schedule(value){const times=[await value.queue.deadline(),await journal?.deadline(),await git?.deadline()].filter(Number.isFinite),due=times.length?Math.max(Date.now()+1000,Math.min(...times)):null;if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}}
   return {start:core,handle,closeDocument:id=>modules?.closeDocument(id),website:async details=>{await core();await scripts?.inject(details);},downloadsChanged:async()=>{const value=await core();await journal.changed();await discover.changed();await backup.changed();if(lifecycle)await lifecycle.recover();if(modules)await modules.turn();await schedule(value);},wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(lifecycle)await lifecycle.recover();await journal.changed();await backup.changed();await journal.tick();if(modules)await modules.turn();await git.tick();await creator.initialize();await value.queue.acknowledgeWake(cut);await schedule(value);}};
