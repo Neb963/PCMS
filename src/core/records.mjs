@@ -1,3 +1,4 @@
+import {attachBlobStream} from './blob-stream.mjs';
 import {attachCaptureCut} from './capture-cut.mjs';
 import {createQueue} from './queue.mjs';
 // The only PCMS record store. Callers are packaged Core services, never ZIP code.
@@ -242,6 +243,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }
   };
   attachBlobs(core,transact,root,checkedRefs,append,clock);
+  attachBlobStream(core,{transact,root,req,check:requireCore});
   attachCaptureCut(core,{transact,root,checkedRefs,append,req,check:requireCore,clock,assertGuard,tables:TABLES,stores:STORES});
   // A fixed privileged data boundary, never exposed to ZIP/dashboard RPC.
   // Creator supplies a synchronous policy over this current atomic snapshot.

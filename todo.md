@@ -25,3 +25,7 @@ H/G/P1–P5 NOT TESTED/unauthorized; P42–P49 need named disposable resources/e
 ## Dependency/CI checkpoint
 
 Official upstream sources establish zip.js2.24.0 and noble-hashes2.4.0. The existing focused Actions job now reads their public npm version/integrity metadata, checks module/package invariants and builds. The unchanged P29 installed journey is reused from41311633995 and postmerge41312348086; it is not rerun for codec-only work. P30 implementation/required codec tests remain pending. The temporary metadata command will be removed after exact lockfile resolution.
+
+## Streaming foundation checkpoint
+
+Pinned zip.js2.24.0/noble-hashes2.4.0 to exact public npm integrity metadata from41313142839; no transitive dependencies. Removed the temporary metadata command. Added incremental SHA-256 and a fixed-dataset private Core chunk reader that checks every byte/hash without materializing a whole blob. The build packages native-stream ZIP/hash code and licenses under existing CSP, with no new permission or remote runtime URL. Required new focused tests/codec remain pending.

@@ -21,10 +21,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Resolve exact archive dependency metadata
-        run: |
-          npm view @zip.js/zip.js@2.24.0 version dist dependencies license engines --json
-          npm view @noble/hashes@2.4.0 version dist dependencies license engines --json
       - run: npm ci --ignore-scripts
       - run: node --test tests/seed.test.mjs tests/packages.test.mjs
       - run: npm run build
