@@ -4,9 +4,11 @@ Independent local HTTPS/Git/SOCKS fixtures; normal sandbox and persistent XPI.
 from installed_source_save import *
 from git_write_https_fixture import git,put_blob,put_tree,put_commit,tree,commit,head
 
-def ready(remote,version='v1',status='READY',include_binary=False):
- old=head(remote.root);body=commit(remote.root,old);root=tree(remote.root,body['tree']['sha']);gens=next(e for e in root if e['path']=='generators');folders=tree(remote.root,gens['sha']);folder=next(e for e in folders if e['path']==SLUG);entries=tree(remote.root,folder['sha']);entries=[e for e in entries if e['path'] not in ['DEPLOYMENT.md','main.pjs','index.html']]
- for path,data in [('DEPLOYMENT.md',f'Format: PCMS-1\nVersion: {version}\nAction: DEPLOY\nStatus: {status}\n'.encode()),('main.pjs',b'pinned candidate not saved in P20\n'),('index.html',b'<p>Pinned selected candidate</p>')]:entries.append({'path':path,'type':'blob','mode':'100644','sha':put_blob(remote.root,data)})
+INSTRUCTIONS={p:('Distinct '+str(i)+' '+p+'\r\n雪\n').encode() for i,p in enumerate(['specification.md','ui.md','agents.md','prompt.md'])}
+
+def ready(remote,version='v1',status='READY',include_binary=False,action='DEPLOY'):
+ old=head(remote.root);body=commit(remote.root,old);root=tree(remote.root,body['tree']['sha']);gens=next(e for e in root if e['path']=='generators');folders=tree(remote.root,gens['sha']);folder=next(e for e in folders if e['path']==SLUG);entries=tree(remote.root,folder['sha']);entries=[e for e in entries if e['path'] not in ['DEPLOYMENT.md','main.pjs','index.html',*INSTRUCTIONS]]
+ for path,data in [('DEPLOYMENT.md',f'Format: PCMS-1\nVersion: {version}\nAction: {action}\nStatus: {status}\n'.encode()),('main.pjs',b'pinned candidate not saved in P20\n'),('index.html',b'<p>Pinned selected candidate</p>'),*INSTRUCTIONS.items()]:entries.append({'path':path,'type':'blob','mode':'100644','sha':put_blob(remote.root,data)})
  if include_binary:
   entries=[e for e in entries if e['path']!='src'];entries.append({'path':'src','type':'tree','mode':'040000','sha':put_tree(remote.root,[{'path':'new.bin','mode':'100644','type':'blob','sha':put_blob(remote.root,bytes([0,255,128,17]))}])})
  folder['sha']=put_tree(remote.root,entries);gens['sha']=put_tree(remote.root,folders);body.update(tree=put_tree(remote.root,root),parents=[old],message='Independent READY fixture\n');tip=put_commit(remote.root,body);git(remote.root,'update-ref','refs/heads/main',tip);return tip

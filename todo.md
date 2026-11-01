@@ -15,4 +15,4 @@ Base actual main a8a7a3b4; branch p23-develop-staging. Preserve P20–P22 and P2
 - Focused production T covers distinct Unicode/newline instructions, existing binary assets, changed Git roots, dirty/conflicting edits, interruption/restart and original-file preservation. Targeted installed B drives real automatic DEVELOP intake through the native save, kills Firefox after staging application/before ACK, and independently checks every byte and untouched Git originals.
 - Push/verify checkpoints; merge after required T/B, verify main, then continue P24. Existing transport probes are accepted and are not rerun. Live P3 remains NOT TESTED/unauthorized until P46.
 
-Implementation not started. P23 T/B NOT TESTED.
+Exact three-file candidate composition, same-job STAGE save/readback, prepared-operation recovery and contextual UI are implemented. Focused T/build and required installed B are in progress. CI retains its existing two jobs/triggers and replaces only the affected journey with installed_develop_stage.py; unchanged source/Git invariants stay selected.
