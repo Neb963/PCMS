@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createBackupDonor} from '../src/host/backup-donor.mjs';
-function events(){const listeners=new Set();return {addListener:f=>listeners.add(f),removeListener:f=>listeners.delete(f),emit:event=>{for(const f of listeners)f(event);},get size(){return listeners.size;}};}
+function events(){const listeners=new Set();return {addListener:f=>listeners.add(f),removeListener:f=>listeners.delete(f),emit:(...args)=>{for(const f of listeners)f(...args);},get size(){return listeners.size;}};}
 async function fixture(){
  let time=1000;const storageEvents=events(),cookieEvents=events(),versions=new Map([[1,0],[2,0]]),scope={accountId:'account',personaUid:'persona',containerId:'firefox-container-1',routeId:'route'},closed=[];
  const api={storage:{onChanged:storageEvents,local:{get:async()=>({allDonorData:{secret:'synthetic-donor'}})},sync:{get:async()=>({syncKey:'synthetic-sync'})}},cookies:{onChanged:cookieEvents},scripting:{executeScript:async({target,args})=>[{frameId:0,result:{ok:true,version:versions.get(target.tabId)??0,human:false,startedAt:1000,observedAt:time}}]}};
