@@ -31,3 +31,5 @@ Settings Backup now has Back up now, persisted safe destination/draft, separate 
 ## Focused verification checkpoint
 
 Added production cut→codec→Blob/chunks→Core Downloads T, paused/Journal-disabled dedupe, exact private bytes, lost-ID/ACK/service-restart/ambiguity/history-loss, disk failure/last-good/Disable/removed-cut, deterministic re-encoding and interrupted guarded Blob staging. Seed identity expectations now require the explicit Backup0.4 release. Initial storage checkpoint's codec checks passed33/35; two failures were the old0.3 seed version expectations. New focused verification and B/DSK remain pending.
+
+Run41316836023 passed33/35 focused checks, including production archive/Blob delivery, paused Journal-disabled behavior, deterministic bytes and staging interruption. Recovery fixture needed a lookup outage to keep the lost ID genuinely unknown (the service correctly adopted the exact ID immediately otherwise); added that independent outage before testing ambiguity/history loss. Corrected a missing-IDB-row expectation from null to undefined. Required B/DSK remains pending.
