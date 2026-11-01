@@ -11,7 +11,7 @@ export function createBackupCapture({core,donor,clock=Date.now}){
  async function output(j,state='CONTINUE',code=null){const latest=await core.read('jobs',j.id);return {jobRevision:latest.rev,value:{state,code,captureId:j.id,captureComplete:latest.fullCapture?.phase==='COMPLETE',coverageComplete:latest.fullCapture?.phase==='COMPLETE'}};}
  async function stop(j){await Promise.allSettled((j.fullCapture?.results??[]).filter(r=>r.watch).map(r=>donor.endSessionCapture({watchId:r.watch.id})));}
  async function finish(j,code=null){await stop(j);const c=j.fullCapture;await save(j,{...c,phase:code?'INCOMPLETE':'COMPLETE',code,finishedAt:clock()});return output(j,'COMPLETE',code);}
- async function retry(j,code){await stop(j);const c=j.fullCapture;if(c.round>=2)return finish(j,code);await save(j,{...c,round:c.round+1,phase:'STAGE',cursor:0,results:[],code,receipt:null});return output(j);}
+ async function retry(j,code,participant=null){await stop(j);const c=j.fullCapture;if(c.round>=2){if(participant){const accountId=participant.id??participant.accountId;j=await save(j,{...c,results:[...c.results.filter(r=>r.accountId!==accountId),{accountId,label:participant.label,state:'INCOMPLETE',code}]});}return finish(j,code);}await save(j,{...c,round:c.round+1,phase:'STAGE',cursor:0,results:[],code,receipt:null});return output(j);}
  async function enqueue({requestId}){
   const m=await admit();check(typeof requestId==='string'&&/^[a-zA-Z0-9-]{1,100}$/.test(requestId),'INVALID_REQUEST');
   const active=(await rows('jobs')).find(j=>j.moduleId===id&&j.kind==='CAPTURE'&&j.input.coverageOnly===false&&!['COMPLETE','FAILED'].includes(j.state));if(active)return {jobId:active.id,state:active.fullCapture?.phase??'STAGE'};
@@ -68,10 +68,10 @@ export function createBackupCapture({core,donor,clock=Date.now}){
    const p=participants[c.cursor],a=await core.read('accounts',p.id??p.accountId);
    if(c.phase==='STAGE'&&!p.personaUid){await save(j,{...c,cursor:c.cursor+1,results:[...c.results,{accountId:p.id,label:p.label,state:'NOT_REQUIRED',code:'NO_MANAGED_PERSONA'}]});return output(j);}
    if(c.phase==='CHECK'&&p.state==='NOT_REQUIRED'){await save(j,{...c,cursor:c.cursor+1});return output(j);}
-   if(!a||a.state!=='READY'||a.admission||a.personaUid!==p.personaUid||a.containerId!==p.containerId||a.expectedPrincipal!==p.principalFingerprint)return finish(j,'CAPTURE_ACCOUNT_CHANGED');
-   if(c.phase==='CHECK'&&a.rev!==p.revision)return retry(j,'CAPTURE_ACCOUNT_CHANGED');
+   if(!a||a.state!=='READY'||a.admission||a.personaUid!==p.personaUid||a.containerId!==p.containerId||a.expectedPrincipal!==p.principalFingerprint){if(c.phase==='STAGE'){await save(j,{...c,cursor:c.cursor+1,results:[...c.results,{accountId:p.id,label:p.label,state:'INCOMPLETE',code:'CAPTURE_ACCOUNT_CHANGED'}]});return output(j);}return retry(j,'CAPTURE_ACCOUNT_CHANGED',p);}
+   if(c.phase==='CHECK'&&a.rev!==p.revision)return retry(j,'CAPTURE_ACCOUNT_CHANGED',p);
    const report=await read(j,a,reconcile);j=await core.read('jobs',j.id);if(!report)return output(j);if(j.effect?.boundary==='POSSIBLE')return output(j,'HELD','CAPTURE_READ_UNKNOWN');
-   if(report.state==='INCOMPLETE'&&['AUTH_SESSION_CHANGED','CAPTURE_WITNESS_LOST','AUTH_CONTEXT_CHANGED'].includes(report.code))return retry(j,report.code);
+   if(report.state==='INCOMPLETE'&&['AUTH_SESSION_CHANGED','CAPTURE_WITNESS_LOST','AUTH_CONTEXT_CHANGED'].includes(report.code))return retry(j,report.code,p);
    if(c.phase==='STAGE')await save(j,{...c,cursor:c.cursor+1,results:[...c.results,{...report,label:p.label}]});
    else if(!report.ok)return finish(j,report.code??'CAPTURE_SESSION_UNJOINED');
    else await save(j,{...c,cursor:c.cursor+1,results:c.results.map((r,i)=>i===c.cursor?{...r,witness:report.witness}:r)});

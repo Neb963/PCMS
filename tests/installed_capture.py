@@ -1,7 +1,7 @@
 """P29 B: real packaged immutable capture and checked Core/donor/session join.
 Synthetic protected service/storage only; no external provider or live bridge.
 """
-from installed_backup_sessions import backup_page,coverage,manage,configure_auth
+from installed_backup_sessions import backup_page,coverage,manage,configure_auth,collect as collect_sessions,inspect_paused
 from installed_accounts import account_session,add,settle,login,account,page as account_page
 from installed_lifecycle import permission_choice
 from installed_packages import *
@@ -47,6 +47,8 @@ def main():
    binary_bytes=base64.b64decode(asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),b=await c.bytes(arguments[0]);c.close();let result='';for(let i=0;i<b.length;i+=8192)result+=String.fromCharCode(...b.slice(i,i+8192));return btoa(result);",[model['binary']]));expected=bytes(i%251 for i in range(1048601));assert binary_bytes==expected and hashlib.sha256(expected).hexdigest()==model['binary'];assert any(b['blobId']==model['binary'] and b['bytes']==len(expected) for b in core['blobs']);assert any(c['value']=='private-cookie-sentinel' for s in external['sessions'] for c in s['cookies']);assert first['receipt']['barrierMs']<=5000 and first['verifiedBytes']>=len(expected)
    progress=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),v=await c.view('independent-work');await c.saveView('fixture-draft',{draft:'later live draft'},crypto.randomUUID());c.close();return v.progress;");assert progress>=2;assert private_cut(sid,first['jobId'])==raw;assert all(x not in json.dumps(coverage(sid))+script(sid,"return document.getElementById('records').textContent") for x in ['donor-secret-sentinel','private-cookie-sentinel','exact-secret-','sessionToken']);wait(lambda:'Capture ready' in script(sid,"return document.getElementById('backup-capture-state').textContent"));call('POST',f'/session/{sid}/window/rect',{'width':420,'height':900});(OUT/'immutable-capture.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
    receipt['checks'].append('actual-Prepare-capture/sandbox-Core-donor-join/two-independent-auth-documents/real-cookie-bytes/full-local-sync-donor-inventory/seven-active-and-staged-package-bytes/credential-draft-source-history/preserved-Possible-writer/independent-1MiB-binary-reopen/other-Core-progress/short-barrier/immutable-revision/secret-safe-narrow-UI/global-Pause/Journal-disabled/no-disk-success')
+   with fixture.lock:rotation_token=fixture.logins[account(sid,ids[0])['routeId']]['sessionToken']
+   configure_auth(sid,ids[0],rotation_token,rotate=True);unstable=collect_sessions(sid);assert not unstable['complete'] and next(r for r in unstable['rows'] if r['accountId']==ids[0])['code']=='AUTH_SESSION_CHANGED';configure_auth(sid,ids[0],rotation_token);receipt['checks'].append('actual-scoped-coverage-control/deterministic-real-guard-change-at-native-digest-yield/three-bounded-attempts/no-secret-projection')
    ordered=[r['accountId'] for r in first['rows']];fixture.hold_route=account(sid,ordered[1])['routeId'];raced=prepare(sid,False);wait(lambda:fixture.witness_waiting.is_set(),30)
    witness=asyncjs(sid,"""let found;for(const t of await browser.tabs.query({})){const tag=await browser.sessions.getTabValue(t.id,'pcmsAuthCaptureWitness');if(tag?.captureId===arguments[0]&&tag.accountId===arguments[1]){found=t;break;}}if(!found)throw Error('WITNESS_FIXTURE_MISSING');await browser.scripting.executeScript({target:{tabId:found.id},world:'ISOLATED',func:()=>{if(!globalThis.__PCMS_AUTH_WATCH_1)throw Error('WATCH_NOT_INSTALLED');document.documentElement.dataset.fixtureCaptureWitness='selected';}});return found.id;""",[raced['jobId'],ordered[0]])
    matched=False
@@ -60,10 +62,11 @@ def main():
    asyncjs(sid,"globalThis.__DONOR_ROTATION=setInterval(()=>browser.storage.local.set({fixtureDonorRotation:Math.random()}),5);return true;");changed=prepare(sid);asyncjs(sid,"clearInterval(globalThis.__DONOR_ROTATION);return true;");assert not changed['complete'] and changed['code']=='CAPTURE_DONOR_CHANGED',json.dumps(changed);assert coverage(sid)['capture']['lastGood']['jobId']==raced_done['jobId'];assert private_cut(sid,first['jobId'])==raw
    receipt['checks'].append('actual-donor-storage-change/incomplete-cut/previous-complete-preserved/no-Pause-or-writer-release')
    interrupted=prepare(sid,False);wait(lambda:inspect_job(sid,interrupted['jobId'])['phase']=='STAGE' and inspect_job(sid,interrupted['jobId'])['cursor']>=1,30);asyncjs(sid,"clearInterval(globalThis.__CAPTURE_OTHER_TIMER);return true;");prior=stop(sid,profile);sid=None;sid,_=account_session(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);backup_page(sid);wait(lambda:current(sid)['jobId']==interrupted['jobId']);assert not current(sid)['complete']
-   # Fresh account Open revalidates the protected contexts after real restart.
+   # Fresh Accounts work obeys ordinary global Pause; explicitly Resume for it.
+   assert inspect_paused(sid);wait(lambda:script(sid,"return document.getElementById('pause-core').dataset.operation")=='queue.resume');click(sid,'#pause-core');wait(lambda:not inspect_paused(sid))
    for id in ids:
     account_page(sid,id);click(sid,'#account-open');settle(sid,id,'READY');dashboard(sid)
-   backup_page(sid);pending=current(sid)
+   wait(lambda:script(sid,"return document.getElementById('pause-core').dataset.operation")=='queue.pause');click(sid,'#pause-core');wait(lambda:inspect_paused(sid));backup_page(sid);pending=current(sid)
    if pending['state'] not in ['COMPLETE','INCOMPLETE']:
     click(sid,'#backup-capture-check');wait(lambda:current(sid)['state'] in ['COMPLETE','INCOMPLETE'],180)
    repaired=prepare(sid)
@@ -72,7 +75,7 @@ def main():
      if not r.get('inspectionTabId'):continue
      selector='button[data-capture-inspect="'+r['accountId']+'"]';wait(lambda:script(sid,'return !!document.querySelector(arguments[0])',[selector]));click(sid,selector);assert asyncjs(sid,"return (await browser.tabs.get(arguments[0])).active;",[r['inspectionTabId']]);context(sid,'chrome');script(sid,"Services.wm.getMostRecentWindow('navigator:browser').gBrowser.removeCurrentTab();return true;");context(sid,'content');dashboard(sid);backup_page(sid)
     repaired=prepare(sid)
-   assert repaired['complete'],json.dumps(repaired);assert fixture.receipt()['unexpected']==[]
+   assert repaired['complete'],json.dumps(repaired);assert asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),j=await c.read('jobs','retained-possible'),g=await c.read('generators','captured-generator');c.close();return j.effect.boundary==='POSSIBLE'&&g.writerHold.jobId==='retained-possible';");assert fixture.receipt()['unexpected']==[]
    receipt['checks'].append('actual-process-interruption/staged-data-retained/lost-provenance-never-promoted/fresh-Accounts-Open/actual-Check-and-Prepare-recovery/previous-snapshot-preserved/no-provider-write');receipt['coreBarrierMs']=repaired['receipt']['barrierMs'];receipt['verifiedBytes']=repaired['verifiedBytes'];receipt['result']='PASS'
   except Exception as error:
    receipt['error']=str(error)
