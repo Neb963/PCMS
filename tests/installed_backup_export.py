@@ -67,7 +67,7 @@ def main():
    for p,b in binaries.items():
     if p.startswith('modules/'):
      with zipfile.ZipFile(io.BytesIO(b)) as z:assert z.testzip() is None and json.loads(z.read('module.json'))['coreApi']==1
-   assert 'Firefox download complete' in script(sid,"return document.getElementById('backup-export-state').textContent");assert 'synthetic-token' not in script(sid,"return document.body.textContent")
+   wait(lambda:'Firefox download complete' in script(sid,"return document.getElementById('backup-export-state').textContent"),15);assert 'synthetic-token' not in script(sid,"return document.body.textContent")
    receipt['checks'].append('actual-Back-up-now/qualified-production-capture/streamed-ZIP/Core-Downloads/independent-disk-CRC-manifest-all-entry-hashes/exact-source-history-binary-NUL-auth-cookie-credential-draft-donor/current-and-staged-module-ZIPs/7-modules/Pause/Journal-disabled')
    # Invalid fresh auth coverage must not create a second complete file.
    configure_auth(sid,ids[0],'synthetic-bad-schema',unknown=True);bad=request_export(sid);bad_done=completed(sid,bad['jobId']);assert bad_done['state']=='FAILED' and not file_receipt(sid,bad['jobId']),json.dumps(bad_done);assert state(sid)['lastComplete']['id']==first['jobId'];configure_auth(sid,ids[0],'synthetic-restored-token')
