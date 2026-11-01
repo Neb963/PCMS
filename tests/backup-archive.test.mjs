@@ -55,6 +55,10 @@ else:
    v=json.loads(b); v["root"]["schema"]=99; b=json.dumps(v,ensure_ascii=False).encode()
   if op=="closure" and p=="records/blobs.ndjson":
    rows=[json.loads(x) for x in b.splitlines()]; rows.pop(); b=b"".join(json.dumps(r).encode()+b"\n" for r in rows)
+  if op=="module" and p=="records/modules.ndjson":
+   rows=[json.loads(x) for x in b.splitlines()]; rows[0]["manifest"]["coreApi"]=99; b=b"".join(json.dumps(r).encode()+b"\n" for r in rows)
+  if op=="job" and p=="records/jobs.ndjson":
+   rows=[json.loads(x) for x in b.splitlines()]; rows[0]["jobSchema"]=99; b=b"".join(json.dumps(r).encode()+b"\n" for r in rows)
   if op=="secret" and p.startswith("auth/") and p.endswith(".json"):
    v=json.loads(b); v["auth"]["user"].pop("sessionToken"); b=json.dumps(v,ensure_ascii=False).encode()
   if op=="sha" and p=="credentials.json": b=b.replace(b"fixture-token",b"fixture-tokeN")
@@ -86,7 +90,7 @@ test('production ZIP64 codec preserves exact full cut and large binary/history; 
 });
 test('checksum-consistent malformed capture sections, required secrets, closure, schema and unsafe/duplicate paths reject before any writes',async t=>{
  const f=await archiveFixture(t,50),encoded=await f.encode();
- for(const operation of ['missing','unsafe','duplicate','credential','schema','closure','secret','sha'])await t.test(operation,async()=>{await assert.rejects(validateBackup(await rewritten(encoded.blob,operation)));assert.equal(await f.c.credentials.get(f.receipt.credentialId),f.raw);});
+ for(const operation of ['missing','unsafe','duplicate','credential','schema','closure','module','job','secret','sha'])await t.test(operation,async()=>{await assert.rejects(validateBackup(await rewritten(encoded.blob,operation)));assert.equal(await f.c.credentials.get(f.receipt.credentialId),f.raw);});
 });
 test('corrupt CRC/local headers, truncated/appended ZIP, missing immutable bytes, unqualified cut, budget and cancellation stay incomplete',async t=>{
  const f=await archiveFixture(t,50),encoded=await f.encode(),raw=new Uint8Array(await encoded.blob.arrayBuffer());

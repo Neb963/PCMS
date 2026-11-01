@@ -77,7 +77,7 @@ async function parseSection(blob,ndjson){
 }
 function reassemble(manifest,values){
  const meta=values.get('records/meta.json');need(meta?.format===1,'ARCHIVE_SECTION_MISSING');
- const core={root:meta.root,records:{},credentials:values.get('credentials.json'),journal:{...manifest.journal,events:values.get('journal/events.ndjson')}};
+ const core={root:meta.root,records:{},credentials:values.get('credentials.json'),journal:{first:manifest.journal.first,last:manifest.journal.last,gaps:manifest.journal.gaps,events:values.get('journal/events.ndjson')}};
  for(const key of TABLES)core.records[key]=values.get('records/'+key+'.ndjson');for(const key of LISTS)core[key]=values.get('records/'+key+'.ndjson');
  const sessions=[];for(const [path,value]of values)if(/^auth\/[^/]+\/perchance-auth-1\.json$/.test(path))sessions.push({...value,cookies:values.get('cookies/'+value.personaUid+'.ndjson')});
  return {format:1,captureId:meta.captureId,createdAt:meta.createdAt,core,external:{donor:values.get('donor/state.json'),sessions,witnesses:values.get('auth/witnesses.ndjson')},disclosures:meta.disclosures};
