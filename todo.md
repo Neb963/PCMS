@@ -61,3 +61,5 @@ Full B41307673711 reached the real capture adapter and held AUTH_CONTEXT_CHANGED
 ## Witness recovery bound
 
 An owned witness whose observation continuity is lost now blocks another witness allocation for that account instead of accumulating abandoned tabs. Its exact collection tab has a packaged Open action; user work is preserved for inspection. A witness with trusted human input is parked as review and never reused or automatically closed. Only an exact untouched owned document is removed. These changes still need affected T/B verification.
+
+Required B now also holds the second fixture origin briefly while the first participant writes/restores the same guard. Native sibling storage events must force a fresh round despite equal bytes. Trusted WebDriver input in that owned witness must survive as parked review. Interrupted orphan witnesses, if restored, are inspected through the actual contextual button before the fixture user closes them and prepares fresh data. No production test gate was added.
