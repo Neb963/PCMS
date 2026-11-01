@@ -63,7 +63,7 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
    check(patch&&Object.keys(patch).every(k=>fields.includes(k))&&(!patch.state||['HELD','READY','LOGIN_REQUIRED'].includes(patch.state)),'RESTORE_ACCOUNT_PATCH');
    if(patch.state==='READY'){
     const p=c.participants?.find(p=>p.accountId===accountId),proof=p?.routeProof;
-    check(p?.local?.state==='IMPORTED'&&p.login?.state==='VALIDATED'&&p.login.principalFingerprint===a.expectedPrincipal&&proof?.source==='RESTORE_ROUTE_1'&&proof.personaUid===map.personaUid&&proof.containerId===map.destinationContainerId&&p.route?.state==='VALIDATED','RESTORE_ACCOUNT_UNVERIFIED');
+    check(p?.local?.state==='IMPORTED'&&p.login?.state==='VALIDATED'&&p.login.principalFingerprint===a.expectedPrincipal&&proof?.source==='RESTORE_ROUTE_1'&&proof.personaUid===map.personaUid&&proof.containerId===map.destinationContainerId&&p.route?.state==='VALIDATED'&&(patch.routeId??a.routeId)===proof.routeId&&JSON.stringify(patch.exitAddresses??a.exitAddresses)===JSON.stringify(proof.exitAddresses)&&(patch.identityObservedAt??a.identityObservedAt)===p.login.observedAt&&(patch.routeObservedAt??a.routeObservedAt)===proof.observedAt,'RESTORE_ACCOUNT_UNVERIFIED');
    }
    const staged=r.dataset===c.newDataset?r:{...structuredClone(c.stagedRoot),key:'restore-staged-root:'+id};
    await writeRows(s,staged,[{table:'accounts',id:accountId,expectedRev:a.rev,refs:a.refs,value:{...a,...structuredClone(patch)}}],{moduleId:'pcms-backup',targetId:accountId,jobId:guard.jobId,step:'RESTORE_ACCOUNT_DATA',result:patch.state==='READY'?'COMPLETE':'HELD'});

@@ -19,7 +19,7 @@ export function createBackupRestore({core,donor,clock=Date.now}){
  async function checkedArchive(blob){try{return await validateBackup(blob);}catch(e){if(e instanceof ArchiveError||e instanceof PackageError)throw e;check(false,'RESTORE_ARCHIVE_INVALID');}}
  async function archive(c){
   if(cached?.id===c.id&&cached.hash===c.source.blobId)return cached.checked;
-  const blob=await core.readBlob(c.source.blobId),checked=await checkedArchive(blob);await donor.restoreValidateSource(checked.data);
+  const blob=await core.readBlob(c.source.blobId,{dataset:c.previousRoot?.dataset??c.previewDataset}),checked=await checkedArchive(blob);await donor.restoreValidateSource(checked.data);
   cached={id:c.id,hash:c.source.blobId,checked,image:null};return checked;
  }
  async function image(c){
@@ -37,7 +37,7 @@ export function createBackupRestore({core,donor,clock=Date.now}){
   const observation=async()=>{observed=await observe();const receipt=await core.view(key);return observed?.ok?{matched:true,operationId:op}:receipt?.noDispatch?{resolved:true,outcome:'FAILED',operationId:op,code:receipt.code??'RESTORE_EFFECT_FAILED'}:{matched:false,operationId:op};};
   let latest=await fresh(j);
   if(latest.effect?.boundary==='POSSIBLE'){
-   check(latest.effect.operationId===op,'RESTORE_OPERATION_SCOPE');const result=await observation();
+   check(latest.effect.operationId===op,'RESTORE_OPERATION_SCOPE');if(inflight.has(op))return {done:false,code:'RESTORE_EFFECT_PENDING'};const result=await observation();
    if(result.matched||result.resolved)await core.queue.reconcile(j.id,latest.rev,op,result);
    else if(c.wantRollback&&!inflight.has(op)&&(observed?.before||c.state==='ALLOCATE'&&observed?.code==='RESTORE_ALLOCATION_UNKNOWN'))await core.queue.reconcile(j.id,latest.rev,op,{matched:true,operationId:op,disposition:'REJECTED'});
    else return {done:false,code:inflight.has(op)?'RESTORE_EFFECT_PENDING':observed?.code??'RESTORE_EFFECT_UNKNOWN'};

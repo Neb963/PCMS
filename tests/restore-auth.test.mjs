@@ -32,3 +32,8 @@ test('registration uses fixed document_start/private world and stale admission u
  await b.arm(input,async()=>allowed);assert.equal(registered[0].runAt,'document_start');assert.equal(registered[0].allFrames,false);assert.equal((await b.registered(input)).ok,true);
  const d={url:restoreBootstrapTarget(input).url,type:'main_frame',tabId:8,cookieStoreId:'firefox-container-7'};assert.deepEqual(await listener(d),{});allowed=false;assert.deepEqual(await listener(d),{cancel:true});await b.remove(input);assert.deepEqual(listener(d),{cancel:true});assert.equal(removed.length,1);await b.close();
 });
+
+test('the per-call mutation revision does not revoke its separately current scoped request admission between finite steps',async()=>{
+ let listener,rows=[],revision=1,owner=true;const api={webRequest:{onBeforeRequest:{addListener:f=>listener=f,removeListener:()=>{}}},permissions:{contains:async()=>true},tabs:{get:async()=>({cookieStoreId:'firefox-container-7',url:'about:blank'})},userScripts:{getScripts:async()=>rows,configureWorld:async()=>{},register:async r=>rows=r,unregister:async()=>rows=[]}},b=createRestoreBootstrap({api}),input={...request,tabId:8,containerId:'firefox-container-7'};await b.arm(input,async()=>revision===1,async()=>owner);revision=2;
+ const details={url:restoreBootstrapTarget(input).url,type:'main_frame',tabId:8,cookieStoreId:'firefox-container-7'};assert.deepEqual(await listener(details),{});owner=false;assert.deepEqual(await listener(details),{cancel:true});await b.close();
+});

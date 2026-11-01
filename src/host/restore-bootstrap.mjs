@@ -28,12 +28,12 @@ export function createRestoreBootstrap({api}){
  api.webRequest.onBeforeRequest.addListener(gate,{urls:['<all_urls>']},['blocking']);
  async function registered(input){const target=restoreBootstrapTarget(input),scripts=await api.userScripts.getScripts({ids:[target.id]});if(!scripts.length)return {ok:false,code:'RESTORE_BOOTSTRAP_NOT_REGISTERED'};const expected=descriptor(input),actual=scripts[0];check(scripts.length===1&&actual.id===expected.id&&actual.world==='USER_SCRIPT'&&actual.worldId===expected.worldId&&actual.runAt==='document_start'&&actual.allFrames===false&&JSON.stringify(actual.matches)===JSON.stringify(expected.matches)&&JSON.stringify(actual.includeGlobs)===JSON.stringify(expected.includeGlobs)&&JSON.stringify(actual.js)===JSON.stringify(expected.js),'RESTORE_BOOTSTRAP_REGISTRATION_CHANGED');return {ok:true,...target};}
  return {
-  async arm(input,admitted){
-   const target=restoreBootstrapTarget(input);check(typeof admitted==='function'&&await admitted(),'RESTORE_INTERRUPTED');
+  async arm(input,validNow,admitted=validNow){
+   const target=restoreBootstrapTarget(input);check(typeof admitted==='function'&&typeof validNow==='function'&&await validNow(),'RESTORE_INTERRUPTED');
    check(await api.permissions.contains({permissions:['userScripts']}),'USERSCRIPTS_PERMISSION_REQUIRED');
    const tab=await api.tabs.get(target.tabId);check(tab.cookieStoreId===target.containerId&&['about:blank',target.url].includes(tab.url),'RESTORE_BOOTSTRAP_CONTEXT');
    const existing=await api.userScripts.getScripts({ids:[target.id]});if(existing.length)await registered(input);
-   gates.set(target.id,{...target,admitted});try{await api.userScripts.configureWorld({worldId:target.worldId,messaging:false});if(!existing.length)await api.userScripts.register([descriptor(input)]);check(await admitted(),'RESTORE_INTERRUPTED');return {ok:true,...target};}catch(error){gates.delete(target.id);try{await api.userScripts.unregister({ids:[target.id]});}catch{}throw error;}
+   gates.set(target.id,{...target,admitted});try{await api.userScripts.configureWorld({worldId:target.worldId,messaging:false});if(!existing.length)await api.userScripts.register([descriptor(input)]);check(await validNow(),'RESTORE_INTERRUPTED');return {ok:true,...target};}catch(error){gates.delete(target.id);try{await api.userScripts.unregister({ids:[target.id]});}catch{}throw error;}
   },
   registered,
   async observe(input){
