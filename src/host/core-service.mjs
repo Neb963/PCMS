@@ -55,6 +55,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
       const value=await core();let result;
       switch(message?.operation) {
         case 'module.lifecycle':{if(!lifecycle)return {ok:false,code:'MODULE_HOST_UNAVAILABLE'};let m=await lifecycle.request(message.id,message.kind,message.requestId);if(message.id==='pcms-discover'){await discover.changed();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}if(message.id==='pcms-creator'){await creator.recover();if(m.lifecycle?.code==='MODULE_EFFECT_UNKNOWN')m=await lifecycle.request(message.id,'CONTINUE',crypto.randomUUID());}await journal.tick();await accounts.initialize();await discover.initialize();await creator.initialize();await modules.start();await schedule(value);notify({type:'moduleChanged',moduleId:m.id});result={id:m.id,state:m.state,enabled:m.enabled,code:m.lifecycle?.code??null};break;}
+        case 'creator.inspect':result=await creator.inspect(message);break;
         case 'creator.status':result=await creator.status();break;
         case 'creator.get':result=await creator.get(message.id);break;
         case 'creator.override':result=await creator.override(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;

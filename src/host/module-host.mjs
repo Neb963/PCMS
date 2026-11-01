@@ -107,7 +107,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
  window.addEventListener('message',message);
  function request(binding,type,value={}){
   const callId=crypto.randomUUID();return new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>{binding.pending.delete(callId);reject(Error('MODULE_STEP_TIMEOUT'));},binding.moduleId==='pcms-accounts'&&type==='STEP'?90000:30000);
+   const timer=setTimeout(()=>{binding.pending.delete(callId);reject(Error('MODULE_STEP_TIMEOUT'));},type==='STEP'&&binding.moduleId==='pcms-accounts'?90000:type==='STEP'&&binding.moduleId==='pcms-creator'?120000:30000);
    binding.pending.set(callId,{resolve,reject,timer});binding.window.postMessage({channel:binding.channel,type,callId,...value},'*');
   });
  }

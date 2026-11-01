@@ -4,6 +4,7 @@
 import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
+import {observePerchanceCreation} from '../modules/creation-observations.mjs';
 import {observePerchanceOwnership} from '../modules/ownership-observations.mjs';
 const PERCHANCE='https://perchance.org/';
 const ownOrigin=url=>{try{return new URL(url).origin==='https://perchance.org';}catch{return false;}};
@@ -337,6 +338,21 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    await api.sessions.setTabValue(tab.tabId,'pcmsDiscoverTab',{...tag,role:'parked'});
   }catch{}
  }
+ async function creation(scope,request){
+  const ready=await prerequisites();if(!ready.ok)return {ok:false,code:ready.code,noDispatch:true};const found=await protectedProfile(scope);if(found.code)return {ok:false,code:found.code,noDispatch:true};
+  const matches=await ownedTabs(scope),selected=matches.find(x=>x.tab.id===scope.tabId)??(matches.length===1?matches[0]:null);if(!selected)return {ok:false,code:matches.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING',noDispatch:true};
+  const tab=selected.tab,target={tabId:tab.id,frameIds:[0]},run=async(func,args=[])=>{const rows=await api.scripting.executeScript({target,world:'ISOLATED',func,args});if(rows?.length!==1||rows[0].frameId!==0||rows[0].error)throw Error('ACCOUNT_DOCUMENT_CHANGED');return rows[0].result;};
+  try{const witness=await run(accountDocumentWitness),result=await run(observePerchanceCreation,[{...request,principalFingerprint:scope.expectedPrincipal,documentWitness:witness}]),after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);
+   if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url||final.code)return {ok:false,code:final.code??'ACCOUNT_DOCUMENT_CHANGED'};return result;
+  }catch{return {ok:false,code:'CREATOR_CONTEXT_UNKNOWN'};}
+ }
+ async function inspectCreated(scope,{slug}){
+  if(nativeSlug(slug)!==slug)return fail('SLUG_INVALID');const ready=await prerequisites();if(!ready.ok)return ready;const found=await protectedProfile(scope);if(found.code)return fail(found.code);
+  // Open a dedicated protected view; never navigate the user's editor/login.
+  const tabs=await api.tabs.query({cookieStoreId:scope.containerId});let selected=null;for(const tab of tabs){const tag=await api.sessions.getTabValue(tab.id,'pcmsCreatorInspection');if(tag?.accountId===scope.accountId&&tag.slug===slug&&tab.url===PERCHANCE+slug){selected=tab;break;}}
+  if(selected){await api.tabs.update(selected.id,{active:true});await api.windows.update(selected.windowId,{focused:true});return {ok:true,tabId:selected.id};}
+  const tab=await personaPlatform.open(scope.containerId,PERCHANCE+slug,true);await api.sessions.setTabValue(tab.id,'pcmsCreatorInspection',{accountId:scope.accountId,slug});return {ok:true,tabId:tab.id};
+ }
  async function observeOwnership(scope,{slug}){
   const ready=await prerequisites();if(!ready.ok)return {state:'UNKNOWN',code:ready.code};const protectedNow=await protectedProfile(scope);if(protectedNow.code)return {state:'UNKNOWN',code:protectedNow.code};
   const matches=await ownedTabs(scope),selected=matches.find(x=>x.tab.id===scope.tabId)??(matches.length===1?matches[0]:null);if(!selected)return {state:'UNKNOWN',code:matches.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING'};
@@ -347,5 +363,5 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    return {...result,...identity.inventory?{inventory:identity.inventory}:{}};
   }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
  }
- return Object.freeze({observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ return Object.freeze({creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }
