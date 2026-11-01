@@ -71,3 +71,5 @@ Current full B41308659654 passed immutable bytes/packages/history/possible write
 ## Exact Work outcome and read recovery
 
 Work now projects secret-safe capture quality separately from completion of the attempt, links Backup, and checks the exact immutable capture job. The installed journey clicks that real result/control and proves unchanged cut bytes. Session coverage's existing control now explicitly reconciles its own missing pure-read receipt before proceeding; a focused loss/recheck test proves one job/one effect identity with bounded fresh readback. No mutable provider operation is retried.
+
+Sourcee9355bcc passed235 T/build, including the missing pure-read receipt recovery. B41309507407 again passed the complete immutable bytes/cut checks, then its new Work navigation poll dereferenced the asynchronously mounting section before it existed. The poll now waits for the section and still requires the actual result, exact Check action and unchanged private bytes. Product checks remain unchanged; full B is still pending.
