@@ -39,3 +39,5 @@ First codec run41315393006 failed on a multiline Python fixture string syntax er
 Run41315470579 exposed a fixture admission mistake: Pause was entered before Backup registered its maintenance policy, so no capture job was selected. The fixture now uses production Backup.initialize before Pause, preserving the real scheduler contract. Added explicit settings/unfinished-job compatibility validation. No failed run is counted as codec evidence.
 
 Run41315534147 passed adversarial archive/CRC/cancellation checks but exact whole-cut comparison exposed an extra derived Journal count in decoded data. Removed that reconstruction artifact to preserve the original logical snapshot exactly; added incompatible module/job negatives. Required round-trip/build evidence remains pending.
+
+Run41315646250 passed the 20MiB exact whole-cut round-trip, independent Python ZIP64/CRC/digest checks, binary/module reopens, all focused negatives and build. Final closure review adds semantic source-manifest child checks plus explicit unsupported encryption/method/symlink/split/bounds and missing-marker tests for this maintained reader. These final affected checks must pass before merge.

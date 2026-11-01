@@ -46,6 +46,7 @@ op=q["operation"]
 if op=="missing": entries=[(p,b) for p,b in entries if p!="credentials.json"]
 elif op=="unsafe": entries.append(("../escape",b"x"))
 elif op=="duplicate": entries.append(("credentials.json",z.read("credentials.json")))
+elif op=="marker": entries=[(p,b) for p,b in entries if p!="COMPLETE.json"]
 else:
  out=[]
  for p,b in entries:
@@ -74,7 +75,18 @@ else:
 o=io.BytesIO()
 with zipfile.ZipFile(o,"w",compression=zipfile.ZIP_DEFLATED) as w:
  for p,b in entries: w.writestr(p,b)
-sys.stdout.buffer.write(o.getvalue())
+raw=bytearray(o.getvalue())
+if op in ["encrypted","method","symlink","disk","bounds"]:
+ d=raw.find(b"PK\x01\x02")
+ if op=="encrypted":
+  raw[d+8:d+10]=(int.from_bytes(raw[d+8:d+10],"little")|1).to_bytes(2,"little")
+  raw[6:8]=(int.from_bytes(raw[6:8],"little")|1).to_bytes(2,"little")
+ if op=="method":
+  raw[d+10:d+12]=(99).to_bytes(2,"little"); raw[8:10]=(99).to_bytes(2,"little")
+ if op=="symlink": raw[d+38:d+42]=(0o120777<<16).to_bytes(4,"little")
+ if op=="disk": raw[d+34:d+36]=(1).to_bytes(2,"little")
+ if op=="bounds": raw[d+42:d+46]=(len(raw)+100).to_bytes(4,"little")
+sys.stdout.buffer.write(raw)
 `;
 async function rewritten(blob,operation){return new Blob([python(rewriteScript,JSON.stringify({zip:Buffer.from(await blob.arrayBuffer()).toString('base64'),operation}))]);}
 test('production ZIP64 codec preserves exact full cut and large binary/history; Python independently reads CRCs, bytes and manifest',async t=>{
@@ -90,7 +102,7 @@ test('production ZIP64 codec preserves exact full cut and large binary/history; 
 });
 test('checksum-consistent malformed capture sections, required secrets, closure, schema and unsafe/duplicate paths reject before any writes',async t=>{
  const f=await archiveFixture(t,50),encoded=await f.encode();
- for(const operation of ['missing','unsafe','duplicate','credential','schema','closure','module','job','secret','sha'])await t.test(operation,async()=>{await assert.rejects(validateBackup(await rewritten(encoded.blob,operation)));assert.equal(await f.c.credentials.get(f.receipt.credentialId),f.raw);});
+ for(const operation of ['missing','marker','unsafe','duplicate','encrypted','method','symlink','disk','bounds','credential','schema','closure','module','job','secret','sha'])await t.test(operation,async()=>{await assert.rejects(validateBackup(await rewritten(encoded.blob,operation)));assert.equal(await f.c.credentials.get(f.receipt.credentialId),f.raw);});
 });
 test('corrupt CRC/local headers, truncated/appended ZIP, missing immutable bytes, unqualified cut, budget and cancellation stay incomplete',async t=>{
  const f=await archiveFixture(t,50),encoded=await f.encode(),raw=new Uint8Array(await encoded.blob.arrayBuffer());

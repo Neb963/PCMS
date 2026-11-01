@@ -113,6 +113,17 @@ export async function validateBackup(blob,{budget,signal=null}={}){
    const valid=await validatePackage(new Uint8Array(await archive.arrayBuffer()),{budget:packageBudget});
    need(valid.packageHash===p.packageHash&&valid.manifestHash===p.manifestHash&&same(valid.manifest,p.manifest),'ARCHIVE_PACKAGE_MISMATCH');
   }
+  const sourceIds=new Set([...data.core.records.generators,...data.core.versions.filter(v=>v.table==='generators')].flatMap(g=>[g.sourceManifest,g.previousGood].filter(Boolean)));
+  for(const j of [...data.core.records.jobs,...data.core.versions.filter(v=>v.table==='jobs')])if(j.inspection?.manifestId)sourceIds.add(j.inspection.manifestId);
+  for(const id of sourceIds){
+   const e=byName.get('blobs/'+id);need(e&&e.uncompressedSize<=b.metadataBytes,'ARCHIVE_SOURCE_MISSING');
+   // Reopen in a separate strict reader: the primary reader tracks overlap
+   // across its first full pass, so re-reading is not mistaken for overlap.
+   const next=new ZipReader(new BlobReader(blob),options);let rows;
+   try{const entry=(await next.getEntries({...options,signal})).find(e=>e.filename==='blobs/'+id),r=await consume(entry,{signal,max:e.uncompressedSize,keep:true});need(r.sha256===id,'ARCHIVE_ENTRY_HASH');rows=await parseSection(r.blob,false);}finally{await next.close();}
+   need(Array.isArray(rows),'ARCHIVE_SOURCE_INVALID');let previous='';
+   for(const file of rows){need(plain(file)&&typeof file.path==='string'&&file.path.isWellFormed()&&file.path>previous&&!/[\\\0]/.test(file.path)&&!file.path.startsWith('/')&&file.path.split('/').every(s=>s&&s!=='.'&&s!=='..')&&hashId(file.blobId)&&file.sha256===file.blobId&&coverage.blobs.get(file.blobId)?.bytes===file.bytes&&coverage.blobs.get(id).refs.includes(file.blobId),'ARCHIVE_SOURCE_REFERENCE');previous=file.path;}
+  }
   // Return inert data and an immutable Blob reader only after every entry passed.
   // Any later read rechecks integrity; this grants no restore/write authority.
   return {state:'VALID',manifest,data,read:async path=>{
