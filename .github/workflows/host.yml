@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: node --test tests/backup-export.test.mjs tests/backup-capture.test.mjs tests/capture-cut.test.mjs tests/backup-archive.test.mjs tests/backup-restore.test.mjs tests/retention.test.mjs tests/downloads.test.mjs tests/queue.test.mjs tests/lifecycle.test.mjs tests/seed.test.mjs tests/packages.test.mjs tests/host.test.mjs
+      - run: node --test tests/backup-background.test.mjs tests/backup-export.test.mjs tests/backup-capture.test.mjs tests/capture-cut.test.mjs tests/backup-archive.test.mjs tests/backup-restore.test.mjs tests/retention.test.mjs tests/downloads.test.mjs tests/queue.test.mjs tests/lifecycle.test.mjs tests/seed.test.mjs tests/packages.test.mjs tests/host.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}
