@@ -16,7 +16,7 @@ export async function observeSourceCheckpoint(request){
 }
 
 export async function saveNativeSource(request){
- const hold=(code,extra={})=>({ok:false,code,...extra}),w=window;let dispatched=0,staged=false,ack=null,code=null;
+ const hold=(code,extra={})=>({ok:false,code,...extra}),w=window;let dispatched=0,staged=false,ack=null,code=null,failurePath=null;
  const fail=c=>{code=c;throw Object.assign(Error(c),{code:c});},ensure=(v,c)=>{if(!v)fail(c);},hash=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join(''),encode=new TextEncoder();
  let fetchOriginal,confirmOriginal,saveOriginal,model,html,src,menu;const options=[],listeners=[],linked=[];
  try{
@@ -37,7 +37,7 @@ export async function saveNativeSource(request){
   const current=async()=>{const files=[];for(const [path,value]of [['main.pjs',model.getValue()],['index.html',html.getValue()]])files.push({path,bytes:encode.encode(value).length,sha256:await hash(encode.encode(value))});for(const path of names()){const b=await bytesOf(await src.readFile(path));files.push({path:'src/'+path,bytes:b.length,sha256:await hash(b)});}return files.sort((a,b)=>a.path<b.path?-1:1);};
   const equivalent=(a,b)=>JSON.stringify(a.map(f=>[f.path,f.bytes,f.sha256]).sort())===JSON.stringify(b.map(f=>[f.path,f.bytes,f.sha256]).sort());
   ensure(equivalent(await current(),request.baseFiles),'SOURCE_EDITOR_BASE_CHANGED');
-  const candidate=[];for(const f of request.files){ensure(typeof f.path==='string'&&/^(main\.pjs|index\.html|src\/)/.test(f.path)&&!f.path.includes('\\')&&!f.path.includes('\0')&&f.path.split('/').every(s=>s&&s!=='.'&&s!=='..'),'SOURCE_PATH_UNSUPPORTED');const b=Uint8Array.from(atob(f.base64),c=>c.charCodeAt(0));ensure(await hash(b)===f.sha256&&b.length===f.bytes,'SOURCE_CANDIDATE_CHANGED');if(f.path.startsWith('src/'))ensure(src._internals.validatePath(f.path.slice(4))===null,'SOURCE_NATIVE_PATH_UNSUPPORTED');candidate.push({...f,data:b});}
+  const candidate=[];for(const f of request.files){ensure(typeof f.path==='string'&&/^(?:main\.pjs$|index\.html$|src\/)/.test(f.path)&&!f.path.includes('\\')&&!f.path.includes('\0')&&f.path.split('/').every(s=>s&&s!=='.'&&s!=='..'),'SOURCE_PATH_UNSUPPORTED');const b=Uint8Array.from(atob(f.base64),c=>c.charCodeAt(0));ensure(await hash(b)===f.sha256&&b.length===f.bytes,'SOURCE_CANDIDATE_CHANGED');if(f.path.startsWith('src/')&&src._internals.validatePath(f.path.slice(4))!==null){failurePath=f.path;fail('SOURCE_NATIVE_PATH_UNSUPPORTED');}candidate.push({...f,data:b});}
   ensure(new Set(candidate.map(f=>f.path)).size===candidate.length&&candidate.some(f=>f.path==='main.pjs')&&candidate.some(f=>f.path==='index.html'),'SOURCE_SET_INCOMPLETE');
   const text=path=>new TextDecoder('utf-8',{fatal:true,ignoreBOM:true}).decode(candidate.find(f=>f.path===path).data),pjs=text('main.pjs'),template=text('index.html');
   ensure(pjs.isWellFormed()&&template.isWellFormed(),'SOURCE_TEXT_UNSUPPORTED');
@@ -71,7 +71,7 @@ export async function saveNativeSource(request){
   if(!ack||ack.status!=='saved'||code)return hold(code??'SOURCE_SAVE_UNKNOWN',{dispatched,staged,ack});
   ensure(ack.saveCount===request.checkpoint.saveCount+1&&ack.time>=request.checkpoint.time,'SOURCE_RESPONSE_SCHEMA');
   return {ok:true,source:'PERCHANCE_NATIVE_SAVE_1',operationId:request.operationId,dispatched,staged,ack};
- }catch(error){return hold(error.code??'SOURCE_SAVE_UNKNOWN',{dispatched,staged,ack});}
+ }catch(error){return hold(error.code??'SOURCE_SAVE_UNKNOWN',{dispatched,staged,ack,...failurePath?{path:failurePath}:{}});}
  finally{
   if(fetchOriginal)w.fetch=fetchOriginal;if(confirmOriginal)w.confirm=confirmOriginal;
   for(const [name,fn]of listeners)document.removeEventListener(name,fn,true);
