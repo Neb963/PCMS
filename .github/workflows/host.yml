@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: node --test tests/source-save-native.test.mjs tests/source-writer.test.mjs tests/donor-accounts.test.mjs tests/source-inspection.test.mjs tests/source-observations.test.mjs tests/source-set.test.mjs tests/queue.test.mjs tests/seed.test.mjs tests/packages.test.mjs
+      - run: node --test tests/source-save-native.test.mjs tests/source-writer.test.mjs tests/donor-accounts.test.mjs tests/host.test.mjs tests/source-inspection.test.mjs tests/source-observations.test.mjs tests/source-set.test.mjs tests/queue.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}

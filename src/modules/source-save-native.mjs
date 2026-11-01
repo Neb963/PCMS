@@ -5,7 +5,7 @@ export async function observeSourceCheckpoint(request){
  try{
   if(location.origin!=='https://perchance.org'||location.pathname!=='/'+request.slug||location.hash!=='#edit'||location.search)return hold('EDITOR_TARGET_CHANGED');
   const w=window,g=w.app?.data?.generator,cp=w.saveCheckpointManager?.current?.();
-  if(g?.name!==request.slug||'public_'+g.publicId!==request.remoteId||w.generatorSaveCountKnown!==true||!Number.isSafeInteger(w.generatorSaveCount)||w.generatorSaveCount<0||!Number.isSafeInteger(w.generatorLastSaveTime)||w.generatorLastSaveTime<=0||cp?.saveCountKnown!==true||cp.saveCount!==w.generatorSaveCount||cp.time!==w.generatorLastSaveTime)return hold('SOURCE_CHECKPOINT_UNSUPPORTED');
+  if(g?.name!==request.slug||'public_'+(g.publicId??w.generatorPublicId)!==request.remoteId||w.generatorSaveCountKnown!==true||!Number.isSafeInteger(w.generatorSaveCount)||w.generatorSaveCount<0||!Number.isSafeInteger(w.generatorLastSaveTime)||w.generatorLastSaveTime<=0||cp?.saveCountKnown!==true||cp.saveCount!==w.generatorSaveCount||cp.time!==w.generatorLastSaveTime)return hold('SOURCE_CHECKPOINT_UNSUPPORTED');
   const visible=e=>!!e&&!e.hidden&&getComputedStyle(e).display!=='none',stop=document.getElementById('aiAgentStopBtn'),queue=document.getElementById('aiAgentQueueRowEl');
   if(visible(stop)||visible(queue)&&queue.children.length||w.__pendingCheckpointNote||w.__saveInFlight!==false)return hold('EDITOR_AI_OR_SAVE_PENDING');
   const workspace=typeof w.aiAgentWorkspaceSnapshot==='function'?await w.aiAgentWorkspaceSnapshot():null;
@@ -26,10 +26,10 @@ export async function saveNativeSource(request){
   const storage=localStorage.getItem('app-storage'),change=localStorage.getItem('sessionTokenLastChangeTime'),user=JSON.parse(storage)?.user;
   ensure(user?.loggedIn===true&&typeof user.email==='string'&&await hash(encode.encode(user.email.trim().toLowerCase()))===request.principalFingerprint,'ACCOUNT_PRINCIPAL_CHANGED');
   const g=w.app?.data?.generator;model=w.modelTextEditor;html=w.outputTemplateEditor;src=w.srcState;menu=w.menuBar;
-  ensure(w.__editorReady===true&&w.userOwnsThisGenerator===true&&g?.name===request.slug&&'public_'+g.publicId===request.remoteId&&g.isPrivate===(request.listing==='UNLISTED'),'SOURCE_TARGET_CHANGED');
+  ensure(w.__editorReady===true&&w.userOwnsThisGenerator===true&&g?.name===request.slug&&'public_'+(g.publicId??w.generatorPublicId)===request.remoteId&&g.isPrivate===(request.listing==='UNLISTED'),'SOURCE_TARGET_CHANGED');
   ensure(typeof w.app.saveGenerator==='function'&&typeof src?.ready==='function'&&typeof src.prepareForSave==='function'&&typeof src.afterSaveSuccess==='function'&&typeof src.writeFile==='function'&&typeof src.deleteFile==='function'&&typeof src._internals?.validatePath==='function'&&typeof menu?.setSaveState==='function','SOURCE_SAVE_CONTRACT');
   const checkpointSame=()=>{const cp=w.saveCheckpointManager?.current?.();return cp?.time===request.checkpoint.time&&cp.saveCount===request.checkpoint.saveCount&&cp.saveCountKnown===true&&w.generatorSaveCountKnown===true&&w.generatorSaveCount===cp.saveCount&&w.generatorLastSaveTime===cp.time;};
-  const contextSame=()=>location.pathname==='/'+request.slug&&location.hash==='#edit'&&!location.search&&w.__PCMS_SOURCE_DOCUMENT_1===request.checkpoint.document&&w.app?.data?.generator===g&&w.srcState===src&&w.modelTextEditor===model&&w.outputTemplateEditor===html&&g.name===request.slug&&'public_'+g.publicId===request.remoteId&&g.isPrivate===(request.listing==='UNLISTED')&&localStorage.getItem('app-storage')===storage&&localStorage.getItem('sessionTokenLastChangeTime')===change;
+  const contextSame=()=>location.pathname==='/'+request.slug&&location.hash==='#edit'&&!location.search&&w.__PCMS_SOURCE_DOCUMENT_1===request.checkpoint.document&&w.app?.data?.generator===g&&w.srcState===src&&w.modelTextEditor===model&&w.outputTemplateEditor===html&&g.name===request.slug&&'public_'+(g.publicId??w.generatorPublicId)===request.remoteId&&g.isPrivate===(request.listing==='UNLISTED')&&localStorage.getItem('app-storage')===storage&&localStorage.getItem('sessionTokenLastChangeTime')===change;
   const solo=()=>{const room=w.yjsProvider,doc=w.yDoc,peers=w.yjsAwareness?.getStates?.();return w.editorCollabInitialSyncIsPending===false&&!w.__collabRoomFailed&&!w.collabEditKeyIsIncorrect&&(!room?!w.yjsProviderRoomName:room.wsconnected===true&&room.synced===true&&room.roomname===w.yjsProviderRoomName&&peers instanceof Map&&peers.size===1&&peers.has(doc?.clientID));};
   const idle=()=>{const visible=e=>!!e&&!e.hidden&&getComputedStyle(e).display!=='none';return !visible(document.getElementById('aiAgentStopBtn'))&&!(visible(document.getElementById('aiAgentQueueRowEl'))&&document.getElementById('aiAgentQueueRowEl').children.length)&&!w.__pendingCheckpointNote;};
   ensure(contextSame()&&checkpointSame()&&solo()&&idle()&&w.__saveInFlight===false&&menu.saveState==='saved'&&w.saveCheckpointManager.isDivergenceBlocked()===false&&src.hasPending()===false&&(await src.isDirty())===false&&src.conflictPaths().length===0,'EDITOR_UNVERIFIED');
@@ -68,7 +68,7 @@ export async function saveNativeSource(request){
   ensure(contextSame()&&checkpointSame()&&solo()&&idle()&&equivalent(await current(),candidate),'SOURCE_STAGED_CHANGED');menu.setSaveState('unsaved');
   await saveOriginal.call(w.app);
   if(ack?.status==='stale')return hold('SOURCE_STALE',{dispatched,staged,ack});
-  if(!ack||ack.status!=='saved'||code)return hold(code??'SOURCE_SAVE_UNKNOWN',{dispatched,staged,ack});
+  if(!ack||ack.status!=='saved'||code)return hold(code??(dispatched===0?'SOURCE_NATIVE_PREPARATION_FAILED':'SOURCE_SAVE_UNKNOWN'),{dispatched,staged,ack});
   ensure(ack.saveCount===request.checkpoint.saveCount+1&&ack.time>=request.checkpoint.time,'SOURCE_RESPONSE_SCHEMA');
   return {ok:true,source:'PERCHANCE_NATIVE_SAVE_1',operationId:request.operationId,dispatched,staged,ack};
  }catch(error){return hold(error.code??'SOURCE_SAVE_UNKNOWN',{dispatched,staged,ack,...failurePath?{path:failurePath}:{}});}
