@@ -16,7 +16,7 @@ export function sanitizeMarkup(html,document) {
  return parsed.body.innerHTML;
 }
 export function sanitizeStyle(css){return /@import|url\s*\(|expression\s*\(|-moz-binding|\\/i.test(css)?'':css;}
-export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},journalEffect=null,accountEffect=null,gitEffect=null,discoverEffect=null,discoverPage=null,creatorEffect=null,sourceEffect=null}) {
+export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},journalEffect=null,accountEffect=null,gitEffect=null,discoverEffect=null,discoverPage=null,creatorEffect=null,sourceEffect=null,backupEffect=null}) {
  const frames=new Set(),backgrounds=new Map(),pageBindings=new Map(),bootId=crypto.randomUUID();let running=null;const reconciled=new Set();
  const manifestCap=(m,group)=>m.manifest?.capabilities?.find(c=>c.startsWith(group+'.'));
  async function current(binding){return core.read('modules',binding.moduleId);}
@@ -29,6 +29,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   if(binding.mode==='validate')throw Error('VALIDATION_READ_ONLY');
   const active=await current(binding),operation=m.operation,args=m.args??{};
   if(binding.reconciling&&!['query','getView'].includes(operation))throw Error('READ_ONLY_RECONCILIATION');
+  const backupCall=['backup.collect','backup.collectStatus'].includes(args.name);
   const sourceCall=['source.step','source.status'].includes(args.name);
   const creatorCall=['creator.step','creator.status'].includes(args.name);
   const discoverPageCall=['discover.list','discover.get','discover.import','discover.command','discover.export','discover.check','discover.preparations','discover.retryPreparation','discover.navigate'].includes(args.name);
@@ -36,8 +37,14 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   const gitCall=['github.prepareFolder','github.prepareFolderStatus'].includes(args.name);
   const accountCall=['accounts.step','accounts.status'].includes(args.name);
   const journalCall=['journal.export','journal.status','journal.cleanup','journal.cleanupStatus'].includes(args.name);
-  const capability=sourceCall?'perchance.source':creatorCall?'perchance.ownership':discoverPageCall?(operation==='query'?'records.discover':'jobs.discover'):discoverCall?'perchance.classify':gitCall?'github.prepareFolder':accountCall?'persona.prepare':journalCall?(args.name.startsWith('journal.cleanup')?'journal.cleanup':'journal.export'):operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
+  const capability=backupCall?'backup.capture':sourceCall?'perchance.source':creatorCall?'perchance.ownership':discoverPageCall?(operation==='query'?'records.discover':'jobs.discover'):discoverCall?'perchance.classify':gitCall?'github.prepareFolder':accountCall?'persona.prepare':journalCall?(args.name.startsWith('journal.cleanup')?'journal.cleanup':'journal.export'):operation==='query'?manifestCap(active??{},'records'):operation==='action'?manifestCap(active??{},'jobs'):'ui.view';
   if(!bindingAllows(binding,{source:binding.window,channel:m.channel,current:active,targetId:args.targetId,operation:capability})&&!(binding.stopping&&['saveView','getView'].includes(operation)))throw Error('CAPABILITY_DENIED');
+  if(backupCall){
+   if(binding.mode!=='background'||!binding.jobId||active.id!=='pcms-backup'||active.packageClass!=='bundled-backup'||!backupEffect||(args.name==='backup.collectStatus'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
+   const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.rev!==binding.expectedRevision||job.kind!=='CAPTURE'||job.input.coverageOnly!==true)throw Error('STALE_REVISION');
+   if(['COMPLETE','FAILED'].includes(job.state))throw Error('JOB_FINISHED');
+   const result=await backupEffect(job,args.name==='backup.collectStatus');binding.expectedRevision=result.jobRevision;return result.value;
+  }
   if(sourceCall){
    if(binding.mode!=='background'||!binding.jobId||active.id!=='pcms-deployer'||!sourceEffect||(args.name==='source.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
    const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.targetId!==binding.targetId||job.accountId!==binding.accountId||job.rev!==binding.expectedRevision||job.kind!=='SOURCE_INSPECT')throw Error('STALE_REVISION');if(['COMPLETE','FAILED'].includes(job.state))throw Error('JOB_FINISHED');

@@ -57,9 +57,16 @@ const creator=`PCMS.defineModule({
  outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{generatorId:result.generatorId}};if(result.state==='WAITING')return {kind:'wait',dueAt:result.dueAt};if(result.state==='CONTINUE')return {kind:'checkpoint',checkpoint:{phase:result.phase}};return {kind:'hold',reason:result.code||'CREATOR_NEEDS_ATTENTION',recovery:{action:'OPEN_GENERATOR'},checkpoint:{phase:result.phase}};},
  stop(){}
 });\n`;
+const backup=`PCMS.defineModule({
+ start(){},
+ async runStep(job,api){return this.outcome(await api.action({name:'backup.collect'}));},
+ async reconcile(job,api){return this.outcome(await api.query({name:'backup.collectStatus'}));},
+ outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{captureId:result.captureId,coverageComplete:result.coverageComplete}};if(result.state==='CONTINUE')return {kind:'checkpoint',checkpoint:{captureId:result.captureId}};return {kind:'hold',reason:result.code||'BACKUP_COVERAGE_UNAVAILABLE',recovery:{action:'OPEN_BACKUP'}};},
+ stop(){}
+});\n`;
 const stamp=new Date('1980-01-01T00:00:00.000Z');
 export function bundledPackage(id,name){
- const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:id==='pcms-creator'?creator:id==='pcms-deployer'?source:pending);
+ const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:id==='pcms-creator'?creator:id==='pcms-deployer'?source:id==='pcms-backup'?backup:pending);
  const manifest={format:1,id,name,version:definition.version,coreApi:1,jobSchema:1,
   readsJobSchemas:[1],capabilities:[...definition.capabilities],entries:{background:'background.js'},
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};
