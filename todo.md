@@ -28,3 +28,7 @@ Added the fixed top-level auth read and strict privileged session/cookie validat
 ## Runtime checkpoint
 
 Backup0.2 now runs finite CAPTURE coverage turns through the existing sandbox/module host/Core queue. Raw capsules are hashed/pinned private Core blobs; projected progress contains no secret fields. Account/module guards, bounded rotation retries, missing account/Persona diagnostics, previous complete coverage and disabled read settlement are implemented. No archive/export success path is exposed. PR19 postmerge41303419331 passed both jobs. Focused T and required B remain pending.
+
+## Primary UI checkpoint
+
+Settings → Backup now provides actual queued session coverage, progress, per-account causes/context/times and exact Accounts recovery links, search and ten-account pages. The query projection excludes capsule/blob IDs, tokens, emails and cookie values. Search/page state persists; polling keeps the search control stable. No disk-export control is present. Verification is pending.
