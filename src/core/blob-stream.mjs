@@ -5,7 +5,7 @@ export function attachBlobStream(core,{transact,root,req,check}){
  core.blobStream=blobId=>{
   let info,dataset,cursor=0,size=0,cancelled=false;const hash=newSHA256();
   return new ReadableStream({
-   async start(){check(typeof blobId==='string'&&/^[a-f0-9]{64}$/.test(blobId),'INVALID_REFERENCE');await transact(['blobs'],'readonly',async s=>{const r=await root(s);dataset=r.dataset;info=await req(s('blobs').get([dataset,blobId]));check(info&&Number.isSafeInteger(info.bytes)&&info.bytes>=0&&Number.isSafeInteger(info.chunks)&&info.chunks>=0,'MISSING_BLOB');});},
+   async start(){check(typeof blobId==='string'&&/^[a-f0-9]{64}$/.test(blobId),'INVALID_REFERENCE');await transact(['blobs'],'readonly',async s=>{const r=await root(s);dataset=r.dataset;info=await req(s('blobs').get([dataset,blobId]));check(!info?.staging,'BLOB_STAGE_INCOMPLETE');check(info&&Number.isSafeInteger(info.bytes)&&info.bytes>=0&&Number.isSafeInteger(info.chunks)&&info.chunks>=0,'MISSING_BLOB');});},
    async pull(controller){
     try{
      if(cancelled)return;

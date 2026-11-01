@@ -22,11 +22,43 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts
-      - run: node --test tests/backup-archive.test.mjs tests/blob-stream.test.mjs tests/capture-cut.test.mjs tests/seed.test.mjs tests/packages.test.mjs
+      - run: node --test tests/blob-write.test.mjs tests/backup-export.test.mjs tests/downloads.test.mjs tests/backup.test.mjs tests/capture-cut.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             build/pcms-dev.xpi
+            build/identity.json
+
+  installed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/pcms-firefox
+          key: firefox-devedition-155.0b1-gecko-0.36.0-v1
+      - name: Prepare qualifying Firefox
+        run: |
+          if [ -x "$RUNNER_TEMP/pcms-firefox/firefox/firefox" ] && [ -x "$RUNNER_TEMP/pcms-firefox/geckodriver" ]; then
+            printf 'FIREFOX_BINARY=%s\nGECKODRIVER_BINARY=%s\n' "$RUNNER_TEMP/pcms-firefox/firefox/firefox" "$RUNNER_TEMP/pcms-firefox/geckodriver" >> "$GITHUB_ENV"
+          else
+            bash scripts/setup-firefox.sh
+          fi
+      - run: npm ci --ignore-scripts
+      - run: npm run build
+      - name: Targeted manual production Backup export and independent disk reopen (normal sandbox)
+        run: python3 tests/installed_backup_export.py build/pcms-dev.xpi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: installed-backup-export-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            test-results/
             build/identity.json

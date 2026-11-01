@@ -85,3 +85,8 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 
 - zip.js2.24: explicitly passing zip64:false prohibits automatic large-entry promotion. Leave it unset for normal streamed encoding; force true only for required/explicit ZIP64. Independent Python reader and real footer/entry versions qualify the fixture.
 - Exact whole-cut comparison caught an otherwise valid archive decoder adding a derived Journal count. Preserve original logical shape; derived coverage belongs in manifest. Strict ZIP/CRC/hash validation still needs semantic source-child, credential, schema and reference closure checks before complete.
+
+- A durable archive staging receipt must precede chunk writes; mark partial blobs unreferenceable and pin them until safe resume/disposal. Actual Firefox stop mid-stage + same-job restart proved this path. Fixed captured ZIP timestamps permit identical re-encoding; native Blob staging can still consume substantial memory/disk and needs later representative measurement.
+- Wire export reconciliation to the real Downloads event, cold start and alarm wake. Immediate small-file observation can conceal a missing event hook. A capture-complete state must never be called a disk-complete export.
+- Byte-fidelity tokens deliberately differ from an independent fixture server's valid login. Correct ACCOUNT_LOGIN_REQUIRED after restart is evidence that bytes do not establish operational login; use actual fixture Sign in/Confirm for subsequent account work.
+- Importing a test helper can change global fixture handlers. Avoid unrelated imports; establish the exact fixture boundary before counting installed evidence.

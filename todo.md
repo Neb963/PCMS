@@ -1,19 +1,31 @@
 # Current work
 
-**P30 implemented and verified; merge/postmerge checkpoint next, then P31.**
+**P31 implemented and verified; merge/postmerge checkpoint next, then P32.**
 
-P30 PR22 source4aa752e9dfa918b1f5650416dcb3a41090c9983c/treecb1ad039282866900de3f241af7862cc3968faa2:35T/build41315775854 PASS, XPId045844d48f8792d64c0a4005c2dc6595af5d2e4f07baf0d2f5ce307c6dd8faf (769022bytes). [PR22](https://github.com/Neb963/PCMS/pull/22). Exact source parent/tree/files/ref verified remotely. Required T uses actual P29 immutable cuts, exact full snapshot equality, 20MiB+25 binary/history, direct module ZIP reopens, independent Python CRC/size/SHA/manifest/forced ZIP64, required credentials/auth/closure/schema/COMPLETE and adversarial unsafe/duplicate/encrypted/method/symlink/split/bounds/corruption/interruption/budget checks. Private chunk streams reject corrupt/missing chunks. Failed intermediate runs remain failed.
+P31 PR23 source6f566d7161831ae4b7c50d88d71c80875074aba6/tree3c4113b825751a777c41daecda6337bf77033e3f:35T/build+required B/DSK41318528062 PASS; XPI85848050d0d348f2dbe395571783983330b580c803d7abefa39d2565fe789761 (775640bytes), Firefox155.0/build20260817142839, normal sandbox6. [PR23](https://github.com/Neb963/PCMS/pull/23). Exact source parent/tree/files/ref verified remotely. Focused and installed jobs produced the same tested XPI hash.
 
-The packaged maintained zip.js2.24.0/noble-hashes2.4.0 codecs use native streams, exact lockfile integrities and packaged licenses under the existing CSP. Default ZIP64 is automatic; the bounded fixture explicitly forces real ZIP64 structures. Encoding and strict full readback grant no download, restore or live operational authority. Resource limits are explicit and failures leave the immutable cut/prior backup untouched.
+## Implemented bounded outcome
 
-P29 native/UI boundary is unchanged and reuses237T/S/B41311633995, source691261f3d233b30f7981819f6b8e7dda8b07b800, XPIa1b23ac73e122614a04a1b7f5283fcf6dd1b13041faf1db824946dd922ceb371; merged maind630a968f4ad54c1a4b9424536dddc2d7036f5d3/tree4d17e0399c61e5bedc0fa11688e54d7783df922e, post41312348086 PASS. No browser/download/restore evidence is claimed for P30, whose required tier is focused production-code T/build.
+Backup0.4 provides real Settings **Back up now**, safe relative destination with preserved draft, separate capture/encoding/staging/download/completion status, filename/bytes/last complete, Work links and Check export. Existing profiles require explicit compatible module update. The existing finite P29 capture and one Core EXPORT job compose the P30 codec and shared Downloads adapter. No alternate scheduler/controller.
+
+Private Core Blob writes hash incrementally and persist verified1MiB chunks with guarded durable staging; partial blobs cannot be read or referenced as complete. The file receipt/pin survives interruption. Stable captured timestamps make same-cut encoding deterministic for local-stage recovery. Downloads dispatch remains at the synchronous queue boundary; exact extension/profile/path/time/URL/ID readback holds ambiguous/missing effects without replay. Backup receives actual Downloads events and cold/alarm reconciliation independently of Journal.
+
+Archive/capture/quota/disk/ACK failures retain the cut, prior complete files and Pause/writer holds. Undispatched partial staging can be explicitly discarded; any possible download blocks that action. Manual receipts remain excluded from shared automatic retention. Scheduling/restore are later phases.
+
+## Verification
+
+35 focused T/build in41318528062: real cut→production codec→Blob/chunks→Downloads, exact bytes, Pause with Journal disabled, dedupe, guarded interrupted chunks, lost-ID/ACK/service restart, ambiguity/history loss, disk failure/last-good, removed cut/Disable and deterministic re-encoding. P30's ZIP corpus and P29 native capture evidence are reused with their original identities in memory; no broad historical rerun.
+
+Targeted B/DSK clicks actual Back up now. Python independently reopens production disk ZIP, CRCs and every manifest entry length/SHA/section, exact1,048,601-byte source/history binary, NUL/Unicode auth/credential/draft/cookie/donor data and all7/current+staged module ZIPs. Real process stop mid-Blob stage preserves the same job/filename/cut/pin; actual Check export finishes and independent disk reopen passes. Actual Downloads cancellation and blocked destination fail without last-good replacement/replay. Backup Disable, paused Journal-disabled exports, prior/manual/unrelated sentinels and no unexpected provider writes pass.
+
+Deliberately arbitrary byte-fidelity fixture tokens are correctly rejected by the independent identity server after restart. The fixture uses actual Sign in/Confirm with server-issued tokens before further captures; this does not qualify real login portability. Intermediate failed/cancelled runs remain failed/cancelled, not acceptance evidence.
 
 ## Next eligible work
 
-Merge the verified P30 lightweight PR and verify exact postmerge main/tree/CI. Then write P31's actual-repository implementation plan here before code. P31 connects the production codec to Core Downloads with real Settings Back up now, durable unique receipts/last-good preservation, exact recovery, Pause/Journal-disabled/Backup-Disable admission and targeted B/DSK independent production disk reopen. P32–P34 follow their dependencies; P36 remains independent.
+Merge verified P31 and verify exact postmerge main/tree/CI. Then write P32's actual-repository plan here before code: trusted-file validation/preview/one replacement confirmation, same-Core staged dataset, durable maintenance/previous cut, fresh logical container maps on same/fresh profile, donor service restore/rollback, runtime-authority invalidation and targeted interrupted B/DSK. P33 auth bootstrap/activation and P34 schedule follow dependencies; P36 remains independently eligible.
 
 ## Holds
 
-P19 remains genuinely held: accessible pinned Alpha app.saveGenerator has no qualified provider revision/precondition recipe; accepted Discovery ZIP cannot be extracted without the unavailable local runtime. SourceStamp/providerRevision:null is not CAS. P20–P27/P35/P37/P38 and descendants await that native contract. Local execution unavailable; GitHub exact leased checkpoints and Actions operate. No unavailable local check is claimed.
+P19: accessible pinned Alpha app.saveGenerator lacks a qualified provider revision/precondition recipe. Accepted Discovery ZIP cannot be extracted while local execution is unavailable; sourceStamp/providerRevision:null is not CAS. P20–P27/P35/P37/P38 and descendants wait. GitHub exact leased checkpoints and Actions work; no unavailable local check is claimed.
 
-H/G/P1–P5 NOT TESTED/unauthorized; P42–P49 require named disposable targets/effects. P48 qualifies real auth/login portability; P49 real fleet resources. Synthetic PASS is never operational route/login acceptance. Continue safely eligible work automatically.
+H/G/P1–P5 NOT TESTED/unauthorized; P42–P49 require named disposable resources/effects. P48 qualifies real login inventory/portability, P49 real fleet capacity. No operational/full-project readiness claim. Continue safely eligible phases automatically.
