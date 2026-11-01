@@ -1,7 +1,7 @@
 // Fixed packaged perchance-auth-1 bootstrap. Serialized into its private
 // USER_SCRIPT world by the trusted host, never supplied by archive code.
 export function restoreAuthBootstrap(request){
- const result=(ok,code=null,extra={})=>({ok,code,operationId:request?.operationId,nonce:request?.nonce,authHash:request?.authHash,...extra});
+ const result=(ok,code=null,extra={})=>{const receipt={ok,code,operationId:request?.operationId,nonce:request?.nonce,authHash:request?.authHash,...extra};if(location.origin==='https://perchance.org'&&location.href===request?.url&&window.top===window)globalThis.__PCMS_RESTORE_AUTH_1=receipt;return receipt;};
  if(window.top!==window||location.origin!=='https://perchance.org'||location.href!==request?.url)return result(false,'RESTORE_BOOTSTRAP_CONTEXT');
  const a=request.auth,plain=v=>v&&typeof v==='object'&&!Array.isArray(v),own=(v,k)=>Object.prototype.hasOwnProperty.call(v,k);
  if(!plain(a)||a.adapter!=='perchance-auth-1'||a.schema!==1||a.origin!==location.origin||typeof a.userPresent!=='boolean'||typeof a.guardPresent!=='boolean'||(a.guardPresent?typeof a.sessionTokenLastChangeTime!=='string':a.sessionTokenLastChangeTime!==null))return result(false,'RESTORE_AUTH_SCHEMA');
@@ -17,7 +17,7 @@ export function restoreAuthBootstrap(request){
   if(a.userPresent)base.user=JSON.parse(JSON.stringify(a.user));else delete base.user;
   localStorage.setItem('app-storage',JSON.stringify(base));
   if(a.guardPresent)localStorage.setItem('sessionTokenLastChangeTime',a.sessionTokenLastChangeTime);else localStorage.removeItem('sessionTokenLastChangeTime');
-  const receipt={operationId:request.operationId,nonce:request.nonce,authHash:request.authHash,appliedAt:Date.now()};
+  const receipt={ok:true,code:null,operationId:request.operationId,nonce:request.nonce,authHash:request.authHash,appliedAt:Date.now()};
   localStorage.setItem(marker,JSON.stringify(receipt));globalThis.__PCMS_RESTORE_AUTH_1=receipt;
   // The URL contains only a one-use random operation token, never a secret.
   // Remove it before ordinary site scripts initialize.

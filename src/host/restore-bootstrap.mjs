@@ -26,7 +26,7 @@ export function createRestoreBootstrap({api}){
  // Core has reconstructed a current validated target. No routing is changed.
  const gate=details=>{const result=bootstrapRequestTarget(gates.values(),details);if(!result.allowed)return {cancel:true};return result.gate?Promise.resolve(result.gate.admitted()).then(ok=>ok?{}:{cancel:true},()=>({cancel:true})):{};};
  api.webRequest.onBeforeRequest.addListener(gate,{urls:['<all_urls>']},['blocking']);
- async function registered(input){const target=restoreBootstrapTarget(input),scripts=await api.userScripts.getScripts({ids:[target.id]});if(!scripts.length)return {ok:false,code:'RESTORE_BOOTSTRAP_NOT_REGISTERED'};const expected=descriptor(input),actual=scripts[0];check(scripts.length===1&&actual.id===expected.id&&actual.worldId===expected.worldId&&actual.runAt==='document_start'&&actual.allFrames===false&&JSON.stringify(actual.matches)===JSON.stringify(expected.matches)&&JSON.stringify(actual.includeGlobs)===JSON.stringify(expected.includeGlobs)&&JSON.stringify(actual.js)===JSON.stringify(expected.js),'RESTORE_BOOTSTRAP_REGISTRATION_CHANGED');return {ok:true,...target};}
+ async function registered(input){const target=restoreBootstrapTarget(input),scripts=await api.userScripts.getScripts({ids:[target.id]});if(!scripts.length)return {ok:false,code:'RESTORE_BOOTSTRAP_NOT_REGISTERED'};const expected=descriptor(input),actual=scripts[0];check(scripts.length===1&&actual.id===expected.id&&actual.world==='USER_SCRIPT'&&actual.worldId===expected.worldId&&actual.runAt==='document_start'&&actual.allFrames===false&&JSON.stringify(actual.matches)===JSON.stringify(expected.matches)&&JSON.stringify(actual.includeGlobs)===JSON.stringify(expected.includeGlobs)&&JSON.stringify(actual.js)===JSON.stringify(expected.js),'RESTORE_BOOTSTRAP_REGISTRATION_CHANGED');return {ok:true,...target};}
  return {
   async arm(input,admitted){
    const target=restoreBootstrapTarget(input);check(typeof admitted==='function'&&await admitted(),'RESTORE_INTERRUPTED');
@@ -44,12 +44,13 @@ export function createRestoreBootstrap({api}){
    const rows=await api.userScripts.execute({target:{tabId:target.tabId,documentIds:[frame.documentId]},world:'USER_SCRIPT',worldId:target.worldId,js:[{code:'globalThis.__PCMS_RESTORE_AUTH_1 ?? null'}]});
    const receipt=rows?.length===1&&rows[0].documentId===frame.documentId?rows[0].result:null;
    if(!receipt)return {ok:false,code:'RESTORE_BOOTSTRAP_ORDER_UNVERIFIED'};
-   check(receipt.operationId===target.operationId&&receipt.nonce===target.nonce&&receipt.authHash===input.authHash&&Number.isFinite(receipt.appliedAt),'RESTORE_BOOTSTRAP_RECEIPT_CHANGED');
+   check(receipt.operationId===target.operationId&&receipt.nonce===target.nonce&&receipt.authHash===input.authHash&&(receipt.ok!==true||Number.isFinite(receipt.appliedAt)),'RESTORE_BOOTSTRAP_RECEIPT_CHANGED');
+   if(receipt.ok!==true)return {ok:false,code:receipt.code??'RESTORE_BOOTSTRAP_ORDER_UNVERIFIED'};
    return {ok:true,operationId:target.operationId,nonce:target.nonce,authHash:receipt.authHash,tabId:target.tabId,containerId:target.containerId,documentId:frame.documentId,appliedAt:receipt.appliedAt};
   },
   async remove(input){const target=restoreBootstrapTarget(input);await api.userScripts.unregister({ids:[target.id]});gates.delete(target.id);return {ok:true,operationId:target.operationId};},
   async stop(){const scripts=await api.userScripts.getScripts();const ids=scripts.filter(s=>s.id.startsWith(prefix)).map(s=>s.id);if(ids.length)await api.userScripts.unregister({ids});gates.clear();},
-  close(){gates.clear();api.webRequest.onBeforeRequest.removeListener(gate);}
+  async close(){gates.clear();const scripts=await api.userScripts.getScripts(),ids=scripts.filter(s=>s.id.startsWith(prefix)).map(s=>s.id);if(ids.length)await api.userScripts.unregister({ids});api.webRequest.onBeforeRequest.removeListener(gate);}
  };
 }
 export function restoreBootstrapFor(api){let instance=instances.get(api);if(!instance){instance=createRestoreBootstrap({api});instances.set(api,instance);}return instance;}
