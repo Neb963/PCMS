@@ -62,6 +62,7 @@ export async function build(output=path.join(ROOT,'build')) {
   const websitePath=path.join(stage,'host/website-scripts.mjs');
   const websiteCode=(await readFile(websitePath,'utf8')).replaceAll('../../vendor/personamonkey/extension/lib/','../lib/');
   await writeFile(websitePath,websiteCode);
+  const restorePath=path.join(stage,'host/restore-donor.mjs');await writeFile(restorePath,(await readFile(restorePath,'utf8')).replaceAll('../../vendor/personamonkey/extension/lib/','../lib/'));
   await writeBundledPackages(stage);
   await mkdir(path.join(stage,'licenses'),{recursive:true});
   await mkdir(path.join(stage,'codecs'),{recursive:true});
