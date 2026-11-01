@@ -33,3 +33,7 @@ Added private capture-scoped scoped-auth storage-event/document witnesses and co
 ## Finite capture integration checkpoint
 
 Backup0.3 adds explicit compatible capture capability and STAGE/CHECK/CUT/BLOBS turns on the same queue. Staged secrets stay in scoped credentials; observed witnesses must survive revalidation, and restart/loss/rotation is bounded or incomplete. The donor-locked cut includes all logical Core data plus donor/auth sections; every pinned blob is independently length/hash checked outside the barrier before completion. Previous completed cuts remain available, and disabled work settles only its own read effects. Settings UI/tests remain pending.
+
+## Focused capture verification checkpoint
+
+Added production Core-cut tests for exact drafts/credentials/source/history, old export-payload exclusion, configured-secret/package/reference/account failures and write usability after abort. Added finite full-capture T for private donor/auth sections, previous-good, bounded lost/rotating witnesses, donor post-cut invalidation and 50-participant S measurements while unrelated Core writes progress. These tests are written but not yet run.
