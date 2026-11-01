@@ -1,3 +1,4 @@
+P30 merged PR22 main9e5742e3fa1011a7b977ba9259b55f3729560086/treea8d36f0e3967ff2624fc86683598174cbd6a2d31; post41315969925 PASS. Current P31 plan on p31-manual-backup-export.
 P30 PR22 source4aa752e9dfa918b1f5650416dcb3a41090c9983c/treecb1ad039282866900de3f241af7862cc3968faa2:35T/build41315775854 PASS, XPId045844d48f8792d64c0a4005c2dc6595af5d2e4f07baf0d2f5ce307c6dd8faf (769022bytes). Required focused production codec complete; no disk/restore yet. Merge/postverify next, then P31. Maintained native-stream ZIP64+incremental SHA, exact full cut/binary/module validation; P29 native/UI evidence reused unchanged.
 
 # PCMS handoff memory
