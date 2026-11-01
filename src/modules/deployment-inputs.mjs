@@ -5,13 +5,14 @@ import {sourcePaths,lfsPointer} from '../core/source-set.mjs';
 
 // Immutable, verified input objects. This reader never changes a ref or uses a
 // mutable path download. Catalog revision is checked again by the caller.
-export function createDeploymentInputs({core,read=createGitReader()}){
+export function createDeploymentInputs({core,read=createGitReader({})}){
+ const cache=new Map();
  return async (g,{fresh=false}={})=>{
   const connection=(await core.view('git-catalog'))?.connection;
   check(connection?.repositoryId===g.repositoryId,'GIT_REPOSITORY_CHANGED');
   check(gitSha(g.folderTreeSha)&&gitSha(g.catalogHead),'GIT_INPUT_MAP_REQUIRED');
-  const token=await core.credentials.get('github:'+g.repositoryId),cache=new Map();
-  const object=async(kind,sha)=>{const key=kind+':'+sha;if(!cache.has(key)){
+  const token=await core.credentials.get('github:'+g.repositoryId);
+  const object=async(kind,sha)=>{const key=g.repositoryId+':'+kind+':'+sha;if(!cache.has(key)){
    const body=(await read({repository:connection.repository,token,path:'/git/'+kind+'/'+sha})).body;
    check(body?.sha===sha,'GIT_OBJECT_INVALID');cache.set(key,body);
   }return cache.get(key);};

@@ -23,11 +23,14 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
   const jobs=(await rows('jobs')).filter(j=>j.moduleId===id&&j.deployment);
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
+   const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);
+   if(same){if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
    let pinned;try{pinned=await inputs(g);}catch(error){await core.record({moduleId:id,targetId:g.id,step:'READ_READY_INPUTS',result:'HELD',code:error.code??publicError(error)});continue;}
    try{
     const prior=jobs.find(j=>j.targetId===g.id&&j.deployment.version===pinned.version);
     if(prior){
      if(prior.kind!==pinned.action||prior.deployment.inputHash!==pinned.inputHash){if(!terminal(prior))await hold(prior,'VERSION_REUSED');else if(g.deploymentCode!=='VERSION_REUSED')await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentCode:'VERSION_REUSED',deploymentState:'HELD'}}],event(prior,'REJECT_REUSED_VERSION','HELD'));}
+     else if(prior.deployment.lastCheckedFolderTreeSha!==g.folderTreeSha){await save(prior,{deployment:{...prior.deployment,lastCheckedFolderTreeSha:g.folderTreeSha}},'VERIFY_UNCHANGED_READY_INPUTS');}
      else if(!terminal(prior)&&prior.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN'].includes(prior.recovery?.code)&&prior.effect?.boundary!=='POSSIBLE')await core.queue.transition(prior.id,prior.rev,{state:'WAITING',dueAt:clock(),recovery:null});
      continue;
     }
@@ -35,7 +38,7 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
     if(active){if(hasEffects(active)){await hold(active,'NEW_READY_REQUIRES_RECONCILIATION');continue;}if(g.writerHold?.jobId===active.id)await core.queue.release(active.id,active.rev);const latest=await core.read('jobs',active.id);await save(latest,{state:'FAILED',recovery:{action:'OPEN_DEPLOYMENT',code:'READY_SUPERSEDED'},deployment:{...latest.deployment,phase:'SUPERSEDED'}},'SUPERSEDE_READY');}
     const j=await core.queue.enqueue({requestId:'ready-'+g.id+'-'+pinned.version,logicalKey:'deploy:'+g.id+':'+pinned.version,moduleId:id,targetId:g.id,kind:pinned.action,input:{version:pinned.version,action:pinned.action,commit:pinned.commit,inputHash:pinned.inputHash},refs:pinned.refs,dueAt:clock()+86400000});
     g=await core.read('generators',g.id);
-    await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:pinned.refs,value:{...j,step:'WAIT_CREATOR',dueAt:clock(),deployment:{schema:1,phase:'WAIT_CREATOR',version:pinned.version,inputHash:pinned.inputHash,inputManifest:pinned.manifestId,expectedInputs:pinned.expectedInputs,repositoryId:g.repositoryId,folder:g.folder,creatorJobId:g.creatorJobId??null,previousGood:null}}},{table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...pinned.refs])],value:{...g,deploymentJobId:j.id,deploymentState:'WAIT_CREATOR',deploymentCode:null}}],event(j,'INTAKE_READY','WAITING'));
+    await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:pinned.refs,value:{...j,step:'WAIT_CREATOR',dueAt:clock(),deployment:{schema:1,phase:'WAIT_CREATOR',version:pinned.version,inputHash:pinned.inputHash,inputManifest:pinned.manifestId,expectedInputs:pinned.expectedInputs,repositoryId:g.repositoryId,folder:g.folder,folderTreeSha:g.folderTreeSha,creatorJobId:g.creatorJobId??null,previousGood:null}}},{table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...pinned.refs])],value:{...g,deploymentJobId:j.id,deploymentState:'WAIT_CREATOR',deploymentCode:null}}],event(j,'INTAKE_READY','WAITING'));
    }finally{await core.releasePin(pinned.pinId);}
   }
  }
