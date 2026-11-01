@@ -1,4 +1,4 @@
-import {requireCore as check,publicError} from '../core/records.mjs';
+import {requireCore as check,publicError,sha256} from '../core/records.mjs';
 import {eligibleAccount} from './creator-allocation.mjs';
 import {compareSources} from '../core/source-set.mjs';
 const id='pcms-deployer',scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal,tabId:a.tabId});
@@ -37,7 +37,8 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
     }
     const active=jobs.find(j=>j.targetId===g.id&&!terminal(j));
     if(active){if(hasEffects(active)){await hold(active,'NEW_READY_REQUIRES_RECONCILIATION');continue;}if(g.writerHold?.jobId===active.id)await core.queue.release(active.id,active.rev);const latest=await core.read('jobs',active.id);await save(latest,{state:'FAILED',recovery:{action:'OPEN_DEPLOYMENT',code:'READY_SUPERSEDED'},deployment:{...latest.deployment,phase:'SUPERSEDED'}},'SUPERSEDE_READY');}
-    const j=await core.queue.enqueue({requestId:'ready-'+g.id+'-'+pinned.version,logicalKey:'deploy:'+g.id+':'+pinned.version,moduleId:id,targetId:g.id,kind:pinned.action,input:{version:pinned.version,action:pinned.action,commit:pinned.commit,inputHash:pinned.inputHash},refs:pinned.refs,dueAt:clock()+86400000});
+    const identity=await sha256(new TextEncoder().encode(JSON.stringify([g.repositoryId,g.id,pinned.version])));
+    const j=await core.queue.enqueue({requestId:'ready-'+identity,logicalKey:'deploy:'+identity,moduleId:id,targetId:g.id,kind:pinned.action,input:{version:pinned.version,action:pinned.action,commit:pinned.commit,inputHash:pinned.inputHash},refs:pinned.refs,dueAt:clock()+86400000});
     g=await core.read('generators',g.id);
     await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:pinned.refs,value:{...j,step:'WAIT_CREATOR',dueAt:clock(),deployment:{schema:1,phase:'WAIT_CREATOR',version:pinned.version,inputHash:pinned.inputHash,inputManifest:pinned.manifestId,expectedInputs:pinned.expectedInputs,repositoryId:g.repositoryId,folder:g.folder,folderTreeSha:g.folderTreeSha,creatorJobId:g.creatorJobId??null,previousGood:null}}},{table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...pinned.refs])],value:{...g,deploymentJobId:j.id,deploymentState:'WAIT_CREATOR',deploymentCode:null}}],event(j,'INTAKE_READY','WAITING'));
    }finally{await core.releasePin(pinned.pinId);}
