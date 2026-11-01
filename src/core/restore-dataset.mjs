@@ -57,6 +57,12 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
    const r=await root(s),c=await own(s,r,id,guard);check(Array.isArray(descriptors)&&descriptors.length<=200,'RESTORE_BATCH_INVALID');
    for(const d of descriptors){const key=[c.newDataset,d.blobId],b=await req(s('blobs').get(key));check(b&&!b.staging&&b.bytes===d.bytes,'RESTORE_REFERENCE_MISSING');for(const ref of d.refs){const child=await req(s('blobs').get([c.newDataset,ref]));check(child&&!child.staging,'RESTORE_REFERENCE_MISSING');}await req(s('blobs').put({...b,refs:[...d.refs]}));}
   }),
+  async cancelUnstarted(id,guard){
+   const result=await transact(['modules','jobs','events','pins'],'readwrite',async s=>{
+    const r=await root(s),c=await own(s,r,id,guard),j=await req(s('jobs').get([r.dataset,guard.jobId]));check(c.state==='DRAIN'&&!j.effect&&!(j.effects??[]).length,'RESTORE_CANCEL_DENIED');
+    delete r.restoreHold;await req(s('pins').delete([r.dataset,c.previousJournalPin]));await req(s('meta').put({...c,state:'CANCELLED',rev:c.rev+1,finishedAt:clock(),code:'RESTORE_CANCELLED_BEFORE_EFFECTS'}));await event(s,r,id,'RESTORE_CANCEL_UNSTARTED','COMPLETE');return {state:'CANCELLED'};
+   });await core.queue.releaseMaintenance(guard.jobId);return result;
+  },
   async rolledBack(id,guard){
    const result=await transact(['modules','jobs','events','pins','accounts','versions','blobs','chunks'],'readwrite',async s=>{
     const r=await root(s),c=await own(s,r,id,guard);check(c.state==='ROLLBACK_VERIFIED'&&c.rollback?.verified===true&&r.dataset===c.previousRoot.dataset,'RESTORE_ROLLBACK_UNVERIFIED');
