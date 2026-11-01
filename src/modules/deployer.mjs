@@ -3,6 +3,7 @@ import {eligibleAccount} from './creator-allocation.mjs';
 import {stageInstructions} from './develop-staging.mjs';
 import {compareSources} from '../core/source-set.mjs';
 const id='pcms-deployer',scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal,tabId:a.tabId});
+const sortedMap=m=>JSON.stringify(Object.fromEntries(Object.entries(m??{}).sort(([a],[b])=>a<b?-1:a>b?1:0)));
 const terminal=j=>['COMPLETE','FAILED'].includes(j.state);
 // Finite Deployer policy; one job retains every input, writer and effect. It
 // waits on Creator without owning the resource needed by that prerequisite.
@@ -17,10 +18,16 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
  async function validate(j,{fresh=true,allowCancelled=false}={}){
   check(allowCancelled||!j.deployment.cancelRequestedAt,'AI_CANCELLED');
   const g=await core.read('generators',j.targetId);check(g?.deploymentJobId===j.id&&g.repositoryId===j.deployment.repositoryId&&g.folder===j.deployment.folder,'DEPLOYMENT_TARGET_CHANGED');
+  if(j.accountId){const a=await core.read('accounts',j.accountId);check(eligibleAccount(a)&&g.accountId===a.id&&g.remoteId===j.input.remoteId&&a.expectedPrincipal===j.input.principalFingerprint&&a.personaUid===j.input.personaUid&&a.containerId===j.input.containerId&&a.routeId===j.input.routeId,'SOURCE_OWNER_CHANGED');}
   if(!fresh){check(g.folderPresent==='YES'&&g.markerStatus==='READY','READY_WITHDRAWN');check(g.markerVersion===j.deployment.version&&g.markerAction===j.kind,'READY_CHANGED');return g;}
-  const observed=await inputs(g,{fresh:true});try{check(observed.status==='READY','READY_WITHDRAWN');check(observed.version===j.deployment.version&&observed.action===j.kind,'READY_CHANGED');check(observed.inputHash===j.deployment.inputHash,'VERSION_REUSED');check(observed.manifestId===j.deployment.inputManifest,'PINNED_INPUT_CHANGED');}finally{await core.releasePin(observed.pinId);}return g;
+  const observed=await inputs(g,{fresh:true});try{check(observed.status==='READY','READY_WITHDRAWN');check(observed.version===j.deployment.version&&observed.action===j.kind,'READY_CHANGED');check(observed.inputHash===j.deployment.inputHash,'VERSION_REUSED');check(observed.manifestId===j.deployment.inputManifest,'PINNED_INPUT_CHANGED');if(j.deployment.gitSourceReceipt)check(sortedMap(observed.sourceMap)===sortedMap(j.deployment.gitSourceReceipt.sourceMap),'GIT_ACCEPTED_SOURCE_CHANGED');}finally{await core.releasePin(observed.pinId);}return g;
  }
  const hasEffects=j=>j.effect?.boundary==='POSSIBLE'||j.effects?.length>0||j.deployment?.acceptance||j.save;
+ async function resumeable(j,g){
+  const publicationEditorMissing=j.recovery?.code==='EDITOR_NOT_OPEN'&&j.deployment.phase==='PUBLISH'&&j.deployment.publicationEditorBootId!==(await core.queue.status()).bootId;
+  if(!publicationEditorMissing&&!['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING','PUBLICATION_PENDING','DEVELOP_STAGING_PENDING','SOURCE_OWNER_CHANGED','ACCOUNT_ROUTE_RECHECK_REQUIRED','SOURCE_CONTEXT_MISSING','ACCOUNT_LOGIN_TAB_MISSING'].includes(j.recovery?.code))return false;
+  if(!j.accountId)return true;const a=await core.read('accounts',j.accountId);return eligibleAccount(a)&&g.accountId===a.id&&g.remoteId===j.input.remoteId&&a.expectedPrincipal===j.input.principalFingerprint&&a.personaUid===j.input.personaUid&&a.containerId===j.input.containerId&&a.routeId===j.input.routeId;
+ }
  async function initialize(){
   const m=await module(),connection=(await core.view('git-catalog'))?.connection,status=await core.status();if(!enabled(m)||!connection||status.restoreHold)return;
   const jobs=(await rows('jobs')).filter(j=>j.moduleId===id&&j.deployment);
@@ -28,14 +35,14 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
    const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);
-   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING','PUBLICATION_PENDING','DEVELOP_STAGING_PENDING'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
+   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&await resumeable(same,g)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
    let pinned;try{pinned=await inputs(g);}catch(error){const code=error.code??publicError(error);if(g.deploymentCode!==code)await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentState:'HELD',deploymentCode:code}}],{moduleId:id,targetId:g.id,step:'READ_READY_INPUTS',result:'HELD',code});continue;}
    try{
     const prior=jobs.find(j=>j.targetId===g.id&&j.deployment.version===pinned.version);
     if(prior){
      if(prior.kind!==pinned.action||prior.deployment.inputHash!==pinned.inputHash){if(!terminal(prior))await hold(prior,'VERSION_REUSED');else if(g.deploymentCode!=='VERSION_REUSED')await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentCode:'VERSION_REUSED',deploymentState:'HELD'}}],event(prior,'REJECT_REUSED_VERSION','HELD'));}
      else if(prior.deployment.lastCheckedFolderTreeSha!==g.folderTreeSha){await save(prior,{deployment:{...prior.deployment,lastCheckedFolderTreeSha:g.folderTreeSha}},'VERIFY_UNCHANGED_READY_INPUTS');}
-     else if(!terminal(prior)&&prior.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING','PUBLICATION_PENDING','DEVELOP_STAGING_PENDING'].includes(prior.recovery?.code)&&prior.effect?.boundary!=='POSSIBLE')await core.queue.transition(prior.id,prior.rev,{state:'WAITING',dueAt:clock(),recovery:null});
+     else if(!terminal(prior)&&prior.state==='HELD'&&await resumeable(prior,g)&&prior.effect?.boundary!=='POSSIBLE')await core.queue.transition(prior.id,prior.rev,{state:'WAITING',dueAt:clock(),recovery:null});
      continue;
     }
     const active=jobs.find(j=>j.targetId===g.id&&!terminal(j));
@@ -43,7 +50,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
     const identity=await sha256(new TextEncoder().encode(JSON.stringify([g.repositoryId,g.id,pinned.version])));
     const j=await core.queue.enqueue({requestId:'ready-'+identity,logicalKey:'deploy:'+identity,moduleId:id,targetId:g.id,kind:pinned.action,input:{version:pinned.version,action:pinned.action,commit:pinned.commit,inputHash:pinned.inputHash},refs:pinned.refs,dueAt:clock()+86400000});
     g=await core.read('generators',g.id);
-    await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:pinned.refs,value:{...j,step:'WAIT_CREATOR',dueAt:clock(),deployment:{schema:1,phase:'WAIT_CREATOR',version:pinned.version,inputHash:pinned.inputHash,inputManifest:pinned.manifestId,expectedInputs:pinned.expectedInputs,repositoryId:g.repositoryId,folder:g.folder,folderTreeSha:g.folderTreeSha,creatorJobId:g.creatorJobId??null,previousGood:null}}},{table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...pinned.refs])],value:{...g,deploymentJobId:j.id,deploymentState:'WAIT_CREATOR',deploymentCode:null}}],event(j,'INTAKE_READY','WAITING'));
+    await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:pinned.refs,value:{...j,step:'WAIT_CREATOR',dueAt:clock(),deployment:{schema:1,phase:'WAIT_CREATOR',version:pinned.version,inputHash:pinned.inputHash,inputManifest:pinned.manifestId,expectedInputs:pinned.expectedInputs,gitSourceBefore:pinned.action==='DEVELOP'?pinned.sourceMap:null,repositoryId:g.repositoryId,folder:g.folder,folderTreeSha:g.folderTreeSha,creatorJobId:g.creatorJobId??null,previousGood:null}}},{table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...pinned.refs])],value:{...g,deploymentJobId:j.id,deploymentState:'WAIT_CREATOR',deploymentCode:null}}],event(j,'INTAKE_READY','WAITING'));
    }finally{await core.releasePin(pinned.pinId);}
   }
  }
@@ -126,7 +133,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
  }
  async function editorJob(message,sender){
   check(sender?.frameId===0&&sender.tab&&typeof sender.url==='string','EDITOR_SENDER_DENIED');
-  const matches=(await rows('jobs')).filter(j=>j.moduleId===id&&j.deployment?.ai?.tabId===sender.tab.id&&(!message.jobId||j.id===message.jobId));check(matches.length===1,'EDITOR_JOB_UNAVAILABLE');
+  const matches=(await rows('jobs')).filter(j=>j.moduleId===id&&!terminal(j)&&j.deployment?.ai?.tabId===sender.tab.id&&(!message.jobId||j.id===message.jobId));check(matches.length===1,'EDITOR_JOB_UNAVAILABLE');
   const j=matches[0],a=await aiBound(j,{write:false});check(sender.tab.cookieStoreId===a.containerId&&sender.url==='https://perchance.org/'+j.input.slug+'#edit','EDITOR_SENDER_DENIED');
   const o=await donor.aiInspect(scope(a),{...j.input,jobId:j.id,nonce:j.deployment.ai.nonce,operationId:j.deployment.ai.sendOperationId,expectedChatDigest:j.deployment.ai.chatDigest});
   check(o?.ok&&o.context.tabId===sender.tab.id&&o.context.witness===j.deployment.ai.witness&&o.context.document===j.deployment.ai.document,'EDITOR_DOCUMENT_CHANGED');return j;
@@ -162,13 +169,24 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
    }finally{if(current)await core.releasePin(current.pinId);}
   }
   check(j.deployment.phase==='SAVE_ACCEPTED','ACCEPTED_STATE_UNSUPPORTED');if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
-  j=await save(j,{state:'HELD',recovery:{action:'OPEN_DEPLOYMENT',code:'DEVELOP_GIT_SOURCE_PENDING'},deployment:{...j.deployment,phase:'ACCEPTED_SAVED',sourceReceipt:j.save.receipt}},'VERIFY_ACCEPTED_EDITOR_SOURCE',{deploymentState:'ACCEPTED_SAVED',deploymentCode:'DEVELOP_GIT_SOURCE_PENDING'});return output(j,'HELD','DEVELOP_GIT_SOURCE_PENDING');
+  j=await save(j,{state:'RUNNING',recovery:null,deployment:{...j.deployment,phase:'ACCEPTED_SAVED',sourceReceipt:j.save.receipt}},'VERIFY_ACCEPTED_EDITOR_SOURCE',{deploymentState:'ACCEPTED_SAVED',deploymentCode:'DEVELOP_GIT_SOURCE_PENDING'});return output(j,'CONTINUE');
  }
  async function continueRecovered(r,jobId){const latest=await core.read('jobs',jobId);if(latest.rev===r.jobRevision&&latest.state==='RUNNING'&&latest.effect?.boundary!=='POSSIBLE'&&['CONTINUE','WAITING'].includes(r.value.state)){const queued=await core.queue.transition(latest.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {...r,jobRevision:queued.rev};}return r;}
  async function effect(original,reconcile=false){let j=await core.read('jobs',original.id);check(j?.rev===original.rev&&j.deployment?.schema===1,'STALE_REVISION');
   try{
    if(['ACCEPTED','SAVE_ACCEPTED'].includes(j.deployment.phase))return await acceptedEffect(j,reconcile);
-   if(j.deployment.phase==='ACCEPTED_SAVED')return hold(j,'DEVELOP_GIT_SOURCE_PENDING');
+   if(j.deployment.phase==='ACCEPTED_SAVED'){
+    await validate(j);check(j.kind==='DEVELOP'&&j.deployment.acceptance?.manifestId===j.deployment.sourceReceipt?.candidateManifest,'ACCEPTANCE_SOURCE_MISMATCH');
+    let before=j.deployment.gitSourceBefore;if(!before){const g=await core.read('generators',j.targetId);before=(await inputs({...g,folderTreeSha:j.deployment.folderTreeSha,catalogHead:j.input.commit,markerSha:j.deployment.expectedInputs['DEPLOYMENT.md'],markerVersion:j.deployment.version,markerAction:'DEVELOP',markerStatus:'READY'},{sourceOnly:true})).sourceMap;}
+    const files=await core.verifySource(j.deployment.sourceReceipt.candidateManifest),affected=Object.fromEntries([...new Set([...Object.keys(before),...files.map(f=>f.path)])].map(path=>[path,before[path]??null]));
+    j=await save(j,{deployment:{...j.deployment,phase:'GIT_SOURCE',gitSourceBefore:before,gitSourceAffected:affected}},'PREPARE_ACCEPTED_GIT_SOURCE',{deploymentState:'GIT_SOURCE',deploymentCode:null});return output(j,'CONTINUE');
+   }
+   if(j.deployment.phase==='GIT_SOURCE'){
+    check(gitWriter,'GIT_WRITER_UNAVAILABLE');const request={kind:'SOURCE',slug:j.input.slug,folder:j.deployment.folder,version:j.deployment.version,action:'DEVELOP',sourceManifest:j.deployment.sourceReceipt.candidateManifest,ownedPaths:Object.keys(j.deployment.gitSourceBefore),expectedInputs:j.deployment.expectedInputs,expectedAffected:j.deployment.gitSourceAffected};
+    const r=await gitWriter.step(j,request,reconcile);j=await core.read('jobs',j.id);if(r.value.state!=='COMPLETE'){if(r.value.state==='HELD')return hold(j,r.value.code??'GIT_SOURCE_PENDING');return output(j,'CONTINUE');}
+    const sourceMap=Object.fromEntries(Object.entries(j.git.active.plan.source).map(([path,e])=>[path,e.sha])),doneInputs={...j.deployment.expectedInputs,...Object.fromEntries(Object.keys(j.deployment.gitSourceAffected).map(path=>[path,sourceMap[path]??null]))};
+    j=await save(j,{deployment:{...j.deployment,phase:'SAVED',gitSourceReceipt:{...r.value.receipt,sourceMap},doneInputs}},'VERIFY_ACCEPTED_GIT_SOURCE',{deploymentState:'SAVED_PUBLICATION_PENDING',deploymentCode:null});return output(j,'CONTINUE');
+   }
    if(['NEW_CHAT','SEND'].includes(j.deployment.phase))return await aiEffect(j,reconcile);
    if(['AI_UNKNOWN','WAIT_REVIEW'].includes(j.deployment.phase))return hold(j,j.deployment.readiness?.kind??'AI_REVIEW_REQUIRED');
    if(j.deployment.phase==='AI_RUNNING'){if((await core.queue.status()).bootId!==j.deployment.ai.bootId)return hold(j,'AI_INSPECTION_REQUIRED');if(j.deployment.cancelRequestedAt)return hold(j,'STOP_AI_IN_EDITOR');return hold(j,'AI_RUNNING_REVIEW_PENDING');}
@@ -246,7 +264,11 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
     }finally{await core.releasePin(baseline.pinId);}return output(j,'CONTINUE');
    }
    if(j.deployment.phase==='PUBLISH'){
-    if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
+    if(j.kind==='DEVELOP'&&['PREFLIGHT','SAVE'].includes(j.save.phase)&&j.effect?.boundary!=='POSSIBLE'&&j.deployment.publicationEditorBootId!==(await core.queue.status()).bootId){
+     const a=await aiBound(j),opened=await donor.openSourceEditor(scope(a),j.input);check(opened?.ok,opened?.code??'EDITOR_NOT_OPEN');j=await save(j,{save:{...j.save,code:null},deployment:{...j.deployment,publicationEditorBootId:(await core.queue.status()).bootId,publicationEditorRequestedAt:clock()}},'OPEN_VERIFIED_PUBLICATION_EDITOR',{deploymentState:'PUBLISH',deploymentCode:null,sourceSaveState:'WAITING',sourceSaveCode:null});return output(j,'WAITING');
+    }
+    if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);j=await core.read('jobs',j.id);if(r.value.state!=='COMPLETE'){if(j.effect?.boundary!=='POSSIBLE'&&clock()-(j.deployment.publicationEditorRequestedAt??0)<20000&&['EDITOR_NOT_OPEN','EDITOR_CONTRACT_UNVERIFIED','EDITOR_OBSERVATION_UNKNOWN'].includes(r.value.code))return output(j,'WAITING',r.value.code);return r.value.state==='HELD'?hold(j,r.value.code??'PUBLICATION_PENDING'):r;}}
+
     check(j.save.targetListing==='PUBLIC'&&j.save.receipt?.candidateManifest===j.deployment.sourceReceipt.candidateManifest,'PUBLICATION_RECEIPT_MISSING');
     j=await save(j,{deployment:{...j.deployment,phase:'POOL',publicationReceipt:j.save.receipt}},'VERIFY_PUBLICATION',{deploymentState:'PUBLIC_POOL_PENDING',deploymentCode:null});return output(j,'CONTINUE');
    }
@@ -266,10 +288,10 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
    return hold(j,'DEPLOYMENT_STATE_UNSUPPORTED');
   }catch(error){if(error.code==='STALE_REVISION')throw error;const latest=await core.read('jobs',j.id);if(latest.deployment.phase==='PREPARE'&&clock()-latest.deployment.editorRequestedAt<20000&&['EDITOR_NOT_OPEN','EDITOR_CONTRACT_UNVERIFIED','EDITOR_OBSERVATION_UNKNOWN','SOURCE_CONTEXT_MISSING'].includes(error.code))return output(latest,'WAITING',error.code);return hold(latest,error.code??publicError(error));}
  }
- return {validate,recover:()=>run(async()=>{for(const j of await rows('jobs'))if(j.moduleId===id&&j.deployment&&(j.effect?.boundary==='POSSIBLE'||j.save?.phase!=='COMPLETE'&&j.effect?.disposition==='APPLIED'))await continueRecovered(await effect(j,true),j.id);}),initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
-  async get(targetId){let g=await core.read('generators',targetId);check(g,'TARGET_MISSING');let j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;if(j?.deployment.readiness){j=await run(()=>revalidateReadiness(j));g=await core.read('generators',targetId);}return {paused:(await core.status()).paused,acceptanceId:j?.deployment.acceptance?.id??null,acceptedSourceHash:j?.deployment.acceptance?.sourceHash??null,acceptanceHistoryCount:j?.deployment.priorAcceptances?.length??0,readiness:j?.deployment.readiness?.kind??null,cancelRequested:!!j?.deployment.cancelRequestedAt,canReview:!!j?.deployment.ai&&!terminal(j),jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,conflictManifest:j?.deployment.conflict?.manifestId??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',publicationVerified:!!j?.deployment.publicationReceipt,poolMember:g.pool?.member===true,doneCommit:j?.deployment.doneReceipt?.commit??null,chatDigest:j?.deployment.ai?.chatDigest??null,possible:j?.effect?.boundary==='POSSIBLE'};},
+ return {validate,recover:()=>run(async()=>{for(const j of await rows('jobs'))if(j.moduleId===id&&j.deployment&&(j.effect?.boundary==='POSSIBLE'||j.save?.phase!=='COMPLETE'&&j.effect?.disposition==='APPLIED'))await continueRecovered(await effect(j,true),j.id);await initialize();}),initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
+  async get(targetId){let g=await core.read('generators',targetId);check(g,'TARGET_MISSING');let j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;if(j?.deployment.readiness){j=await run(()=>revalidateReadiness(j));g=await core.read('generators',targetId);}return {paused:(await core.status()).paused,acceptanceId:j?.deployment.acceptance?.id??null,acceptedSourceHash:j?.deployment.acceptance?.sourceHash??null,acceptanceHistoryCount:j?.deployment.priorAcceptances?.length??0,readiness:j?.deployment.readiness?.kind??null,cancelRequested:!!j?.deployment.cancelRequestedAt,canReview:!!j?.deployment.ai&&!terminal(j),jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,conflictManifest:j?.deployment.conflict?.manifestId??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',publicationVerified:!!j?.deployment.publicationReceipt,poolMember:g.pool?.member===true,sourceCommit:j?.deployment.gitSourceReceipt?.commit??null,doneCommit:j?.deployment.doneReceipt?.commit??null,chatDigest:j?.deployment.ai?.chatDigest??null,possible:j?.effect?.boundary==='POSSIBLE'};},
   editor:(message,sender)=>run(()=>editor(message,sender)),
   checkAi:args=>run(()=>checkAi(args)),reviewAi:args=>run(()=>reviewAi(args)),cancelAi:args=>run(()=>cancelAi(args)),
-  check:args=>run(async()=>{const g=await core.read('generators',args.id);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);if(j.deployment.phase==='DONE'&&j.effect?.boundary==='OBSERVED'&&j.effect.outcome==='FAILED')j=await gitWriter.retryRejected(j.id);check(!terminal(j),'JOB_FINISHED');if(j.effect?.boundary==='POSSIBLE')return (await continueRecovered(await effect(j,true),j.id)).value;if(j.deployment.ai){check(!j.deployment.cancelRequestedAt,'AI_CANCELLED');check(j.deployment.ai.bootId===(await core.queue.status()).bootId,'AI_INSPECTION_REQUIRED');if(j.effect?.disposition==='REJECTED'&&['NEW_CHAT','SEND'].includes(j.deployment.phase)){const key=j.deployment.phase==='NEW_CHAT'?'newChatOperationId':'sendOperationId';j=await save(j,{effect:null,deployment:{...j.deployment,ai:{...j.deployment.ai,[key]:crypto.randomUUID()}}},'RETRY_UNTOUCHED_AI_STEP');}}if(j.deployment.phase!=='DONE')await validate(j);await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {state:'WAITING'};})
+  check:args=>run(async()=>{const g=await core.read('generators',args.id);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);if(['DONE','GIT_SOURCE'].includes(j.deployment.phase)&&j.effect?.boundary==='OBSERVED'&&j.effect.outcome==='FAILED')j=await gitWriter.retryRejected(j.id);check(!terminal(j),'JOB_FINISHED');if(j.effect?.boundary==='POSSIBLE')return (await continueRecovered(await effect(j,true),j.id)).value;if(j.deployment.ai){check(!j.deployment.cancelRequestedAt,'AI_CANCELLED');if(['NEW_CHAT','SEND','AI_RUNNING','AI_UNKNOWN','WAIT_REVIEW'].includes(j.deployment.phase))check(j.deployment.ai.bootId===(await core.queue.status()).bootId,'AI_INSPECTION_REQUIRED');if(j.effect?.disposition==='REJECTED'&&['NEW_CHAT','SEND'].includes(j.deployment.phase)){const key=j.deployment.phase==='NEW_CHAT'?'newChatOperationId':'sendOperationId';j=await save(j,{effect:null,deployment:{...j.deployment,ai:{...j.deployment.ai,[key]:crypto.randomUUID()}}},'RETRY_UNTOUCHED_AI_STEP');}}if(j.deployment.phase!=='DONE')await validate(j);await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {state:'WAITING'};})
  };
 }

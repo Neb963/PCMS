@@ -53,12 +53,12 @@ jobs:
           fi
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - name: Verify packaged Finish and exact accepted source save (normal sandbox)
-        run: python3 tests/installed_develop_finish.py build/pcms-dev.xpi
+      - name: Verify full DEVELOP first version and update (normal sandbox)
+        run: python3 tests/installed_develop_complete.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-develop-finish-${{ github.event.pull_request.head.sha || github.sha }}
+          name: installed-develop-complete-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             test-results/
             build/identity.json
