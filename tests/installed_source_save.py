@@ -14,6 +14,10 @@ import account_fixture,signal,threading
 from git_write_https_fixture import GitWriteFixture
 from git_https_fixture import TOKEN
 NATIVE=(pathlib.Path(__file__).parent/'native_source_fixture.js').read_text()
+_base_dashboard=dashboard
+def dashboard(sid):
+ handle=_base_dashboard(sid);wait(lambda:script(sid,"return !!document.querySelector('nav a[href=\"#settings\"]')"),20);return handle
+
 
 class Provider(ReadProvider):
  def do_GET(self):
