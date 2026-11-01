@@ -46,7 +46,7 @@ class Provider(ReadProvider):
    if b.get('lastKnownSaveTime')!=f.version['time'] or b.get('lastKnownSaveCount')!=f.version['saveCount']:return self.send({'status':'stale',**f.version,'sourceRevision':hashlib.sha256(json.dumps(f.generator,sort_keys=True).encode()).hexdigest()})
    manifest=b['srcManifest'];assert isinstance(manifest,dict)
    for p,e in manifest.items():assert isinstance(p,str) and e['key'] in f.bytes and e['size']==len(f.bytes[e['key']])
-   f.assets=manifest;f.generator.update(isPrivate=b['generator']['isPrivate'],modelText=b['generator']['modelText'],outputTemplate=b['generator']['outputTemplate'],srcManifest=manifest);f.version={'time':f.version['time']+1,'saveCount':f.version['saveCount']+1};reply={'status':'saved',**f.version,'sourceRevision':hashlib.sha256(json.dumps(f.generator,sort_keys=True).encode()).hexdigest()};delay=f.delay_after_apply
+   f.assets=manifest;f.generator.update(isPrivate=b['generator']['isPrivate'],modelText=b['generator']['modelText'],outputTemplate=b['generator']['outputTemplate'],srcManifest=manifest);f.version={'time':f.version['time']+1,'saveCount':f.version['saveCount']+1};reply={'status':'saved',**f.version,'sourceRevision':hashlib.sha256(json.dumps(f.generator,sort_keys=True).encode()).hexdigest()};delay=f.delay_after_apply and len(f.save_requests)>=getattr(f,'delay_save_number',1)
    if delay:f.applied.set()
   if delay:f.release_ack.wait(40)
   try:return self.send(reply)
