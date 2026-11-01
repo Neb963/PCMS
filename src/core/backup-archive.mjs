@@ -33,7 +33,7 @@ export async function encodeBackup(input,{receipt,readBlob,budget,signal=null,fo
   stopped(signal);need(entries.length+2<b.entries,'ARCHIVE_BUDGET_EXCEEDED');
   const meter=metered(stream,{signal,max:Math.min(b.entryBytes,b.totalBytes-total),onChunk(bytes){total+=bytes.length;if(!binary)metadata+=bytes.length;need(total<=b.totalBytes&&metadata<=b.metadataBytes,'ARCHIVE_BUDGET_EXCEEDED');}});
   try{
-   await writer.add(path,meter.stream,{...options,level:store?0:6,...(forceZip64?{zip64:true}:{}),signal,...expected?{uncompressedSize:expected.bytes}:{}});
+   await writer.add(path,meter.stream,{...options,lastModDate:new Date(data.createdAt),extendedTimestamp:false,level:store?0:6,...(forceZip64?{zip64:true}:{}),signal,...expected?{uncompressedSize:expected.bytes}:{}});
    const descriptor={path,...meter.result(),schema:1,result:'COMPLETE'};need(!expected||descriptor.bytes===expected.bytes&&descriptor.sha256===expected.sha256,'ARCHIVE_BLOB_MISMATCH');entries.push(descriptor);return descriptor;
   }finally{meter.destroy();}
  }

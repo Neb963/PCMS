@@ -1,3 +1,4 @@
+import {digestStream} from './stream-hash.mjs';
 import {requireCore as check,sha256} from './records.mjs';
 export function exportFolder(value){
  check(typeof value==='string'&&value.startsWith('PCMS/')&&!value.endsWith('/')&&value.split('/').every(p=>p&&p!=='.'&&p!=='..'&&!/^[.]|[. ]$|[\\\u0000-\u001f:*?"<>|]/.test(p)),'EXPORT_DESTINATION_INVALID');return value;
@@ -24,11 +25,26 @@ export function createDownloads({core,api,profileId,clock=Date.now,urls=URL}){
    try{await core.mutate([{table:'files',id,value:row,refs:[payloadId]}],{step:'PREPARE_EXPORT',result:'COMPLETE',moduleId,operationId:id});}finally{await core.releasePin(pin);}
    return {receipt:await core.read('files',id),bytes:new Uint8Array(bytes)};
   },
+  async prepareBlob({id,jobId,moduleId,type,automatic,folder,blob,metadata={},guard=null,signal=null}){
+   check(type==='backup'&&moduleId==='pcms-backup','EXPORT_SCOPE_DENIED');exportFolder(folder);check(typeof id==='string'&&/^[a-zA-Z0-9-]+$/.test(id)&&blob instanceof Blob,'INVALID_EXPORT');
+   const digest=await digestStream(blob.stream(),{signal}),pin='export-'+id;let row=await core.read('files',id);
+   if(row)check(row.sha256===digest.sha256&&row.bytes===digest.bytes&&row.moduleId===moduleId&&row.profileId===profileId,'EXPORT_ID_CONFLICT');
+   else{
+    const stamp=new Date(clock()).toISOString().replaceAll(':','-'),value={captureId:id,jobId,moduleId,type,automatic:automatic===true,profileId,filename:folder+'/'+(automatic?'auto-':'manual-')+stamp+'-'+id+'.pcms.zip',bytes:digest.bytes,sha256:digest.sha256,payloadId:digest.sha256,state:'STAGING',preparedAt:clock(),metadata};
+    await core.mutate([{table:'files',id,value,refs:[]}],{step:'STAGE_EXPORT',result:'WAITING',moduleId,operationId:id},null,guard);row=await core.read('files',id);
+   }
+   if(row.state==='STAGING'){
+    const payloadId=await core.putBlob(blob,{pinId:pin,guard,signal,expected:digest});
+    await core.mutate([{table:'files',id,expectedRev:row.rev,value:{...row,state:'PREPARED',payloadId},refs:[payloadId]}],{step:'PREPARE_EXPORT',result:'COMPLETE',moduleId,operationId:id},null,guard);await core.releasePin(pin);row=await core.read('files',id);
+   }else check(row.state==='PREPARED','EXPORT_ALREADY_DISPATCHED');
+   return {receipt:row,blob};
+  },
+  async prepared(id){const receipt=await core.read('files',id);check(receipt?.state==='PREPARED'&&receipt.profileId===profileId,'EXPORT_NOT_PREPARED');const blob=await core.readBlob(receipt.payloadId);check(blob.size===receipt.bytes,'EXPORT_BYTES_MISMATCH');return {receipt,blob};},
   // Call synchronously at the queue's final dispatch boundary. All preparation
   // and durable intent precede this call; there is no await before download().
   start(prepared){
    const r=prepared.receipt;check(r.state==='PREPARED'&&r.profileId===profileId&&!live.has(r.id),'EXPORT_ALREADY_DISPATCHED');
-   const sourceUrl=urls.createObjectURL(new Blob([prepared.bytes],{type:'application/zip'}));live.set(r.id,sourceUrl);
+   const sourceUrl=urls.createObjectURL(prepared.blob??new Blob([prepared.bytes],{type:'application/zip'}));live.set(r.id,sourceUrl);
    let sent,didStart=false;try{sent=api.downloads.download({url:sourceUrl,filename:r.filename,saveAs:false,conflictAction:'uniquify'});}catch(error){sent=Promise.reject(error);}
    return Promise.resolve(sent).then(downloadId=>{didStart=true;return serial(r.id,async()=>{const current=await core.read('files',r.id);check(Number.isSafeInteger(downloadId),'EXPORT_ID_UNKNOWN');return save(current,{downloadId,sourceUrl,state:'IN_PROGRESS'},'IN_PROGRESS');});}).catch(async error=>{
     // API rejection does not silently authorize retry of an uncertain request.

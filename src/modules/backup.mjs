@@ -1,9 +1,10 @@
 import {requireCore as check,publicError,sha256} from '../core/records.mjs';
+import {createBackupExport} from './backup-export.mjs';
 import {createBackupCapture} from './backup-capture.mjs';
 import {checkedSession} from './backup-session.mjs';
-// Coverage collection only; archive/export/restore belong to later phases.
-export function createBackup({core,donor,clock=Date.now}){
- const capture=createBackupCapture({core,donor,clock});
+// Backup policy composes the existing capture, queue and Core Downloads.
+export function createBackup({core,donor,downloads=null,clock=Date.now}){
+ const capture=createBackupCapture({core,donor,clock}),exports=createBackupExport({core,capture,downloads,clock});
  const id='pcms-backup';let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
  const module=()=>core.read('modules',id),capable=m=>m?.packageClass==='bundled-backup'&&m.manifest?.capabilities?.includes('backup.capture'),enabled=m=>capable(m)&&m.enabled&&!m.lifecycle;
  const scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal,tabId:a.tabId});
@@ -61,8 +62,8 @@ export function createBackup({core,donor,clock=Date.now}){
   await save(j,{...i,cursor:i.cursor+1,attempt:0,results:[...i.results,{...receipt,label:p.label}]},[],receipt.capsuleId?a:null);
   return output(j,'CONTINUE');
  }
- return {initialize:setup,enqueue:args=>run(()=>enqueue(args)),capture:args=>run(()=>capture.enqueue(args)),checkCapture:args=>run(()=>capture.check(args)),inspectCapture:args=>run(()=>capture.inspect(args)),effect:(j,r)=>run(()=>j.input.coverageOnly===false?capture.effect(j,r):effect(j,r)),
-  async status(){const m=await setup(),all=(await rows('jobs')).filter(j=>j.moduleId===id&&j.kind==='CAPTURE'&&j.input.coverageOnly===true).sort((a,b)=>b.createdAt-a.createdAt);for(const j of all)if(j.capture){for(const r of j.capture.results)if(r.state==='CAPTURED'&&!await core.credentials.get(r.capsuleId)){r.state='INCOMPLETE';r.code='BACKUP_SESSION_REMOVED';j.capture.state='INCOMPLETE';}}const j=all[0]??null,good=all.find(j=>j.capture?.state==='COMPLETE');return {available:capable(m),enabled:enabled(m),coverage:summarize(j),lastGood:good&&good.id!==j?.id?summarize(good,true):null,capture:await capture.status(),adapter:'perchance-auth-1',liveLoginQualified:false};},
-  recover:()=>run(async()=>{const m=await module();if(enabled(m))return;await capture.recover();for(let j of await rows('jobs'))if(j.moduleId===id&&j.kind==='CAPTURE'&&j.effect?.boundary==='POSSIBLE'&&j.effect.kind==='BACKUP_SESSION_READ'){await core.queue.reconcile(j.id,j.rev,j.effect.operationId,{matched:true,operationId:j.effect.operationId});j=await core.read('jobs',j.id);await core.queue.transition(j.id,j.rev,{state:'HELD',recovery:{action:'OPEN_BACKUP',code:'BACKUP_READ_INTERRUPTED'}});}})
+ return {initialize:async()=>{await setup();return exports.initialize();},export:args=>run(()=>exports.enqueue(args)),exportSettings:args=>run(()=>exports.settings(args)),checkExport:args=>run(()=>exports.check(args)),discardExport:args=>run(()=>exports.discard(args)),changed:()=>run(()=>exports.changed()),enqueue:args=>run(()=>enqueue(args)),capture:args=>run(()=>capture.enqueue(args)),checkCapture:args=>run(()=>capture.check(args)),inspectCapture:args=>run(()=>capture.inspect(args)),effect:(j,r)=>run(()=>j.kind==='EXPORT'?exports.effect(j,r):j.input.coverageOnly===false?capture.effect(j,r):effect(j,r)),
+  async status(){const m=await setup(),all=(await rows('jobs')).filter(j=>j.moduleId===id&&j.kind==='CAPTURE'&&j.input.coverageOnly===true).sort((a,b)=>b.createdAt-a.createdAt);for(const j of all)if(j.capture){for(const r of j.capture.results)if(r.state==='CAPTURED'&&!await core.credentials.get(r.capsuleId)){r.state='INCOMPLETE';r.code='BACKUP_SESSION_REMOVED';j.capture.state='INCOMPLETE';}}const j=all[0]??null,good=all.find(j=>j.capture?.state==='COMPLETE');return {available:capable(m),enabled:enabled(m),coverage:summarize(j),lastGood:good&&good.id!==j?.id?summarize(good,true):null,capture:await capture.status(),export:await exports.status(),adapter:'perchance-auth-1',liveLoginQualified:false};},
+  recover:()=>run(async()=>{await exports.changed();const m=await module();if(enabled(m))return;await capture.recover();for(let j of await rows('jobs'))if(j.moduleId===id&&j.kind==='CAPTURE'&&j.effect?.boundary==='POSSIBLE'&&j.effect.kind==='BACKUP_SESSION_READ'){await core.queue.reconcile(j.id,j.rev,j.effect.operationId,{matched:true,operationId:j.effect.operationId});j=await core.read('jobs',j.id);await core.queue.transition(j.id,j.rev,{state:'HELD',recovery:{action:'OPEN_BACKUP',code:'BACKUP_READ_INTERRUPTED'}});}})
  };
 }

@@ -1,3 +1,4 @@
+import {attachBlobWrite} from './blob-write.mjs';
 import {attachBlobStream} from './blob-stream.mjs';
 import {attachCaptureCut} from './capture-cut.mjs';
 import {createQueue} from './queue.mjs';
@@ -96,7 +97,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     requireCore(Array.isArray(refs)&&refs.every(hash),'INVALID_REFERENCE');
     const closure=new Set(),pending=[...refs];
     while(pending.length){const blobId=pending.pop();if(closure.has(blobId))continue;requireCore(hash(blobId),'INVALID_REFERENCE');closure.add(blobId);
-      const blob=await req(s('blobs').get([r.dataset,blobId]));requireCore(blob,'MISSING_BLOB');
+      const blob=await req(s('blobs').get([r.dataset,blobId]));requireCore(blob,'MISSING_BLOB');requireCore(!blob.staging,'BLOB_STAGE_INCOMPLETE');
       for(let i=0;i<blob.chunks;i++)requireCore(await req(s('chunks').get([r.dataset,blobId,i])),'MISSING_CHUNK');
       pending.push(...(blob.refs??[]));
     }
@@ -243,6 +244,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }
   };
   attachBlobs(core,transact,root,checkedRefs,append,clock);
+  attachBlobWrite(core,{transact,root,req,check:requireCore,assertGuard,append,clock});
   attachBlobStream(core,{transact,root,req,check:requireCore});
   attachCaptureCut(core,{transact,root,checkedRefs,append,req,check:requireCore,clock,assertGuard,tables:TABLES,stores:STORES});
   // A fixed privileged data boundary, never exposed to ZIP/dashboard RPC.
@@ -269,14 +271,14 @@ function attachBlobs(core,transact,root,checkedRefs,append,clock) {
     return transact(['blobs','chunks','events','pins'],'readwrite',async s=>{
       const r=await root(s),key=[r.dataset,blobId];
       if(pinId){const pinKey=[r.dataset,pinId],old=await req(s('pins').get(pinKey));await req(s('pins').put({...old,key:pinKey,refs:[...new Set([...(old?.refs??[]),blobId])]}));}
-      if(await req(s('blobs').get(key))){if(pinId){await append(s,r,{step:'PIN_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}return blobId;}
+      const prior=await req(s('blobs').get(key));requireCore(!prior?.staging,'BLOB_STAGE_INCOMPLETE');if(prior){if(pinId){await append(s,r,{step:'PIN_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}return blobId;}
       const chunkSize=1024*1024,chunks=Math.ceil(bytes.length/chunkSize);
       for(let i=0;i<chunks;i++)await req(s('chunks').add({key:[r.dataset,blobId,i],bytes:bytes.slice(i*chunkSize,(i+1)*chunkSize)}));
       await req(s('blobs').add({key,dataset:r.dataset,blobId,bytes:bytes.length,chunks,refs}));await append(s,r,{step:'STORE_BLOB',result:'COMPLETE',evidence:[blobId]});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return blobId;
     });
   };
   core.bytes=blobId=>transact(['blobs','chunks'],'readonly',async s=>{
-    requireCore(hash(blobId),'INVALID_REFERENCE');const r=await root(s),row=await req(s('blobs').get([r.dataset,blobId]));requireCore(row,'MISSING_BLOB');
+    requireCore(hash(blobId),'INVALID_REFERENCE');const r=await root(s),row=await req(s('blobs').get([r.dataset,blobId]));requireCore(row,'MISSING_BLOB');requireCore(!row.staging,'BLOB_STAGE_INCOMPLETE');
     const out=new Uint8Array(row.bytes);let offset=0;
     for(let i=0;i<row.chunks;i++){const chunk=await req(s('chunks').get([r.dataset,blobId,i]));requireCore(chunk&&ArrayBuffer.isView(chunk.bytes)&&Object.prototype.toString.call(chunk.bytes)==='[object Uint8Array]','MISSING_CHUNK');out.set(chunk.bytes,offset);offset+=chunk.bytes.length;}
     requireCore(offset===row.bytes,'BLOB_LENGTH_MISMATCH');return out;

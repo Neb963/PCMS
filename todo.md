@@ -19,3 +19,7 @@ P30 [PR22](https://github.com/Neb963/PCMS/pull/22) merged main9e5742e3fa1011a7b9
 P19 remains held by missing qualified native revision/precondition evidence; source fingerprints are not CAS. P20–P27/P35/P37/P38 and descendants wait. Accepted Discovery ZIP cannot be extracted while local runtime is unavailable; GitHub/Actions operate. No historical investigation or unauthorized live provider operation is repeated.
 
 H/G/P1–P5 NOT TESTED/unauthorized, P42–P49 require named disposable effects. Production archive byte portability does not prove login/route/fleet readiness. No P31 disk evidence exists yet.
+
+## Storage and export checkpoint
+
+Implemented private verified Blob→existing1MiB chunk staging with durable partial metadata/pin and guarded writes; incomplete blobs cannot be read/referenced as complete. Core Downloads gains Blob preparation/readback while preserving Journal/Discover byte API. Backup0.4 adds explicit typed export capability, one EXPORT job joins the existing full capture, production codec/Downloads final dispatch and same-ID readback; partial local stages can be explicitly discarded only before any possible download. Added separate export status/settings/recovery; no schedule/restore added. UI and focused/B/DSK evidence are still pending. No completion claim.
