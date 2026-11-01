@@ -22,8 +22,8 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci --ignore-scripts
-      - run: node --test tests/restore-dataset.test.mjs tests/queue.test.mjs tests/blob-write.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - run: npm run build
+      - run: node --test tests/restore-dataset.test.mjs tests/restore-donor.test.mjs tests/queue.test.mjs tests/blob-write.test.mjs tests/seed.test.mjs tests/packages.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}

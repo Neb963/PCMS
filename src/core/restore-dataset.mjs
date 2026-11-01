@@ -54,8 +54,9 @@ export function attachRestoreDataset(core,{transact,root,req,check,assertGuard,a
    for(const d of descriptors){const key=[c.newDataset,d.blobId],b=await req(s('blobs').get(key));check(b&&!b.staging&&b.bytes===d.bytes,'RESTORE_REFERENCE_MISSING');for(const ref of d.refs){const child=await req(s('blobs').get([c.newDataset,ref]));check(child&&!child.staging,'RESTORE_REFERENCE_MISSING');}await req(s('blobs').put({...b,refs:[...d.refs]}));}
   }),
   async rolledBack(id,guard){
-   const result=await transact(['modules','jobs','events','pins'],'readwrite',async s=>{
+   const result=await transact(['modules','jobs','events','pins','accounts','versions','blobs','chunks'],'readwrite',async s=>{
     const r=await root(s),c=await own(s,r,id,guard);check(c.state==='ROLLBACK_VERIFIED'&&c.rollback?.verified===true&&r.dataset===c.previousRoot.dataset,'RESTORE_ROLLBACK_UNVERIFIED');
+    const accounts=await req(s('accounts').index('dataset').getAll(IDBKeyRange.only(r.dataset))),changes=accounts.filter(a=>a.state==='READY').map(a=>({table:'accounts',id:a.id,expectedRev:a.rev,refs:a.refs,value:{...a,state:'HELD',holdCode:'RESTORE_ROLLBACK_ROUTE_RECHECK',routeObservedAt:null,identityObservedAt:null}}));if(changes.length)await writeRows(s,r,changes,{moduleId:'pcms-backup',targetId:id,step:'RESTORE_ROLLBACK_ACCOUNT_RECHECK',result:'HELD'});
     delete r.restoreHold;await req(s('pins').delete([r.dataset,c.previousJournalPin]));await req(s('meta').put({...c,state:'ROLLED_BACK',rev:c.rev+1,finishedAt:clock()}));await event(s,r,id,'RESTORE_ROLLED_BACK','COMPLETE');return {state:'ROLLED_BACK',dataset:r.dataset};
    });await core.queue.releaseMaintenance(guard.jobId);return result;
   },
