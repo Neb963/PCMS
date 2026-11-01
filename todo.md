@@ -15,4 +15,4 @@ Base is actual main a17cb4d; branch p21-pinned-deploy-source. Preserve P20 and P
 - Add focused production T for exact pinned bytes, relevant Git/source drift, dirty editors, Pause, stale revision, lost ACK and cold recovery. Extend only the affected installed B journey: actual Git intake → protected native full-source save, dashboard closed, process death after application, exact independent bytes/counts and no other-generator/Git writes.
 - Push meaningful checkpoints; merge after required T/B, verify postmerge main and automatically proceed to P22. G/P2 remain deferred to P43/P45, NOT TESTED/unauthorized.
 
-Implementation not started. P21 T/B NOT TESTED. No live provider effect is authorized.
+Same-job pinned-source continuation and contextual Saved — publication pending UI implemented. Focused T and targeted installed B are in progress. CI retains the same two jobs/triggers and replaces only the affected journey with installed_deploy_source.py; local Firefox remains unavailable. No live provider effect is authorized.

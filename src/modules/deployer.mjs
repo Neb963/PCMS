@@ -25,14 +25,14 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
    const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);
-   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
+   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING'].includes(same.recovery?.code)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
    let pinned;try{pinned=await inputs(g);}catch(error){const code=error.code??publicError(error);if(g.deploymentCode!==code)await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentState:'HELD',deploymentCode:code}}],{moduleId:id,targetId:g.id,step:'READ_READY_INPUTS',result:'HELD',code});continue;}
    try{
     const prior=jobs.find(j=>j.targetId===g.id&&j.deployment.version===pinned.version);
     if(prior){
      if(prior.kind!==pinned.action||prior.deployment.inputHash!==pinned.inputHash){if(!terminal(prior))await hold(prior,'VERSION_REUSED');else if(g.deploymentCode!=='VERSION_REUSED')await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentCode:'VERSION_REUSED',deploymentState:'HELD'}}],event(prior,'REJECT_REUSED_VERSION','HELD'));}
      else if(prior.deployment.lastCheckedFolderTreeSha!==g.folderTreeSha){await save(prior,{deployment:{...prior.deployment,lastCheckedFolderTreeSha:g.folderTreeSha}},'VERIFY_UNCHANGED_READY_INPUTS');}
-     else if(!terminal(prior)&&prior.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN'].includes(prior.recovery?.code)&&prior.effect?.boundary!=='POSSIBLE')await core.queue.transition(prior.id,prior.rev,{state:'WAITING',dueAt:clock(),recovery:null});
+     else if(!terminal(prior)&&prior.state==='HELD'&&['RESTART_RECHECK','WAIT_CREATOR','CREATOR_OUTCOME_UNKNOWN','DEPLOY_SOURCE_PENDING'].includes(prior.recovery?.code)&&prior.effect?.boundary!=='POSSIBLE')await core.queue.transition(prior.id,prior.rev,{state:'WAITING',dueAt:clock(),recovery:null});
      continue;
     }
     const active=jobs.find(j=>j.targetId===g.id&&!terminal(j));
@@ -73,12 +73,26 @@ export function createDeployer({core,donor,inputs,writer,clock=Date.now}){
     if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
     j=await save(j,{deployment:{...j.deployment,phase:'PREPARED',unlistReceipt:j.save.receipt}},'VERIFY_UNLIST_BEFORE_EDIT',{deploymentState:'PREPARED',deploymentCode:null});return output(j,'CONTINUE');
    }
-   if(j.deployment.phase==='PREPARED')return hold(j,j.kind==='DEPLOY'?'DEPLOY_SOURCE_PENDING':'DEVELOP_STAGING_PENDING');
+   if(j.deployment.phase==='PREPARED'){
+    if(j.kind==='DEVELOP')return hold(j,'DEVELOP_STAGING_PENDING');
+    const baseline=await writer.capture(j);try{
+     if(baseline.manifestId!==g.sourceManifest||baseline.sourceStamp!==g.sourceStamp||baseline.listing!=='UNLISTED'){
+      j=await save(j,{deployment:{...j.deployment,conflict:baseline}},'RETAIN_DEPLOYMENT_SOURCE_CONFLICT',null,baseline.refs);check(false,'SOURCE_REMOTE_CONFLICT');
+     }
+     j=await writer.prepareJob(j,{candidateManifest:j.deployment.inputManifest,baseline});
+     j=await save(j,{deployment:{...j.deployment,phase:'DEPLOY_SAVE'}},'PREPARE_PINNED_DEPLOY_SOURCE',{deploymentState:'DEPLOY_SAVE',deploymentCode:null});
+    }finally{await core.releasePin(baseline.pinId);}return output(j,'CONTINUE');
+   }
+   if(j.deployment.phase==='DEPLOY_SAVE'){
+    if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
+    j=await save(j,{deployment:{...j.deployment,phase:'SAVED',sourceReceipt:j.save.receipt}},'VERIFY_PINNED_DEPLOY_SOURCE',{deploymentState:'SAVED_PUBLICATION_PENDING',deploymentCode:null});return output(j,'CONTINUE');
+   }
+   if(j.deployment.phase==='SAVED')return hold(j,'PUBLICATION_PENDING');
    return hold(j,'DEPLOYMENT_STATE_UNSUPPORTED');
   }catch(error){if(error.code==='STALE_REVISION')throw error;const latest=await core.read('jobs',j.id);if(latest.deployment.phase==='PREPARE'&&clock()-latest.deployment.editorRequestedAt<20000&&['EDITOR_NOT_OPEN','EDITOR_CONTRACT_UNVERIFIED','EDITOR_OBSERVATION_UNKNOWN','SOURCE_CONTEXT_MISSING'].includes(error.code))return output(latest,'WAITING',error.code);return hold(latest,error.code??publicError(error));}
  }
  return {validate,recover:()=>run(async()=>{for(const j of await rows('jobs'))if(j.moduleId===id&&j.deployment&&j.save?.phase!=='COMPLETE'&&(j.effect?.boundary==='POSSIBLE'||j.effect?.disposition==='APPLIED'))await effect(j,true);}),initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
-  async get(targetId){const g=await core.read('generators',targetId);check(g,'TARGET_MISSING');const j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;return {jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',possible:j?.effect?.boundary==='POSSIBLE'};},
+  async get(targetId){const g=await core.read('generators',targetId);check(g,'TARGET_MISSING');const j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;return {jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,conflictManifest:j?.deployment.conflict?.manifestId??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',possible:j?.effect?.boundary==='POSSIBLE'};},
   check:args=>run(async()=>{const g=await core.read('generators',args.id);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);check(!terminal(j),'JOB_FINISHED');if(j.effect?.boundary==='POSSIBLE')return effect(j,true);await validate(j);await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {state:'WAITING'};})
  };
 }
