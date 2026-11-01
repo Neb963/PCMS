@@ -22,3 +22,5 @@ P16 code is not yet written. Next implement atomic local ownership/reservation p
 The runtime is restored at `/workspace/scratch/a60548e2a34d/PCMS`; clean checkout matches verified main. Dependencies installed with npm ci --ignore-scripts. P13–P15 evidence remains its original GitHub CI identity; no unavailable historical local command is claimed run.
 
 H/G/P1–P5 remain NOT TESTED and unauthorized. P44 separately qualifies current provider ownership/adoption contracts. P42–P49 need explicit disposable external resources/effects; all current provider/native tests use isolated local fixtures.
+
+Atomic allocation/adoption checkpoint: a narrow Core transaction supplies current accounts/generators/job/module/repository to synchronous Creator policy. Reservations minimize confirmed ownership plus pending allocations, retain archived reservations and reject stale/dispatched/disabled overrides. Adoption binds exact principal/ID/slug and preserves source references. Five focused local tests PASS, including concurrent balancing, reopen/idempotent override/races, source preservation and conflicts; provider adapter/UI/required final T/B remain OPEN.
