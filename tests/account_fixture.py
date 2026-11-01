@@ -15,10 +15,12 @@ def exact(sock,n):
  return data
 
 class Fixture:
- def __init__(self,root):
+ def __init__(self,root,extra_hosts=()):
+  self.extra_hosts=set(extra_hosts)
+  assert all(host in ['user.uploads.dev'] for host in self.extra_hosts)
   self.lock=threading.RLock();self.tokens={};self.exits={};self.calls=[];self.logins={};self.reads=[];self.probes=[];self.unexpected=[];self.delay_next=False;self.duplicate_exit=False;self.inventory={'remote-sentinel':{'isPrivate':True,'files':{'main.pjs':'protected remote source\n','index.html':'<p>Remote sentinel</p>','src/data.bin':'AAH/'}}}
   ca=root/'ca.pem';key=root/'server.key';csr=root/'server.csr';cert=root/'server.pem';ext=root/'extensions.cnf'
-  ext.write_text('subjectAltName=DNS:perchance.org,DNS:api.mullvad.net,DNS:am.i.mullvad.net,DNS:*.am.i.mullvad.net,DNS:*.dnsleak.am.i.mullvad.net\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
+  ext.write_text('subjectAltName=DNS:perchance.org,DNS:api.mullvad.net,DNS:am.i.mullvad.net,DNS:*.am.i.mullvad.net,DNS:*.dnsleak.am.i.mullvad.net'+''.join(',DNS:'+host for host in sorted(self.extra_hosts))+'\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
   for args in [['req','-x509','-newkey','rsa:2048','-nodes','-days','2','-subj','/CN=PCMS disposable fixture CA','-keyout',str(root/'ca.key'),'-out',str(ca)],['req','-newkey','rsa:2048','-nodes','-subj','/CN=perchance.org','-keyout',str(key),'-out',str(csr)],['x509','-req','-days','2','-in',str(csr),'-CA',str(ca),'-CAkey',str(root/'ca.key'),'-CAcreateserial','-extfile',str(ext),'-out',str(cert)]]:subprocess.run(['openssl',*args],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
   self.root=root;self.catalog=None;self.catalog_log=root/'catalog-requests.jsonl'
   self.ca=ssl.PEM_cert_to_DER_cert(ca.read_text());self.tls=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);self.tls.load_cert_chain(str(cert),str(key));self.tls.set_alpn_protocols(['http/1.1'])
@@ -33,7 +35,7 @@ class Fixture:
      if v!=1 or user!=b'persona' or not route:sock.sendall(b'\x01\x01');return
      sock.sendall(b'\x01\x00');v,command,_,kind=exact(sock,4)
      host=exact(sock,exact(sock,1)[0]).decode() if kind==3 else socket.inet_ntop(socket.AF_INET if kind==1 else socket.AF_INET6,exact(sock,4 if kind==1 else 16));port=struct.unpack('!H',exact(sock,2))[0]
-     allowed=host in ['perchance.org','ipv4.am.i.mullvad.net','ipv6.am.i.mullvad.net','am.i.mullvad.net'] or host.endswith('.dnsleak.am.i.mullvad.net')
+     allowed=host in ['perchance.org','ipv4.am.i.mullvad.net','ipv6.am.i.mullvad.net','am.i.mullvad.net'] or host.endswith('.dnsleak.am.i.mullvad.net') or host in self.extra_hosts
      if v!=5 or command!=1 or port!=443 or not allowed:
       with self.lock:self.unexpected.append('SOCKS_TARGET_REFUSED')
       sock.sendall(b'\x05\x02\x00\x01'+b'\x00'*6);return
