@@ -1,24 +1,23 @@
 # Current implementation checkpoint
 
-## P24 — native chat and exact one-shot prompt
+## P25 — readiness and same-chat review recovery
 
-P23 merged [PR30](https://github.com/Neb963/PCMS/pull/30) as 0db87e7945b799644dde3361468e10d24710dfe3; remote main tree9a6d0f5895ecf1b75532bad84fcbd6f6db162885 equals tested b1a962da. [41353318368](https://github.com/Neb963/PCMS/actions/runs/41353318368):193T/build + required installed B PASS. Firefox155.0/build20260817142839/sandbox6; XPI499da05004e1b5658d02f3e3b20fd7ca390d9b4e00b727e07fda82862ee0977f. Independent complete source/Git byte oracles and two native saves proved exact staging and cold readback without replay. No AI or live mutations were tested.
+P24 merged [PR31](https://github.com/Neb963/PCMS/pull/31) as fd32636e1515e5075236e4fb878bab0435df719e; actual main treed986294d50b0b11ef3f92450af1b2f70fc5fdf67 equals tested04bcadf3. [41354824414](https://github.com/Neb963/PCMS/actions/runs/41354824414):205T/build + required installed B PASS. Firefox155.0/build20260817142839/sandbox6; XPI1b5abf27a4bc0674f5e92510a8f8e3a16b9eab58fd5d83843fbb0bd4bfb9426f. Independent fixture observed exactly one native New Chat and one exact Unicode/newline prompt, dashboard closure, real process restart and inspection hold with no reset/resend. Known native prompt trimming/textarea CRLF normalization hold before Send. Native-disabled/ambiguous fresh chat holds; live compatibility remains P46. P23 postmerge main41353710629 PASS.
 
 ### Plan before implementation
 
-Base actual main0db87e79; branch p24-native-chat. Preserve all existing verified phase receipts.
+Base actual mainfd32636e; branch p25-ai-review.
 
-- Add one fixed native AI adapter through existing protected donor scope; feature-detect editor/input/send/new-chat/session controls. Reuse accepted historical mechanism evidence; do not repeat live probes or implement streaming transport.
-- Resume the staged DEVELOP job. Persist distinct new-chat and send possible boundaries, independently verify fresh transition, exact raw input and UTF-8 digest, and retain exact account/Persona/remote/document/chat binding. No automatic repeat after unknown effects or lost document continuity.
-- Preserve protected tabs with dashboard closed; account for at most two actively automated DEVELOP jobs separately from later parked review. Never reuse another job's review tab.
-- Verify native input behavior against captured evidence before enabling dispatch. Known native transformation, unsupported context or ambiguous transition must hold before Send, with precise diagnostics; no silent prompt rewriting.
-- Add Work/Generator context and same-operation Check. Record sanitized digests, not prompt/chat capabilities.
-- Focused T checks exact Unicode/newline bytes, duplicate calls, stale document/binding, pause/module fences, unsupported native behavior and restart/no replay. Required installed B uses production adapter and independent native new-chat/send counts, dashboard closure and forced Firefox restart. Merge only when full bounded outcome and required evidence are satisfied; preserve any genuine external hold and continue independent eligible phases.
+- Keep native idle separate from attributed success. Extend fixed observation with pending application/save/queue facts; unsupported native terminal attribution stays AI_UNKNOWN, never fabricated SUCCESS.
+- Provide Review in Perchance and Check AI Helper on the shared Generator/Work detail. Focus only the revalidated reserved account/Persona/remote/chat; missing or changed documents open protected inspection and hold without fresh chat or resend.
+- Permit bounded human readiness only for the same inactive chat after two separated stable full source/editor/revision observations and no pending write, linked-document conflict or uncertain effect. Record HUMAN_VERIFIED_READY only after explicit attestation, with exact hash and times; revoke on any relevant drift. Keep the ordinary success path compatible with one-click Finish in P26.
+- Cancel fences future PCMS effects and retains source, writer and review tab. An active native run requires Stop AI in editor and observed settlement, not destructive tab closure.
+- Separate parked review tabs from two active automation slots. Preserve at least three parked tabs; no two-review cap or recycling.
+- Focused T enumerates active/idle/terminal-unknown/stopped-unsettled, stable fallback, staleness, wrong chat, cancel and cold inspection. Required installed B drives real Review/Check/Cancel controls, independent native counts/source state, late-write invalidation, three parked tabs and restart continuity. No live provider operation or repeated transport probe.
+- Push checkpoints; merge only after required T/B, verify main and continue P26. P46 remains NOT TESTED/unauthorized.
 
-P24 fixed donor/native adapter, staged-job continuation, separate chat/send effects, document/tab reservation, exact-input guards and inspection-only restart behavior are implemented. Local focused73T PASS; build and required installed B pending. Edge whitespace/CRLF that native controls transform hold before Send; no silent trim. A native-disabled initial New Chat also holds rather than inventing a fresh transition. Existing transport evidence is reused; actual provider compatibility remains P46. Live integrated native acceptance remains NOT TESTED/unauthorized (P46).
+Same-chat protected inspection, native active/settled facts, two-sample human readiness, automatic drift revocation, Cancel fencing and separate active/review budgets are implemented. Local83 selectedT PASS before final Cancel-settlement addition; focused recheck and required installed B pending. The native contract supplies no reliable terminal receipt, so this adapter always retains Unknown and uses only the bounded explicit fallback. The three-tab B case starts two additional actual native editor tabs from explicitly seeded prior review checkpoints; P24 intake/send evidence is reused, not claimed again for those seeded jobs.
 
-Checkpoint00a0cb5e/run41354256306: focused T/build PASS; installed B failed in fixture navigation (duplicate dashboard closure), before its AI oracle. Corrected observer selection; required B remains pending.
+Checkpoint25a46ca7: local84 selectedT/build PASS. Required installed review journey running. Added local paused-attestation/module-fence revocation and between-sample late-write cases; fixed the fixture observer to treat persisted null readiness as not ready while checks are in flight.
 
-Checkpoint35c8665e/run41354353859: focused T/build PASS; installed B exposed missing private-bootstrap AI forwarding at NEW_CHAT. Fixed that boundary with a direct regression. Added delayed native-confirmation readback, intervening manual-reset fencing and sanitized prompt/chat hash evidence. Required installed B is pending on this corrected candidate.
-
-Cold initialize now explicitly persists AI_INSPECTION_REQUIRED for already-held and waiting AI work, rather than retaining a stale pre-restart review label; two direct cold-open regressions cover both. New installed candidate pending.
+Checkpoint54edb417/run41355835675:213T/build PASS. Installed B verified active/unsettled denials and stable Unknown but failed at fixture attestation timing before its checkbox enabled. Corrected actual-control wait/assertion; required B remains pending, no HUMAN_VERIFIED_READY or three-tab PASS claimed for this run.

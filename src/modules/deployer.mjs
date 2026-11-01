@@ -11,7 +11,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
  const module=()=>core.read('modules',id),enabled=m=>m?.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('jobs.deployer');
  async function rows(table){const out=[];let cursor=null;do{const page=await core.list({table,cursor,limit:200});for(const r of page.rows)out.push(await core.read(table,r.id));cursor=page.cursor;}while(cursor);return out;}
  const event=(j,step,result)=>({moduleId:id,targetId:j.targetId,jobId:j.id,step,result});
- async function save(j,patch,step,gpatch=null,refs=[]){const changes=[{table:'jobs',id:j.id,expectedRev:j.rev,refs:[...new Set([...j.refs,...refs])],value:{...j,...patch}}];if(gpatch){const g=await core.read('generators',j.targetId);check(g.deploymentJobId===j.id,'DEPLOYMENT_TARGET_CHANGED');changes.push({table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...refs])],value:{...g,...gpatch}});}const ai=patch.deployment?.ai??j.deployment?.ai;await core.mutate(changes,{...event(j,step,patch.state??'IN_PROGRESS'),...ai?{evidence:[ai.promptHash,ai.chatDigest].filter(v=>/^[a-f0-9]{64}$/.test(v??''))}:{}},null,step==='HOLD_DEPLOYMENT'?null:{moduleId:id,generation:j.generation,jobId:j.id,jobRevision:j.rev});return core.read('jobs',j.id);}
+ async function save(j,patch,step,gpatch=null,refs=[]){const changes=[{table:'jobs',id:j.id,expectedRev:j.rev,refs:[...new Set([...j.refs,...refs])],value:{...j,...patch}}];if(gpatch){const g=await core.read('generators',j.targetId);check(g.deploymentJobId===j.id,'DEPLOYMENT_TARGET_CHANGED');changes.push({table:'generators',id:g.id,expectedRev:g.rev,refs:[...new Set([...g.refs,...refs])],value:{...g,...gpatch}});}const ai=patch.deployment?.ai??j.deployment?.ai;await core.mutate(changes,{...event(j,step,patch.state??'IN_PROGRESS'),...ai?{evidence:[ai.promptHash,ai.chatDigest].filter(v=>/^[a-f0-9]{64}$/.test(v??''))}:{}},null,['HOLD_DEPLOYMENT','REVOKE_AI_READINESS','CANCEL_FUTURE_AI_EFFECTS'].includes(step)?null:{moduleId:id,generation:j.generation,jobId:j.id,jobRevision:j.rev});return core.read('jobs',j.id);}
  async function output(j,state,code=null,dueAt=clock()+1000){j=await core.read('jobs',j.id);return {jobRevision:j.rev,value:{state,code,phase:j.deployment.phase,generatorId:j.targetId,dueAt}};}
  async function hold(j,code){j=await core.read('jobs',j.id);if(j.state==='COMPLETE'&&j.deployment.phase==='COMPLETE')return output(j,'COMPLETE');j=await save(j,{state:'HELD',recovery:{action:'OPEN_DEPLOYMENT',code}},'HOLD_DEPLOYMENT',{deploymentState:j.deployment.publicationReceipt?'PUBLISHED_GIT_PENDING':'HELD',deploymentCode:code});return output(j,'HELD',code);}
  async function validate(j,{fresh=true}={}){
@@ -23,7 +23,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
  async function initialize(){
   const m=await module(),connection=(await core.view('git-catalog'))?.connection,status=await core.status();if(!enabled(m)||!connection||status.restoreHold)return;
   const jobs=(await rows('jobs')).filter(j=>j.moduleId===id&&j.deployment);
-  for(let i=0;i<jobs.length;i++){const j=jobs[i];if(j.deployment.ai&&['NEW_CHAT','SEND','AI_RUNNING'].includes(j.deployment.phase)&&j.deployment.ai.bootId!==(await core.queue.status()).bootId&&j.recovery?.code!=='AI_INSPECTION_REQUIRED'){await hold(j,'AI_INSPECTION_REQUIRED');jobs[i]=await core.read('jobs',j.id);}}
+  for(let i=0;i<jobs.length;i++){const j=jobs[i];if(j.deployment.ai&&['NEW_CHAT','SEND','AI_RUNNING','AI_UNKNOWN','WAIT_REVIEW'].includes(j.deployment.phase)&&j.deployment.ai.bootId!==(await core.queue.status()).bootId&&j.recovery?.code!=='AI_INSPECTION_REQUIRED'){if(j.deployment.readiness)await expireReadiness(j,'AI_INSPECTION_REQUIRED');else await hold(j,'AI_INSPECTION_REQUIRED');jobs[i]=await core.read('jobs',j.id);}}
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
    const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);
@@ -46,9 +46,9 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
    }finally{await core.releasePin(pinned.pinId);}
   }
  }
- async function aiBound(j){
+ async function aiBound(j,{write=true}={}){
   const [a,g,m,status]=await Promise.all([core.read('accounts',j.accountId),core.read('generators',j.targetId),module(),core.status()]);
-  check(enabled(m)&&m.generation===j.generation,'STALE_GENERATION');check(!status.paused,'PAUSED');check(!status.restoreHold&&!j.runtimeInvalidated,'RESTORE_MAINTENANCE');
+  check(enabled(m)&&m.generation===j.generation,'STALE_GENERATION');if(write)check(!status.paused,'PAUSED');if(write)check(!j.deployment.cancelRequestedAt,'AI_CANCELLED');check(!status.restoreHold&&!j.runtimeInvalidated,'RESTORE_MAINTENANCE');
   check(eligibleAccount(a)&&a.expectedPrincipal===j.input.principalFingerprint&&a.personaUid===j.input.personaUid&&a.containerId===j.input.containerId&&a.routeId===j.input.routeId,'SOURCE_OWNER_CHANGED');
   check(g.remoteId===j.input.remoteId&&g.accountId===a.id&&g.writerHold?.jobId===j.id,'SOURCE_TARGET_CHANGED');return a;
  }
@@ -64,7 +64,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
    check(o.receipt?.complete&&o.receipt.action===action,'AI_EFFECT_UNKNOWN');
    if(action==='NEW_CHAT')check(o.receipt.fresh&&!o.chatDigest&&o.idle&&o.queueEmpty,'AI_FRESH_CHAT_UNVERIFIED');else check(o.receipt.exactInput&&o.receipt.promptHash===ai.promptHash&&o.chatDigest&&o.chatDigest===o.receipt.chatDigest,'AI_SEND_UNKNOWN');
    await core.queue.reconcile(j.id,j.rev,operationId,{matched:true,operationId,disposition:'APPLIED'});j=await core.read('jobs',j.id);
-   const phase=action==='NEW_CHAT'?'SEND':'AI_RUNNING';j=await save(j,{deployment:{...j.deployment,phase,ai:{...ai,document:o.document,chatDigest:o.chatDigest,...action==='SEND'?{sentAt:clock()}:{} } }},'VERIFY_AI_'+action,{deploymentState:phase,deploymentCode:null});return output(j,'CONTINUE');
+   const phase=action==='NEW_CHAT'?'SEND':'AI_RUNNING';j=await save(j,{deployment:{...j.deployment,phase,ai:{...ai,document:o.document,chatDigest:o.chatDigest,...action==='SEND'?{sentAt:clock()}:{} } }},'VERIFY_AI_'+action,{deploymentState:phase,deploymentCode:null});if(j.deployment.cancelRequestedAt)return hold(j,'AI_CANCELLED');return output(j,'CONTINUE');
   }
   check(!reconcile,'AI_INSPECTION_REQUIRED');await aiBound(j);await validate(j);j=await core.queue.claim(j.id,j.rev);
   const all=await donor.inspectSourceEditors(scope(a),j.input),chosen=all.editors?.find(e=>e.tabId===ai.tabId);check(all?.ok&&chosen?.ok&&chosen.clean&&chosen.witness===ai.witness&&all.editors.every(e=>e.ok&&e.clean),'AI_EDITOR_CHANGED');
@@ -76,11 +76,49 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
    observe:async()=>({matched:false,operationId})});
   return aiEffect(await core.read('jobs',j.id),true);
  }
+ async function reviewSample(original,{focus=false,openMissing=false}={}){
+  const j=await core.read('jobs',original.id),ai=j.deployment.ai;check(ai?.chatDigest,'AI_CHAT_UNVERIFIED');check(j.effect?.boundary!=='POSSIBLE','AI_EFFECT_UNKNOWN');
+  const a=await aiBound(j,{write:false});await validate(j);
+  const native=await donor.aiInspect(scope(a),{...j.input,jobId:j.id,nonce:ai.nonce,operationId:ai.sendOperationId,expectedChatDigest:ai.chatDigest,focus,openMissing});check(native?.ok,native?.code??'AI_OBSERVATION_UNKNOWN');
+  check(native.chatDigest===ai.chatDigest,'AI_CHAT_CHANGED');check(native.idle&&native.queueEmpty,'AI_STILL_ACTIVE');check(native.settled,'AI_APPLICATION_UNSETTLED');
+  const all=await donor.inspectSourceEditors(scope(a),j.input),chosen=all.editors?.find(e=>e.tabId===native.context.tabId&&e.witness===native.context.witness);check(all?.ok&&chosen?.ok,'AI_EDITOR_CHANGED');
+  check(chosen.reasons?.every(c=>['EDITOR_DIRTY','EDITOR_SAVE_UNSETTLED'].includes(c))!==false&&!chosen.documents?.some(d=>!d.primary&&!d.clean),'AI_EDITOR_CONFLICT');
+  for(const e of all.editors)if(e!==chosen)check(e.ok&&e.clean,'AI_UNRELATED_EDITOR_CONFLICT');
+  const cp=await donor.sourceCheckpoint(scope(a),{...j.input,tabId:chosen.tabId,witness:chosen.witness});check(cp?.ok,cp?.code??'AI_REVISION_UNKNOWN');
+  const files=chosen.files.map(({path,bytes,sha256})=>({path,bytes,sha256})).sort((a,b)=>a.path.localeCompare(b.path)),version={time:cp.time,saveCount:cp.saveCount,sourceRevision:cp.sourceRevision??null};
+  const sourceHash=await sha256(new TextEncoder().encode(JSON.stringify({files,version,document:native.context.document,chatDigest:ai.chatDigest})));
+  return {sourceHash,files,version,context:native.context,chatDigest:ai.chatDigest,nativeState:native.nativeState??'UNKNOWN',observedAt:clock()};
+ }
+ async function expireReadiness(j,code){return save(j,{state:'HELD',recovery:{action:'REVIEW_AI',code},deployment:{...j.deployment,phase:'AI_UNKNOWN',priorReadiness:j.deployment.readiness??j.deployment.priorReadiness??null,readiness:null}},'REVOKE_AI_READINESS',{deploymentState:'AI_UNKNOWN',deploymentCode:code});}
+ async function checkAi({id:targetId,confirmReady=false}){
+  const g=await core.read('generators',targetId);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);check(j.kind==='DEVELOP'&&['AI_RUNNING','AI_UNKNOWN','WAIT_REVIEW'].includes(j.deployment.phase),'AI_REVIEW_NOT_AVAILABLE');
+  try{
+   const first=await reviewSample(j);await new Promise(resolve=>setTimeout(resolve,1000));const second=await reviewSample(j);
+   check(second.observedAt-first.observedAt>=1000&&second.observedAt-first.observedAt<=15000&&first.sourceHash===second.sourceHash,'AI_SOURCE_NOT_STABLE');
+   j=await core.read('jobs',j.id);if(j.deployment.cancelRequestedAt){j=await save(j,{deployment:{...j.deployment,ai:{...j.deployment.ai,automationActive:false}}},'OBSERVE_CANCELLED_AI_SETTLED');check(false,'AI_CANCELLED');}
+   const previous=j.deployment.readiness,verified=confirmReady===true||previous?.kind==='HUMAN_VERIFIED_READY'&&previous.sourceHash===second.sourceHash;
+   const readiness={kind:verified?'HUMAN_VERIFIED_READY':'ELIGIBLE_UNKNOWN',sourceHash:second.sourceHash,first,second,verifiedAt:verified?clock():null};
+   j=await save(j,{state:'HELD',recovery:{action:'REVIEW_AI',code:readiness.kind},deployment:{...j.deployment,phase:verified?'WAIT_REVIEW':'AI_UNKNOWN',ai:{...j.deployment.ai,...second.context,automationActive:false,bootId:(await core.queue.status()).bootId},readiness,priorReadiness:previous?.sourceHash!==second.sourceHash?previous??j.deployment.priorReadiness??null:j.deployment.priorReadiness??null}},verified?'HUMAN_VERIFY_AI_READY':'OBSERVE_STABLE_AI_UNKNOWN',{deploymentState:verified?'WAIT_REVIEW':'AI_UNKNOWN',deploymentCode:readiness.kind});
+   return {state:readiness.kind,sourceHash:second.sourceHash};
+  }catch(error){j=await core.read('jobs',j.id);await expireReadiness(j,error.code??publicError(error));return {state:'HELD',code:error.code??publicError(error)};}
+ }
+ async function reviewAi({id:targetId}){
+  const g=await core.read('generators',targetId);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');const j=await core.read('jobs',g.deploymentJobId),ai=j.deployment.ai;check(ai,'AI_REVIEW_NOT_AVAILABLE');const a=await aiBound(j,{write:false});
+  const o=await donor.aiInspect(scope(a),{...j.input,jobId:j.id,nonce:ai.nonce,operationId:ai.sendOperationId,expectedChatDigest:ai.chatDigest,focus:true,openMissing:true});
+  if(!o?.ok){await expireReadiness(await core.read('jobs',j.id),o?.code??'AI_OBSERVATION_UNKNOWN');return {state:'HELD',code:o?.code??'AI_OBSERVATION_UNKNOWN'};}return {state:'OPEN',tabId:o.context.tabId};
+ }
+ async function cancelAi({id:targetId}){
+  const g=await core.read('generators',targetId);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);check(j.deployment.ai&&!terminal(j),'AI_REVIEW_NOT_AVAILABLE');
+  let code='AI_CANCELLED_INSPECT';try{await reviewSample(j);}catch(error){code=error.code==='AI_STILL_ACTIVE'?'STOP_AI_IN_EDITOR':error.code??publicError(error);}
+  j=await core.read('jobs',j.id);j=await save(j,{state:'HELD',recovery:{action:'REVIEW_AI',code},deployment:{...j.deployment,cancelRequestedAt:j.deployment.cancelRequestedAt??clock(),readiness:null}},'CANCEL_FUTURE_AI_EFFECTS',{deploymentState:'CANCELLED',deploymentCode:code});return {state:'HELD',code};
+ }
+ async function revalidateReadiness(j){if(!j.deployment.readiness||!['AI_UNKNOWN','WAIT_REVIEW'].includes(j.deployment.phase))return j;try{const sample=await reviewSample(j);if(sample.sourceHash!==j.deployment.readiness.sourceHash)return expireReadiness(j,'AI_REVIEW_CHANGED');}catch(error){return expireReadiness(j,error.code??publicError(error));}return j;}
  async function continueRecovered(r,jobId){const latest=await core.read('jobs',jobId);if(latest.rev===r.jobRevision&&latest.state==='RUNNING'&&latest.effect?.boundary!=='POSSIBLE'&&['CONTINUE','WAITING'].includes(r.value.state)){const queued=await core.queue.transition(latest.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {...r,jobRevision:queued.rev};}return r;}
  async function effect(original,reconcile=false){let j=await core.read('jobs',original.id);check(j?.rev===original.rev&&j.deployment?.schema===1,'STALE_REVISION');
   try{
    if(['NEW_CHAT','SEND'].includes(j.deployment.phase))return await aiEffect(j,reconcile);
-   if(j.deployment.phase==='AI_RUNNING')return hold(j,(await core.queue.status()).bootId!==j.deployment.ai.bootId?'AI_INSPECTION_REQUIRED':'AI_RUNNING_REVIEW_PENDING');
+   if(['AI_UNKNOWN','WAIT_REVIEW'].includes(j.deployment.phase))return hold(j,j.deployment.readiness?.kind??'AI_REVIEW_REQUIRED');
+   if(j.deployment.phase==='AI_RUNNING'){if((await core.queue.status()).bootId!==j.deployment.ai.bootId)return hold(j,'AI_INSPECTION_REQUIRED');if(j.deployment.cancelRequestedAt)return hold(j,'STOP_AI_IN_EDITOR');return hold(j,'AI_RUNNING_REVIEW_PENDING');}
    if(j.save?.phase!=='COMPLETE'&&j.save&&j.effect?.operationId===j.save.operationId&&(j.effect?.boundary==='POSSIBLE'||j.effect?.disposition==='APPLIED')){
     const r=await writer.effect(j,true);j=await core.read('jobs',j.id);if(r.value.state!=='COMPLETE')return r;
    }
@@ -135,12 +173,12 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
     j=await save(j,{deployment:{...j.deployment,phase:'STAGED',stageReceipt:j.save.receipt}},'VERIFY_DEVELOP_INSTRUCTIONS',{deploymentState:'STAGED',deploymentCode:null});return output(j,'CONTINUE');
    }
    if(j.deployment.phase==='STAGED'){
-    const active=(await rows('jobs')).filter(x=>x.id!==j.id&&x.deployment?.ai&&['NEW_CHAT','SEND','AI_RUNNING'].includes(x.deployment.phase)&&x.state!=='HELD');
+    const active=(await rows('jobs')).filter(x=>x.id!==j.id&&x.deployment?.ai&&(x.deployment.ai.automationActive??['NEW_CHAT','SEND','AI_RUNNING'].includes(x.deployment.phase))&&!terminal(x));
     if(active.length>=2||active.some(x=>x.accountId===j.accountId))return output(j,'WAITING','AI_RESOURCES_BUSY',clock()+30000);
     const a=await aiBound(j),snapshot=await writer.capture(j);try{check(snapshot.manifestId===j.deployment.stageReceipt.candidateManifest&&snapshot.listing==='UNLISTED','AI_STAGED_SOURCE_CHANGED');}finally{await core.releasePin(snapshot.pinId);}
     const all=await donor.inspectSourceEditors(scope(a),j.input),chosen=all.editors?.find(e=>e.tabId===j.save.tabId);check(all?.ok&&chosen?.ok&&chosen.clean&&all.editors.every(e=>e.ok&&e.clean),'AI_EDITOR_CHANGED');
     const prompt=(await core.verifySource(j.deployment.inputManifest)).find(f=>f.path==='prompt.md');check(prompt,'AI_PROMPT_MISSING');
-    j=await save(j,{effect:null,deployment:{...j.deployment,phase:'NEW_CHAT',ai:{schema:1,bootId:(await core.queue.status()).bootId,tabId:chosen.tabId,witness:chosen.witness,document:null,nonce:crypto.randomUUID(),newChatOperationId:crypto.randomUUID(),sendOperationId:crypto.randomUUID(),promptHash:prompt.sha256}}},'PREPARE_NATIVE_AI',{deploymentState:'NEW_CHAT',deploymentCode:null});return output(j,'CONTINUE');
+    j=await save(j,{effect:null,deployment:{...j.deployment,phase:'NEW_CHAT',ai:{schema:1,bootId:(await core.queue.status()).bootId,tabId:chosen.tabId,witness:chosen.witness,document:null,nonce:crypto.randomUUID(),newChatOperationId:crypto.randomUUID(),sendOperationId:crypto.randomUUID(),promptHash:prompt.sha256,automationActive:true}}},'PREPARE_NATIVE_AI',{deploymentState:'NEW_CHAT',deploymentCode:null});return output(j,'CONTINUE');
    }
    if(j.deployment.phase==='DEPLOY_SAVE'){
     if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
@@ -176,7 +214,8 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
   }catch(error){if(error.code==='STALE_REVISION')throw error;const latest=await core.read('jobs',j.id);if(latest.deployment.phase==='PREPARE'&&clock()-latest.deployment.editorRequestedAt<20000&&['EDITOR_NOT_OPEN','EDITOR_CONTRACT_UNVERIFIED','EDITOR_OBSERVATION_UNKNOWN','SOURCE_CONTEXT_MISSING'].includes(error.code))return output(latest,'WAITING',error.code);return hold(latest,error.code??publicError(error));}
  }
  return {validate,recover:()=>run(async()=>{for(const j of await rows('jobs'))if(j.moduleId===id&&j.deployment&&(j.effect?.boundary==='POSSIBLE'||j.save?.phase!=='COMPLETE'&&j.effect?.disposition==='APPLIED'))await continueRecovered(await effect(j,true),j.id);}),initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
-  async get(targetId){const g=await core.read('generators',targetId);check(g,'TARGET_MISSING');const j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;return {jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,conflictManifest:j?.deployment.conflict?.manifestId??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',publicationVerified:!!j?.deployment.publicationReceipt,poolMember:g.pool?.member===true,doneCommit:j?.deployment.doneReceipt?.commit??null,chatDigest:j?.deployment.ai?.chatDigest??null,possible:j?.effect?.boundary==='POSSIBLE'};},
-  check:args=>run(async()=>{const g=await core.read('generators',args.id);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);if(j.deployment.phase==='DONE'&&j.effect?.boundary==='OBSERVED'&&j.effect.outcome==='FAILED')j=await gitWriter.retryRejected(j.id);check(!terminal(j),'JOB_FINISHED');if(j.effect?.boundary==='POSSIBLE')return (await continueRecovered(await effect(j,true),j.id)).value;if(j.deployment.ai){check(j.deployment.ai.bootId===(await core.queue.status()).bootId,'AI_INSPECTION_REQUIRED');if(j.effect?.disposition==='REJECTED'&&['NEW_CHAT','SEND'].includes(j.deployment.phase)){const key=j.deployment.phase==='NEW_CHAT'?'newChatOperationId':'sendOperationId';j=await save(j,{effect:null,deployment:{...j.deployment,ai:{...j.deployment.ai,[key]:crypto.randomUUID()}}},'RETRY_UNTOUCHED_AI_STEP');}}if(j.deployment.phase!=='DONE')await validate(j);await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {state:'WAITING'};})
+  async get(targetId){let g=await core.read('generators',targetId);check(g,'TARGET_MISSING');let j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;if(j?.deployment.readiness){j=await run(()=>revalidateReadiness(j));g=await core.read('generators',targetId);}return {readiness:j?.deployment.readiness?.kind??null,cancelRequested:!!j?.deployment.cancelRequestedAt,canReview:!!j?.deployment.ai,jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,conflictManifest:j?.deployment.conflict?.manifestId??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',publicationVerified:!!j?.deployment.publicationReceipt,poolMember:g.pool?.member===true,doneCommit:j?.deployment.doneReceipt?.commit??null,chatDigest:j?.deployment.ai?.chatDigest??null,possible:j?.effect?.boundary==='POSSIBLE'};},
+  checkAi:args=>run(()=>checkAi(args)),reviewAi:args=>run(()=>reviewAi(args)),cancelAi:args=>run(()=>cancelAi(args)),
+  check:args=>run(async()=>{const g=await core.read('generators',args.id);check(g?.deploymentJobId,'DEPLOYMENT_JOB_MISSING');let j=await core.read('jobs',g.deploymentJobId);if(j.deployment.phase==='DONE'&&j.effect?.boundary==='OBSERVED'&&j.effect.outcome==='FAILED')j=await gitWriter.retryRejected(j.id);check(!terminal(j),'JOB_FINISHED');if(j.effect?.boundary==='POSSIBLE')return (await continueRecovered(await effect(j,true),j.id)).value;if(j.deployment.ai){check(!j.deployment.cancelRequestedAt,'AI_CANCELLED');check(j.deployment.ai.bootId===(await core.queue.status()).bootId,'AI_INSPECTION_REQUIRED');if(j.effect?.disposition==='REJECTED'&&['NEW_CHAT','SEND'].includes(j.deployment.phase)){const key=j.deployment.phase==='NEW_CHAT'?'newChatOperationId':'sendOperationId';j=await save(j,{effect:null,deployment:{...j.deployment,ai:{...j.deployment.ai,[key]:crypto.randomUUID()}}},'RETRY_UNTOUCHED_AI_STEP');}}if(j.deployment.phase!=='DONE')await validate(j);await core.queue.transition(j.id,j.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {state:'WAITING'};})
  };
 }
