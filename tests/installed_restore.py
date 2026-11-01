@@ -98,7 +98,10 @@ def main():
     prior=stop(sid,profile);sid=None;sid,_=account_session(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);backup_page(sid);reopened=restore(sid);assert reopened['control']['mappings']==maps and reopened['root']['dataset']==old_dataset
     if reopened['job']['state'] in ['HELD','FAILED']:check_restore(sid)
     v=staged(sid);assert v['control']['code']=='RESTORE_AUTH_IMPORT_PENDING';result=inspect_staged(sid,source_id,model,baseline,old_dataset);assert result['active']==old_dataset and result['hold'] and result['fresh'] and result['bytes']==1048601 and result['digest']==model['binary'] and result['accountHeld'] and result['source'] and result['jobHeld'] and result['modules']==7 and result['draft'] and result['native'],result;assert census(sid).count(maps[0]['destinationContainerId'])==1 and len(census(sid))==len(baseline)+1;assert_unrelated(sid,unrelated_id)
-    assert asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{await c.queue.resume(crypto.randomUUID());return false;}catch(e){return e.code==='RESTORE_MAINTENANCE';}finally{c.close();}");assert script(sid,"return document.getElementById('backup-export').disabled");assert 'are staged' in script(sid,"return document.getElementById('backup-restore-state').textContent");assert 'sessionToken' not in script(sid,"return document.getElementById('records').textContent")
+    assert asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{await c.queue.resume(crypto.randomUUID());return false;}catch(e){return e.code==='RESTORE_MAINTENANCE';}finally{c.close();}"),'MAINTENANCE_RESUME_ADMITTED'
+    assert script(sid,"return document.getElementById('backup-export').disabled"),'EXPORT_ENABLED_DURING_RESTORE'
+    wait(lambda:'are staged' in script(sid,"return document.getElementById('backup-restore-state').textContent"),15)
+    assert 'sessionToken' not in script(sid,"return document.getElementById('records').textContent"),'PRIVATE_AUTH_FIELD_IN_UI'
     rollback(sid,old_state,old_dataset,unrelated_id);assert len(census(sid))==len(baseline)+1
     if label=='same':
      assert account(sid,source_id)['state']=='HELD' and account(sid,source_id)['holdCode']=='RESTORE_ROLLBACK_ROUTE_RECHECK'
