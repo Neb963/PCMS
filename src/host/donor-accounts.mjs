@@ -4,6 +4,7 @@
 import {captureSlugDocument,nativeSlug} from '../modules/slug-observations.mjs';
 import {accountRouteAllowed} from './account-pins.mjs';
 import {observePerchanceIdentity,accountDocumentWitness} from '../modules/account-observations.mjs';
+import {createBackupDonor} from './backup-donor.mjs';
 import {observePerchanceAuth} from '../modules/auth-observations.mjs';
 import {observeSavedSource,observeNativeEditor} from '../modules/source-observations.mjs';
 import {observePerchanceCreation} from '../modules/creation-observations.mjs';
@@ -353,7 +354,7 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    const epoch=cookieEpoch,cookies=await cookieService.list(scope.containerId),second=await run(observePerchanceAuth,[{documentWitness:witness,principalFingerprint:scope.expectedPrincipal}]);if(!second?.ok)return fail(second?.code??'AUTH_COLLECTION_UNAVAILABLE');
    const after=await run(accountDocumentWitness),current=await api.tabs.get(tab.id),final=await protectedProfile(scope);
    if(final.code)return fail(final.code);if(witness!==after||current.cookieStoreId!==scope.containerId||current.url!==tab.url)return fail('ACCOUNT_DOCUMENT_CHANGED');if(epoch!==cookieEpoch||first.fingerprint!==second.fingerprint)return fail('AUTH_SESSION_CHANGED');
-   return {ok:true,source:'PCMS_MANAGED_SESSION_1',accountId:scope.accountId,personaUid:scope.personaUid,containerId:scope.containerId,startedAt:first.startedAt,observedAt:second.observedAt,fingerprint:second.fingerprint,auth:second.data,cookies};
+   return {ok:true,source:'PCMS_MANAGED_SESSION_1',accountId:scope.accountId,personaUid:scope.personaUid,containerId:scope.containerId,startedAt:first.startedAt,observedAt:second.observedAt,fingerprint:second.fingerprint,context:{tabId:tab.id,witness},auth:second.data,cookies};
   }catch{return fail('AUTH_COLLECTION_UNAVAILABLE');}finally{api.cookies.onChanged.removeListener(changed);}
  }
  async function sourceRead(scope,request){
@@ -405,5 +406,6 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    return {...result,...identity.inventory?{inventory:identity.inventory}:{}};
   }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
  }
- return Object.freeze({collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
+ const backupDonor=createBackupDonor({api,stateManager,initialize,getState,protectedProfile,collectSession});
+ return Object.freeze({...backupDonor,collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }

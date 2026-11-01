@@ -25,3 +25,7 @@ H/G/P1–P5 NOT TESTED/unauthorized. P42–P49 need named disposable resources/e
 ## Core cut checkpoint
 
 Added the private all-store IDB capture cut and pinned reference closure. The native transaction is the short write barrier; it awaits only IDB operations, never provider/native/login work. Captures include active logical rows/history/views/commands/credentials/modules/retained Journal and immutable blob descriptors. Old download payload bytes and older derived capture payloads are excluded explicitly to prevent recursive archives; their metadata remains. Required configured Git credentials and package references are checked. Derived capture secrets are invalidated by existing account removal. Integration/T/S/B pending. P28 postmerge41305056036 passed both jobs.
+
+## Donor provenance checkpoint
+
+Added private capture-scoped scoped-auth storage-event/document witnesses and cookie-change counters, fresh known guard/fingerprint checks, bounded witness lifetime and explicit loss on event-page restart. Full donor local/sync data is read under the existing state-manager admission lock/revision, with a managed-Persona census and no new native export service. The Core cut callback runs only after origin staging/revalidation; donor mutation or missing managed coverage invalidates it. Integration and verification pending.
