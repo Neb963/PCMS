@@ -41,3 +41,5 @@ Added production Core-cut tests for exact drafts/credentials/source/history, old
 ## Capture UI checkpoint
 
 Settings → Backup now has actual Prepare capture / Check capture controls, finite phase progress, checked Core/donor revisions, byte/reference/barrier counts, exact missing-account links and previous-complete preservation. Capture readiness explicitly says no backup file was exported. The existing session-coverage controls remain separate and operational; old Backup packages require compatible update for the new capability. Required installed full-capture B is not yet added/passed.
+
+Provenance review added two independent same-Persona documents, so a native localStorage write by either is observed by its sibling; equal auth reads alone cannot certify the join. The extra protected read-only witness never replaces an editor/review tab, and only its exact untouched owned document may be closed. Both documents, cookie versions and source guard are checked before/after the donor/Core cut; loss/rotation is incomplete. Witness checks use at most two accounts concurrently and no new source/provider write.

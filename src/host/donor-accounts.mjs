@@ -406,6 +406,15 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    return {...result,...identity.inventory?{inventory:identity.inventory}:{}};
   }catch(error){return {state:'UNKNOWN',code:/^[A-Z][A-Z0-9_]*$/.test(error.message)?error.message:'OWNERSHIP_UNVERIFIED'};}
  }
- const backupDonor=createBackupDonor({api,stateManager,initialize,getState,protectedProfile,collectSession});
+ async function openAuthWitness(scope,{captureId}){
+  const found=await protectedProfile(scope);if(found.code)return fail(found.code);const tab=await personaPlatform.open(scope.containerId,PERCHANCE,false);await api.sessions.setTabValue(tab.id,'pcmsAuthCaptureWitness',{accountId:scope.accountId,personaUid:scope.personaUid,captureId});
+  const until=Date.now()+15000;for(;;){const current=await api.tabs.get(tab.id),fresh=await protectedProfile(scope);if(fresh.code)return fail(fresh.code);if(current.cookieStoreId!==scope.containerId||current.url!==PERCHANCE)return fail('AUTH_CONTEXT_CHANGED');if(current.status==='complete')break;if(Date.now()>=until)return fail('AUTH_CONTEXT_UNAVAILABLE');await new Promise(resolve=>setTimeout(resolve,200));}
+  const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:accountDocumentWitness,args:[]});if(rows?.length!==1||typeof rows[0].result!=='string')return fail('AUTH_CONTEXT_UNAVAILABLE');return {tabId:tab.id,witness:rows[0].result};
+ }
+ async function closeAuthWitness(w,context){
+  const tab=await api.tabs.get(context.tabId),tag=await api.sessions.getTabValue(tab.id,'pcmsAuthCaptureWitness');if(tab.url!==PERCHANCE||tab.cookieStoreId!==w.containerId||tag?.accountId!==w.accountId||tag.personaUid!==w.personaUid||tag.captureId!==w.captureId)return;
+  const rows=await api.scripting.executeScript({target:{tabId:tab.id,frameIds:[0]},world:'ISOLATED',func:accountDocumentWitness,args:[]});if(rows?.length===1&&rows[0].result===context.witness)await api.tabs.remove(tab.id);
+ }
+ const backupDonor=createBackupDonor({api,stateManager,initialize,getState,protectedProfile,collectSession,openAuthWitness,closeAuthWitness});
  return Object.freeze({...backupDonor,collectSession,sourceRead,openSourceEditor,inspectSourceEditors,creation,inspectCreated,observeOwnership,releaseSlugObservation,observeSlug,closeTabs,observeClosedTabs,removePersona,observeRemoval,preparePersona,checkBinding,openProtectedTab,repairRoute:(scope,operation)=>preparePersona(scope,{...operation,stage:'VERIFY'})});
 }
