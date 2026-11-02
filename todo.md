@@ -20,3 +20,6 @@ P35 code checkpoint: batched durable clock policy, session/boot/monotonic fencin
 
 
 Checkpoint90245f1/tree60f5897c: [41365811347](https://github.com/Neb963/PCMS/actions/runs/41365811347) focused71T/build PASS; installed B stopped before cycles because its reused settings() helper opens Modules, where no Refresher section link belongs. Correct the fixture to click Settings index explicitly and wait for the real link. Product settings/defaults and account enrollment were reached; the cycle journey remains unverified, not passed.
+
+
+Run [41365991842](https://github.com/Neb963/PCMS/actions/runs/41365991842) atdb1f688:71T/build PASS; B verified actual defaults/settings, protected full source/route, Pause/Resume and zero unearned initial start. It then observed correct EDITOR_DIRTY with 278ms of already earned eligible time from the settings operation before editing. The fixture incorrectly compared against the older pre-resume baseline. Move its baseline immediately before the edit, retain all earned time, and wait for the actual visible hold. Remaining Sleep/restart/Disable cases are still pending.
