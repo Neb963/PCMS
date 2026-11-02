@@ -70,7 +70,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
   async function handle(message,sender={}) {
     try {
       const value=await core();let result;
-      if((await value.status()).restoreHold&&['refresher.open','refresher.refresh','directory.check','directory.open','refresher.configure','backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
+      if((await value.status()).restoreHold&&['refresher.open','refresher.refresh','directory.check','directory.open','refresher.configure','backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.draftSet','source.draftPrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
       switch(message?.operation) {
         case 'directory.status':result=await directory.projection();break;
         case 'directory.check':result=await directory.check();if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
@@ -102,10 +102,13 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'deployment.cancel':result=await deployer.cancelAi(message);break;
         case 'deployment.get':result=await deployer.get(message.id);break;
         case 'deployment.check':result=await deployer.check(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.draftGet':result=await sourceWriter.draftGet(message.id);break;
+        case 'source.draftSet':result=await sourceWriter.draftSet(message);break;
+        case 'source.draftPrepare':result=await sourceWriter.prepareDraft(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.saveGet':result=await sourceWriter.get(message.id);break;
         case 'source.savePrepare':result=await sourceWriter.prepare(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.saveRestore':result=await sourceWriter.enqueue({...message,restore:true});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
-        case 'source.saveCheck':{const state=await sourceWriter.get(message.id),job=state.jobId?await value.read('jobs',state.jobId):null;result=job?.deployment?await deployer.check(message):await sourceWriter.check(message);}if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.saveCheck':{const state=await sourceWriter.get(message.id),job=state.jobId?await value.read('jobs',state.jobId):null;result=job?.refresh?await refreshSave.check(message):job?.deployment?await deployer.check(message):await sourceWriter.check(message);}if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.saveAdopt':result=await sourceWriter.adopt(message);await schedule(value);break;
         case 'source.saveFile':{const s=await sourceWriter.get(message.id),manifestId=({candidate:s.candidateManifest,baseline:s.baselineManifest,remote:s.remoteManifest})[message.version];if(!manifestId)throw new Error('SOURCE_FILE_MISSING');const files=await value.verifySource(manifestId),entry=files.find(f=>f.path===message.path);if(!entry)return {ok:false,code:'SOURCE_FILE_MISSING'};const offset=message.offset??0;if(!Number.isSafeInteger(offset)||offset<0||offset>entry.bytes)return {ok:false,code:'SOURCE_CHUNK_INVALID'};const bytes=(await value.bytes(entry.blobId)).subarray(offset,offset+65536);let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.subarray(i,i+8192));result={path:entry.path,version:message.version,offset,total:entry.bytes,sha256:entry.sha256,base64:btoa(raw),next:offset+bytes.length<entry.bytes?offset+bytes.length:null};break;}
         case 'source.get':{const {current,previous,changes,...summary}=await source.get(message.id);result={...summary,currentFiles:current.length,previousFiles:previous.length};break;}
