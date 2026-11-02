@@ -1,7 +1,9 @@
 // Packaged dashboard host. Supplied UI stays in its opaque iframe.
 export async function openModulePage({core,moduleId,pageId,container,onError}) {
  const response=await core('module.open',{id:moduleId,pageId});if(!response.ok)throw Error(response.code);
- const descriptor=response.result,iframe=document.createElement('iframe');iframe.title=descriptor.title;iframe.className='module-frame';iframe.setAttribute('sandbox','allow-scripts');iframe.src=browser.runtime.getURL('host/module-runner.html');
+ const descriptor=response.result;
+ if(!container.isConnected){await core('module.close',{token:descriptor.token});return ()=>{};}
+ const iframe=document.createElement('iframe');iframe.title=descriptor.title;iframe.className='module-frame';iframe.setAttribute('sandbox','allow-scripts');iframe.src=browser.runtime.getURL('host/module-runner.html');
  const channel=descriptor.token;let ready=false,disposed=false;
  const listener=async event=>{
   if(disposed||event.source!==iframe.contentWindow||event.data?.channel!==channel)return;

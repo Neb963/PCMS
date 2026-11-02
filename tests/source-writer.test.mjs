@@ -57,3 +57,9 @@ test('selected full-source draft survives GC/restart and starts one stable guard
  await assert.rejects(f.writer.draftSet({id:'target',files:files.filter(f=>f.path!=='main.pjs'),requestId:crypto.randomUUID()}));assert.equal((await f.writer.draftGet('target')).manifestId,d.manifestId);
  await f.writer.prepareDraft({id:'target',draftId:d.id});const job=await f.job();assert.equal((await f.effect()).value.state,'COMPLETE');assert.deepEqual(f.native.files,candidate());await f.writer.prepareDraft({id:'target',draftId:d.id});assert.equal((await f.job()).id,job.id);assert.equal(f.native.calls.length,1);
 });
+
+test('disabling the module of a previous Refresh does not disable Deployer source controls or previous-good restoration',async t=>{
+ const f=await fixture(t),g=await f.core.read('generators','target'),next=await f.core.source(Object.entries(candidate()).map(([path,bytes])=>({path,bytes})));
+ await f.core.mutate([{table:'modules',id:'pcms-refresher',value:{enabled:false,generation:1,manifest:{capabilities:['perchance.source']}}},{table:'jobs',id:'previous-refresh',refs:[next.manifestId,g.sourceManifest],value:{moduleId:'pcms-refresher',targetId:g.id,state:'COMPLETE',kind:'REFRESH',refresh:{schema:1},save:{phase:'COMPLETE',candidateManifest:next.manifestId,baselineManifest:g.sourceManifest}}},{table:'generators',id:g.id,expectedRev:g.rev,refs:[...g.refs,...next.refs],value:{...g,sourceManifest:next.manifestId,sourceSaveJobId:'previous-refresh',sourceSaveState:'VERIFIED'}}],event);await f.core.releasePin(next.pinId);
+ const s=await f.writer.get('target');assert.equal(s.enabled,false);assert.equal(s.manualEnabled,true);assert.equal(s.canRestore,true);assert.equal(f.native.calls.length,0);
+});
