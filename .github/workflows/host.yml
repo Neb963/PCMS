@@ -24,7 +24,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: python3 scripts/release-preflight.py build/pcms-dev.xpi
-      - run: node --test tests/host.test.mjs tests/seed.test.mjs tests/modules.test.mjs tests/queue.test.mjs tests/source-writer.test.mjs tests/capture-cut.test.mjs tests/records.test.mjs tests/journal.test.mjs tests/retention.test.mjs tests/git-writer.test.mjs tests/remediation-diagnostics.test.mjs tests/git-commit-identity.test.mjs tests/accounts.test.mjs tests/donor-accounts.test.mjs tests/creator-allocation.test.mjs tests/creator-creation.test.mjs tests/ui-queries.test.mjs tests/current-rows.test.mjs tests/host-request-diagnostics.test.mjs tests/directory.test.mjs tests/refresher.test.mjs tests/refresh-controller.test.mjs
+      - run: node --test tests/host.test.mjs tests/seed.test.mjs tests/modules.test.mjs tests/queue.test.mjs tests/source-writer.test.mjs tests/source-save-native.test.mjs tests/capture-cut.test.mjs tests/records.test.mjs tests/journal.test.mjs tests/retention.test.mjs tests/git-writer.test.mjs tests/remediation-diagnostics.test.mjs tests/git-commit-identity.test.mjs tests/accounts.test.mjs tests/donor-accounts.test.mjs tests/creator-allocation.test.mjs tests/creator-creation.test.mjs tests/ui-queries.test.mjs tests/current-rows.test.mjs tests/host-request-diagnostics.test.mjs tests/directory.test.mjs tests/refresher.test.mjs tests/refresh-controller.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-candidate-${{ github.event.pull_request.head.sha || github.sha }}

@@ -6,18 +6,29 @@ import base64,hashlib,json,time
 
 def keyboard(sid,label,receipt):
  # Test actual browser Tab traversal. No keys activate provider actions.
- saved=script(sid,"window.__captureFocus=document.activeElement;const nav=document.querySelector('nav');const s={x:scrollX,y:scrollY,nav:nav.scrollLeft};document.querySelector('a.brand').focus();return s;")
- reached=[]
+ saved=script(sid,"window.__captureFocus=document.activeElement;const nav=document.querySelector('nav');return {x:scrollX,y:scrollY,nav:nav.scrollLeft,route:location.hash};")
+ reached=[];audit={'label':label,'width':script(sid,'return innerWidth'),'scope':'24 real Tabs in top document; explicit WebDriver window/content focus; opaque-frame internals covered by installed module action journey','steps':[],'reached':reached,'result':'FAIL'}
  try:
+  handle=call('GET',f'/session/{sid}/window');call('POST',f'/session/{sid}/window',{'handle':handle})
+  # Headless Firefox may leave OS-document focus outside the selected tab.
+  # A real click on the inert heading focuses content without invoking a task.
+  heading=call('POST',f'/session/{sid}/element',{'using':'css selector','value':'#heading'})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/element/{heading}/click',{})
+  script(sid,"window.focus();document.querySelector('a.brand').focus({preventScroll:true});")
   for _ in range(24):
    call('POST',f'/session/{sid}/actions',{'actions':[{'type':'key','id':'visual-keyboard','actions':[{'type':'keyDown','value':'\ue004'},{'type':'keyUp','value':'\ue004'}]}]})
-   state=script(sid,r"const e=document.activeElement;if(!document.hasFocus()||!e||['BODY','HTML'].includes(e.tagName))return {outside:true};const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {tag:e.tagName,id:e.id||null,name:(e.getAttribute('aria-labelledby')?.split(/\s+/).map(id=>document.getElementById(id)?.textContent??'').join(' ')||e.getAttribute('aria-label')||e.labels&&[...e.labels].map(l=>l.textContent).join(' ')||e.getAttribute('title')||(['BUTTON','A','SUMMARY'].includes(e.tagName)?e.textContent:['button','submit','reset'].includes(e.type)?e.value:'')).trim().slice(0,180),hidden:!!e.closest('[hidden],[inert]')||s.display==='none'||s.visibility==='hidden'||r.width<=0||r.height<=0,disabled:!!e.disabled,focusVisible:e.matches(':focus-visible'),outline:s.outlineStyle,frame:e.tagName==='IFRAME'};")
+   state=script(sid,r"const e=document.activeElement,documentFocused=document.hasFocus();if(!e||['BODY','HTML'].includes(e.tagName))return {outside:true,tag:e?.tagName??null,documentFocused};const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {tag:e.tagName,id:e.id||null,href:e.getAttribute('href'),documentFocused,name:(e.getAttribute('aria-labelledby')?.split(/\s+/).map(id=>document.getElementById(id)?.textContent??'').join(' ')||e.getAttribute('aria-label')||e.labels&&[...e.labels].map(l=>l.textContent).join(' ')||e.getAttribute('title')||(['BUTTON','A','SUMMARY'].includes(e.tagName)?e.textContent:['button','submit','reset'].includes(e.type)?e.value:'')).trim().slice(0,180),hidden:!!e.closest('[hidden],[inert]')||s.display==='none'||s.visibility==='hidden'||r.width<=0||r.height<=0,disabled:!!e.disabled,focusVisible:e.matches(':focus-visible'),outline:s.outlineStyle,frame:e.tagName==='IFRAME'};")
+   audit['steps'].append(state)
    if state.get('outside'):continue
    assert not state['hidden'] and not state['disabled'] and state['name'],('KEYBOARD_CONTROL',label,state)
    reached.append(state)
-  assert reached,('NO_KEYBOARD_CONTROLS',label)
-  receipt.setdefault('keyboard',[]).append({'label':label,'width':script(sid,'return innerWidth'),'scope':'24 real Tabs in top document; opaque-frame internals covered by installed module action journey','reached':reached})
+  distinct={(s['tag'],s['id'],s['href'],s['name']) for s in reached};audit['distinctControls']=len(distinct)
+  assert len(distinct)>=4,('NO_KEYBOARD_PROGRESS',label,audit)
+  assert script(sid,'return location.hash;')==saved['route'],('KEYBOARD_CHANGED_ROUTE',label)
+  audit['result']='PASS'
+ except Exception as error:
+  audit['error']=str(error);raise
  finally:
+  receipt.setdefault('keyboard',[]).append(audit)
   call('DELETE',f'/session/{sid}/actions')
   script(sid,"document.querySelector('nav').scrollLeft=arguments[0].nav;window.scrollTo(arguments[0].x,arguments[0].y);if(window.__captureFocus?.isConnected){if(['BODY','HTML'].includes(window.__captureFocus.tagName))document.activeElement?.blur();else window.__captureFocus.focus({preventScroll:true});}delete window.__captureFocus;",[saved])
 

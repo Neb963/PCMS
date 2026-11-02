@@ -22,7 +22,9 @@ def select_editor(sid,slug):
 
 def finish_review(sid,model,html,receipt=None):
  select_editor(sid,SLUG);wait(lambda:script(sid,"return !!window.fixtureAi"));click(sid,'#aiAgentStopBtn');click(sid,'#fixture-settle-ai');set_input(sid,'#fixture-source-model',model);set_input(sid,'#fixture-source-html',html);click(sid,'#fixture-review-assets');wait(lambda:script(sid,"return srcState.list().includes('reviewed.bin')&&!srcState.list().includes('delete.bin')"));toolbar(sid);dashboard(sid);detail(sid,SLUG);click(sid,'#deployment-ai-check');wait(lambda:(deployment(sid)['j']['deployment'].get('readiness') or {}).get('kind')=='ELIGIBLE_UNKNOWN');
- if receipt:state_matrix(sid,'develop-human-review-ready',receipt)
+ if receipt:
+  wait(lambda:script(sid,"const b=document.getElementById('deployment-ai-check'),a=document.getElementById('ai-ready-attestation');return b&&!b.disabled&&a&&!a.parentElement.hidden;"),30)
+  state_matrix(sid,'develop-review-readiness-unknown',receipt)
  select_editor(sid,SLUG);wait(lambda:script(sid,"return !!document.getElementById('pcms-finish-publish')&&!document.getElementById('pcms-finish-publish').disabled"));click(sid,'#pcms-finish-ready');click(sid,'#pcms-finish-publish');toolbar(sid);dashboard(sid)
 
 def check_git(remote,expected,instructions,count):

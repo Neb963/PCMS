@@ -12,7 +12,7 @@ window.app={data:{generator:INITIAL_GENERATOR},store:{data:{user:JSON.parse(loca
 window.modelTextEditor=nativeEditor(app.data.generator.modelText);window.outputTemplateEditor=nativeEditor(app.data.generator.outputTemplate);
 const nativeBytes={};for(const [path,data]of Object.entries(INITIAL_FILES))nativeBytes[path]=Uint8Array.from(atob(data),c=>c.charCodeAt(0));
 const working=JSON.parse(JSON.stringify(app.data.generator.srcManifest));let srcDirty=false;
-window.srcState={_internals:{working,validatePath:path=>path.length>500||path.split('/').some(p=>!/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(p))?'unsupported native path':null},
+window.srcState={_internals:{working,validatePath:path=>path.length>500||path.split('/').some(p=>!(window.__FIXTURE_UNICODE_PATHS===true?/^[\p{L}\p{N}][\p{L}\p{N}\p{M}._ -]*$/u:/^[A-Za-z0-9][A-Za-z0-9._-]*$/).test(p))?'unsupported native path':null},
  list:()=>Object.keys(working),readFile:async path=>nativeBytes[path],isDirty:async()=>srcDirty,hasPending:()=>!!nativeControl.pending,conflictPaths:()=>nativeControl.conflicts??[],ready:async()=>{},
  writeFile:async(path,bytes)=>{const err=srcState._internals.validatePath(path);if(err)throw Error(err);nativeBytes[path]=new Uint8Array(bytes);working[path]={pending:true,size:bytes.length};srcDirty=true;nativeHistory.push({kind:'write',path});},
  deleteFile:async path=>{delete working[path];delete nativeBytes[path];srcDirty=true;nativeHistory.push({kind:'delete',path});},
