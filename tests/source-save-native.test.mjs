@@ -22,3 +22,8 @@ test('request fence refuses a native automatic retry after its first applied sav
 test('lost response and response-schema drift never fake native success',async()=>{for(const fault of ['lose','drift']){const f=await nativeFixture();f[fault]();const p=await f.save(candidate());assert.equal(p.ok,false);assert.equal(f.calls.length,1);assert.deepEqual(f.files,candidate());}});
 test('post-staging asynchronous human or AI changes never cross the native request boundary',async()=>{const f=await nativeFixture();f.c.nativeControl.beforeSubmit=async()=>{f.c.modelTextEditor.getDoc().text+='late human text';};const p=await f.save(candidate());assert.equal(p.code,'SOURCE_STAGED_CHANGED');assert.equal(f.calls.length,0);assert.deepEqual(f.files,initial());assert.ok(f.c.modelTextEditor.getValue().endsWith('late human text'));});
 test('native global public identity supports the observed save payload that omits publicId from generator metadata',async()=>{const f=await nativeFixture();f.c.generatorPublicId=f.c.app.data.generator.publicId;delete f.c.app.data.generator.publicId;const p=await f.save(candidate());assert.equal(p.ok,true,JSON.stringify(p));assert.equal(f.calls.length,1);assert.deepEqual(f.files,candidate());});
+
+test('native 429 retains Retry-After and a definitive rejection with no implicit retry',async()=>{
+ const f=await nativeFixture(),original=f.c.fetch;f.c.fetch=async(url,init)=>String(url).endsWith('/api/save')?new Response('rate limit',{status:429,headers:{'retry-after':'180'}}):original(url,init);
+ const p=await f.save(candidate());assert.equal(p.ok,false);assert.equal(p.code,'SOURCE_RATE_LIMITED');assert.equal(p.rejected,true);assert.equal(p.retryAfterMs,180000);assert.equal(p.dispatched,1);assert.deepEqual(f.files,initial());
+});

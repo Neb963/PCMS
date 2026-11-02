@@ -30,10 +30,14 @@ export function createRefreshController({core,refresher,directory,save,clock=Dat
     catch(error){s.targets[p.id]={until:now+60000,code:publicError(error)};s.pending=null;s.nextDue=now+s.spacingMs;s.code=publicError(error);return persist(s);}
    }
    p={...p,jobId:j.id};s.pending=p;
+   if(j.state==='HELD'&&!j.refresh.context?.loading&&j.effect?.kind==='REFRESH_EDITOR'&&j.effect.boundary==='POSSIBLE')return persist({...s,code:j.recovery?.code??'REFRESH_EDITOR_OPEN_UNKNOWN'});
    if(j.state==='HELD'&&!j.refresh.context?.loading) {
     s.waiting[p.id]=p;s.pending=null;s.nextDue=Math.max(s.nextDue,now+s.spacingMs);s.code=j.recovery?.code??'REFRESH_HELD';
     const packet=j.save?.operationId?await core.view('source-save:'+j.save.operationId):null;
-    if(/RATE_LIMITED|TOO_MANY_REQUESTS|PROVIDER_BACKOFF/.test(s.code))s=providerBackoff(s,{now,retryAfterMs:packet?.retryAfterMs??0,jitter:random()*5000});
+    if(/RATE_LIMITED|TOO_MANY_REQUESTS|PROVIDER_BACKOFF/.test(s.code)){
+     s=providerBackoff(s,{now,retryAfterMs:packet?.retryAfterMs??0,jitter:random()*5000});
+     const m=await core.read('modules',ID);await core.mutate([{table:'modules',id:ID,expectedRev:m.rev,refs:m.refs,value:{...m,refresher:{...m.refresher,backoffUntil:s.backoffUntil}}}],{moduleId:ID,targetId:p.id,step:'REFRESH_PROVIDER_BACKOFF',result:'WAITING'});await refresher.changed?.();
+    }
     return persist(s);
    }
    if(j.state!=='COMPLETE'||g?.refreshLast?.decisionId!==p.decisionId)return persist({...s,code:j.refresh.context?.loading?'REFRESH_EDITOR_LOADING':'SAVING'});
@@ -41,6 +45,7 @@ export function createRefreshController({core,refresher,directory,save,clock=Dat
    if(!snapshot||snapshot.observedAt<p.observeAfter)return persist({...s,code:'WAITING_FOR_MEASUREMENT'});
    if(snapshot.context!==p.before.context){s.pending=null;s.nextDue=now+s.spacingMs;s.code='DIRECTORY_CONTEXT_CHANGED';return persist(s);}
    s=settleRefresh(s,{pending:p,snapshot,owned,now});s.code=s.pending?'WAITING_FOR_PROPAGATION':s.last.responded?'MEASURED_RESPONSE':'NO_VISIBILITY_RESPONSE';
+   if(!s.pending&&!s.last.responded){const target=await core.read('generators',p.id);await core.mutate([{table:'generators',id:p.id,expectedRev:target.rev,refs:target.refs,value:{...target,refreshBackoffUntil:s.targets[p.id].until}}],{moduleId:ID,targetId:p.id,step:'REFRESH_TARGET_BACKOFF',result:'WAITING'});await refresher.changed?.();}
    if(s.pending)await directory.afterSave(s.pending.observeAfter-5000);
    return persist(s);
   }

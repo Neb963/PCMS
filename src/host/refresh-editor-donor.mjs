@@ -20,10 +20,13 @@ export function createRefreshEditorDonor({api,prerequisites,protectedProfile,pat
    return cp.ok?{ok:true,tabId:tab.id,owned:!!(await api.sessions.getTabValue(tab.id,key)),witness:e.witness}:fail(cp.code??'REFRESH_EDITOR_NOT_READY');
   };
   if(selected)return observe(selected);
+  if(op.reconcile||found.profile.pcmsRefreshOpen?.phase==='POSSIBLE'){
+   if(original&&op.reconcile)try{await api.scripting.executeScript({target:{tabId:original.tab.id,frameIds:[0]},world:'MAIN',func:refreshEditorFence,args:[{action:'RELEASE',operationId:op.operationId}]});}catch{/* A closed worker has no local fence. */}
+   return fail('REFRESH_EDITOR_OPEN_UNKNOWN');
+  }
   // A matching user's already-open editor needs no new context or ownership tag.
   const existing=(await api.tabs.query({cookieStoreId:scope.containerId})).find(t=>t.url===url);
   if(existing)return observe(existing);
-  if(op.reconcile||found.profile.pcmsRefreshOpen?.operationId===op.operationId&&found.profile.pcmsRefreshOpen.phase==='POSSIBLE')return fail('REFRESH_EDITOR_OPEN_UNKNOWN');
   if(original) {
    const prior=op.prior,previous=op.priorScope;
    if(!prior||!previous||original.tag.accountId!==previous.accountId||original.tag.slug!==prior.slug||original.tag.remoteId!==prior.remoteId||original.tab.cookieStoreId!==previous.containerId||original.tab.url!=='https://perchance.org/'+prior.slug+'#edit')return fail('REFRESH_WORKER_CONTEXT_CHANGED',true);
@@ -34,6 +37,8 @@ export function createRefreshEditorDonor({api,prerequisites,protectedProfile,pat
    const rows=await api.scripting.executeScript({target:{tabId:original.tab.id,frameIds:[0]},world:'MAIN',func:refreshEditorFence,args:[{action:'ACQUIRE',operationId:op.operationId}]});
    if(rows?.length!==1||rows[0].result?.ok!==true)return fail('REFRESH_WORKER_NEEDS_REVIEW',true);
    try {
+    const census=await inspectSourceEditors(previous,prior),again=census.editors?.find(x=>x.tabId===original.tab.id);
+    if(!census.ok||!again?.clean||again.witness!==e.witness||JSON.stringify(again.files)!==JSON.stringify(e.files))return fail('REFRESH_WORKER_NEEDS_REVIEW',true);
     const final=await sourceCheckpoint(previous,{...prior,tabId:original.tab.id,witness:e.witness});
     if(!final.ok||!await op.validPrevious()||!await op.validNow())return fail(final.code??'REFRESH_ADMISSION_CHANGED',true);
     await patch(scope,{pcmsRefreshOpen:{operationId:op.operationId,phase:'POSSIBLE'}});

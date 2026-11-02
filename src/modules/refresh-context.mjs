@@ -1,7 +1,7 @@
-import {requireCore as check,publicError} from '../core/records.mjs';
+import {requireCore as check} from '../core/records.mjs';
 const scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal});
 export function createRefreshContext({core,donor,validate,clock=Date.now}) {
- async function patch(j,value){await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:j.refs,value:{...j,...value}}],{moduleId:j.moduleId,targetId:j.targetId,jobId:j.id,step:'REFRESH_EDITOR_CONTEXT',result:value.state==='HELD'?'HELD':'IN_PROGRESS'});return core.read('jobs',j.id);}
+ async function patch(j,value){const g=await core.read('generators',j.targetId);await core.mutate([{table:'jobs',id:j.id,expectedRev:j.rev,refs:j.refs,value:{...j,...value}},{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,sourceSaveState:value.state==='HELD'?'UNKNOWN':'WAITING',sourceSaveCode:value.recovery?.code??null}}],{moduleId:j.moduleId,targetId:j.targetId,jobId:j.id,step:'REFRESH_EDITOR_CONTEXT',result:value.state==='HELD'?'HELD':'IN_PROGRESS'});return core.read('jobs',j.id);}
  return async function context(original,reconcile=false) {
   let j=await core.read('jobs',original.id);check(j.rev===original.rev,'STALE_REVISION');
   if(!j.refresh?.automatic||j.refresh.context?.phase==='READY')return null;
@@ -11,7 +11,7 @@ export function createRefreshContext({core,donor,validate,clock=Date.now}) {
    const a=await core.read('accounts',j.accountId),prior=await core.view('refresher-worker'),previous=prior?await core.read('accounts',prior.accountId):null;
    const validNow=async()=>{try{await validate(await core.read('jobs',j.id));return core.queue.effectAllowed(operationId,{moduleId:j.moduleId,targetId:j.targetId,accountId:j.accountId});}catch{return false;}};
    const validPrevious=async()=>{const g=prior?await core.read('generators',prior.id):null;return !!g&&(!g.writerHold||g.writerHold.jobId===j.id)&&g.accountId===prior.accountId&&g.remoteId===prior.remoteId;};
-   let p;try{p=await donor.refreshEditor(scope(a),{...j.input,operationId,reconcile:readOnly,prior,priorScope:previous?scope(previous):null,validNow,validPrevious});}catch(error){p={ok:false,code:publicError(error)};}
+   let p;try{p=await donor.refreshEditor(scope(a),{...j.input,operationId,reconcile:readOnly,prior,priorScope:previous?scope(previous):null,validNow,validPrevious});}catch{p={ok:false,code:'REFRESH_EDITOR_OPEN_UNKNOWN'};}
    if(p.ok||p.noDispatch)await core.saveView(key,p,crypto.randomUUID());return p;
   };
   let response;

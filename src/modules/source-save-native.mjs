@@ -16,7 +16,7 @@ export async function observeSourceCheckpoint(request){
 }
 
 export async function saveNativeSource(request){
- const hold=(code,extra={})=>({ok:false,code,...extra}),w=window;let dispatched=0,staged=false,ack=null,code=null,failurePath=null,rejection=null,afterSaveOriginal=null;const settlements=[];
+ const hold=(code,extra={})=>({ok:false,code,...extra}),w=window;let dispatched=0,staged=false,ack=null,code=null,failurePath=null,rejection=null,retryAfterMs=0,afterSaveOriginal=null;const settlements=[];
  const fail=c=>{code=c;throw Object.assign(Error(c),{code:c});},ensure=(v,c)=>{if(!v)fail(c);},hash=async b=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',b))].map(v=>v.toString(16).padStart(2,'0')).join(''),encode=new TextEncoder();
  let fetchOriginal,confirmOriginal,saveOriginal,model,html,src,menu,listingStaged=false;const options=[],listeners=[],linked=[];
  try{
@@ -60,7 +60,10 @@ export async function saveNativeSource(request){
     ensure(JSON.stringify(Object.keys(b.srcManifest).sort())===JSON.stringify([...expected.keys()].sort()),'SOURCE_MANIFEST_CHANGED');
     ensure(equivalent(await current(),candidate)&&contextSame()&&checkpointSame()&&solo()&&idle(),'SOURCE_STAGED_CHANGED');
     for(const [path,f]of expected){const entry=b.srcManifest[path],working=src._internals.working?.[path];ensure(entry&&entry.size===f.bytes&&typeof entry.key==='string'&&entry.key===working?.key,'SOURCE_MANIFEST_CHANGED');}
-    dispatched++;const response=await nativeFetch(input,init);try{const data=await response.clone().json();if(['saved','stale'].includes(data?.status)&&Number.isSafeInteger(data.time)&&Number.isSafeInteger(data.saveCount)&&/^[a-f0-9]{64}$/.test(data.sourceRevision??''))ack={status:data.status,time:data.time,saveCount:data.saveCount,sourceRevision:data.sourceRevision};else if(['captcha-needed','invalid-edit-key','session-token-error','too-big','too-many-requests','src-too-big','src-too-many-files','src-file-too-big','src-manifest-invalid','src-file-missing','src-verify-unavailable'].includes(data?.status)){rejection=data.status;code='SOURCE_REJECTED_'+data.status.replaceAll('-','_').toUpperCase();}else code='SOURCE_RESPONSE_SCHEMA';}catch{code='SOURCE_RESPONSE_UNKNOWN';}return response;
+    dispatched++;const response=await nativeFetch(input,init);
+    const retry=response.headers.get('retry-after');if(retry){const seconds=Number(retry),date=Date.parse(retry);retryAfterMs=Number.isFinite(seconds)&&seconds>=0?seconds*1000:Number.isFinite(date)?Math.max(0,date-Date.now()):0;if(!Number.isSafeInteger(retryAfterMs))retryAfterMs=0;}
+    if(response.status===429){rejection='too-many-requests';code='SOURCE_RATE_LIMITED';return response;}
+    try{const data=await response.clone().json();if(['saved','stale'].includes(data?.status)&&Number.isSafeInteger(data.time)&&Number.isSafeInteger(data.saveCount)&&/^[a-f0-9]{64}$/.test(data.sourceRevision??''))ack={status:data.status,time:data.time,saveCount:data.saveCount,sourceRevision:data.sourceRevision};else if(['captcha-needed','invalid-edit-key','session-token-error','too-big','too-many-requests','src-too-big','src-too-many-files','src-file-too-big','src-manifest-invalid','src-file-missing','src-verify-unavailable'].includes(data?.status)){rejection=data.status;code='SOURCE_REJECTED_'+data.status.replaceAll('-','_').toUpperCase();}else code='SOURCE_RESPONSE_SCHEMA';}catch{code='SOURCE_RESPONSE_UNKNOWN';}return response;
    }return nativeFetch(input,init);};
   // Deny native escalation only inside this guarded call; restore in finally.
   w.confirm=()=>false;w.app.saveGenerator=()=>false;
@@ -71,11 +74,11 @@ export async function saveNativeSource(request){
   if(request.targetListing!=null){ensure(['PUBLIC','UNLISTED'].includes(request.targetListing),'SOURCE_LISTING_INVALID');g.isPrivate=request.targetListing==='UNLISTED';listingStaged=true;}
   await saveOriginal.call(w.app);await Promise.all(settlements);
   if(ack?.status==='stale')return hold('SOURCE_STALE',{dispatched,staged,ack});
-  if(rejection)return hold(code,{dispatched,staged,ack,rejected:true,rejection});
+  if(rejection)return hold(code,{dispatched,staged,ack,rejected:true,rejection,retryAfterMs});
   if(!ack||ack.status!=='saved'||code)return hold(code??(dispatched===0?'SOURCE_NATIVE_PREPARATION_FAILED':'SOURCE_SAVE_UNKNOWN'),{dispatched,staged,ack});
   ensure(ack.saveCount===request.checkpoint.saveCount+1&&ack.time>=request.checkpoint.time,'SOURCE_RESPONSE_SCHEMA');
   return {ok:true,source:'PERCHANCE_NATIVE_SAVE_1',operationId:request.operationId,dispatched,staged,ack};
- }catch(error){return hold(error.code??'SOURCE_SAVE_UNKNOWN',{dispatched,staged,ack,...failurePath?{path:failurePath}:{}});}
+ }catch(error){return hold(code??error.code??'SOURCE_SAVE_UNKNOWN',{dispatched,staged,ack,retryAfterMs,...rejection?{rejected:true,rejection}:{},...failurePath?{path:failurePath}:{}});}
  finally{
   if(afterSaveOriginal&&src)src.afterSaveSuccess=afterSaveOriginal;if(fetchOriginal)w.fetch=fetchOriginal;if(confirmOriginal)w.confirm=confirmOriginal;
   for(const [name,fn]of listeners)document.removeEventListener(name,fn,true);

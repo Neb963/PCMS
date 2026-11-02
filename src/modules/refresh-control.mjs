@@ -46,7 +46,7 @@ export function settleRefresh(state,{pending,snapshot,owned,now}) {
  const s=structuredClone(state),at=snapshot.displayedSlugs.indexOf(pending.slug),beforeAt=pending.before.displayedSlugs.indexOf(pending.slug),owners=new Set(owned.map(g=>g.slug));
  const countsBefore=vector(pending.before.displayedSlugs,owners),countsAfter=vector(snapshot.displayedSlugs,owners),gain=countsAfter.map((n,i)=>n-countsBefore[i]);
  // A visible, earlier position or a measured maintained endangered band is a response.
- const responded=at>=0&&(beforeAt<0||at<beforeAt||pending.prediction.risk>=2&&at+1<=50);
+ const responded=at>=0&&(beforeAt<0||at<beforeAt||pending.prediction.risk===3&&at+1<=50||pending.prediction.risk===2&&at+1<=100);
  if(!responded && !pending.propagationChecked) {
   s.pending={...pending,propagationChecked:true,observeAfter:Math.max(now+MINUTE,pending.savedAt+MINUTE)};
   s.nextDue=s.pending.observeAfter;return s;
