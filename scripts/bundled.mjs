@@ -64,9 +64,16 @@ const backup=`PCMS.defineModule({
  outcome(result){if(result.state==='COMPLETE')return {kind:'complete',checkpoint:{captureId:result.captureId??null,fileId:result.fileId??null,coverageComplete:result.coverageComplete??null}};if(result.state==='CONTINUE')return {kind:'checkpoint',checkpoint:{captureId:result.captureId??null,restoreId:result.restoreId??null}};if(result.state==='WAITING')return {kind:'wait',dueAt:result.dueAt,checkpoint:{captureId:result.captureId??null,fileId:result.fileId??null,restoreId:result.restoreId??null}};return {kind:'hold',reason:result.code||'BACKUP_PENDING',recovery:{action:'OPEN_BACKUP'}};},
  stop(){}
 });\n`;
+const directory=`PCMS.defineModule({
+ start(){},
+ async runStep(job,api){return this.outcome(await api.action({name:'directory.step'}));},
+ async reconcile(job,api){return this.outcome(await api.query({name:'directory.status'}));},
+ outcome(r){if(r.state==='COMPLETE')return {kind:'complete'};if(r.state==='CONTINUE')return {kind:'checkpoint'};if(r.state==='WAITING')return {kind:'wait',dueAt:r.dueAt||Date.now()+1000};return {kind:'hold',reason:r.code||'DIRECTORY_UNKNOWN',recovery:{action:'OPEN_REFRESHER'}};},
+ stop(){}
+});\n`;
 const stamp=new Date('1980-01-01T00:00:00.000Z');
 export function bundledPackage(id,name){
- const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:id==='pcms-creator'?creator:id==='pcms-deployer'?source:id==='pcms-backup'?backup:pending);
+ const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:id==='pcms-creator'?creator:id==='pcms-deployer'?source:id==='pcms-backup'?backup:id==='pcms-refresher'?directory:pending);
  const manifest={format:1,id,name,version:definition.version,coreApi:1,jobSchema:1,
   readsJobSchemas:[1],capabilities:[...definition.capabilities],entries:{background:'background.js'},
   pages:[],settingsSchema:1,files:[{path:'background.js',bytes:background.length,sha256:sha(background)}]};

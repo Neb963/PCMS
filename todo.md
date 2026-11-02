@@ -18,4 +18,4 @@ Actual main99d8bd0183; branch p36-rendered-directory. Dependencies P10/P07 compl
 
 Local workspace environment is unavailable. All source is persisted on GitHub; author through connected repository tools, verify remote bytes/trees and use hosted focused/qualifying Firefox evidence. Do not claim new local checks.
 
-P36 implementation not yet started.
+P36 first code checkpoint1529ea11142abec9b52c05832690f6ba06720b94 added the rendered snapshot collector and fixed isolated DOM recipe. Current checkpoint adds one private protected observer, finite DIRECTORY queue jobs/module capability, persisted last-good/current state and paging receipts, 60s/120s/5s deadlines, directory eligibility and Home/Refresher controls. Source/provider writes are unchanged. P35 postmerge main run41369941860 PASS. P36 tests and installed evidence are still NOT RUN; next add focused and installed rendered fixtures and run hosted CI before any merge. Current-provider layout qualification remains P47 NOT TESTED.
