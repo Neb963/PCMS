@@ -118,7 +118,7 @@ class Provider(Base):
    with f.lock:
     expected=f.logins.get(self.route);valid=expected and body.get('email')==expected['email'] and body.get('sessionToken')==expected['sessionToken'];f.reads.append({'routeId':self.route,'valid':bool(valid)})
    return self.send({'status':'success','generators':[{'name':'remote-sentinel','isPrivate':True}],'generatorFolderMap':{}} if valid else {'status':'session-token-error'})
-  with f.lock:f.unexpected.append('PROVIDER_OPERATION_REFUSED')
+  with f.lock:f.unexpected.append('PROVIDER_OPERATION_REFUSED:'+self.path)
   self.send({},status=404)
 
 def native_main(port):

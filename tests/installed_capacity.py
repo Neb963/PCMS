@@ -45,6 +45,13 @@ def setup(sid,ids):
  for n in range(3):
   before=script(sid,"return document.querySelector('#global-results a').getAttribute('href')");click(sid,'#global-next');wait(lambda:script(sid,"return document.querySelector('#global-results a')?.getAttribute('href')!==arguments[0]",[before]),30)
  metrics['fourGlobalPagesMs']=(time.monotonic()-start)*1000
+ asyncjs(sid,"const bg=await browser.runtime.getBackgroundPage();bg.__capacityVersionReads=0;const old=bg.IDBCursor.prototype.continue;bg.IDBCursor.prototype.continue=function(...args){if((this.source.objectStore?.name??this.source.name)==='versions')bg.__capacityVersionReads++;return old.apply(this,args);};return true;")
+ repeated=[]
+ for _ in range(3):
+  script(sid,"window.__searchObserved=false;const o=new MutationObserver(()=>{if(document.getElementById('global-search-status').textContent!=='Searching…'){window.__searchObserved=true;o.disconnect();}});o.observe(document.getElementById('global-search-status'),{childList:true,characterData:true,subtree:true});")
+  before=time.monotonic();click(sid,'#global-search-form button');wait(lambda:script(sid,'return window.__searchObserved;'),30);repeated.append((time.monotonic()-before)*1000)
+ metrics['warmRepeatedGlobalSearch']={'uiRoundTripsMs':repeated,'backgroundVersionCursorReads':asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__capacityVersionReads;")}
+
  start=time.monotonic();set_input(sid,'#global-search','scale-generator-0999');click(sid,'#global-search-form button');wait(lambda:script(sid,"return !!document.querySelector('#global-results a[href=\"#generators/scale-generator-0999\"]')"),30);metrics['exactLaterSearchMs']=(time.monotonic()-start)*1000
  result=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{let cursor=null,n=0,pages=0;const start=performance.now();do{const p=await c.list({table:'generators',cursor,limit:50});n+=p.rows.length;pages++;cursor=p.cursor;}while(cursor);await c.collect();const b=await c.readBlob(arguments[0]);return {n,pages,pagingMs:performance.now()-start,binaryBytes:b.size};}finally{c.close();}",[fixture['binaryHash']]);assert result['n']==1001 and result['binaryBytes']==fixture['binaryBytes'],result;metrics['corePagingRetention']=result
  return model

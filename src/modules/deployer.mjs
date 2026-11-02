@@ -35,7 +35,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
   for(let g of await rows('generators')){
    if(g.repositoryId!==connection.repositoryId||g.folderPresent!=='YES'||g.gitHoldCode||g.markerStatus!=='READY')continue;
    const same=jobs.find(j=>j.targetId===g.id&&j.deployment.version===g.markerVersion&&j.kind===g.markerAction&&(j.deployment.lastCheckedFolderTreeSha??j.deployment.folderTreeSha)===g.folderTreeSha);
-   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});else if(!terminal(same)&&same.state==='HELD'&&await resumeable(same,g)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
+   if(same){if(same.state==='WAITING'&&same.deployment.phase==='WAIT_CREATOR'&&g.remoteId&&same.dueAt>clock())await save(same,{state:'WAITING',dueAt:clock(),recovery:null,deployment:{...same.deployment,creatorDependency:null}},'WAKE_CREATOR_DEPENDENCY');else if(!terminal(same)&&same.state==='HELD'&&await resumeable(same,g)&&same.effect?.boundary!=='POSSIBLE')await core.queue.transition(same.id,same.rev,{state:'WAITING',dueAt:clock(),recovery:null});continue;}
    let pinned;try{pinned=await inputs(g);}catch(error){const code=error.code??publicError(error);if(g.deploymentCode!==code)await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,deploymentState:'HELD',deploymentCode:code}}],{moduleId:id,targetId:g.id,step:'READ_READY_INPUTS',result:'HELD',code});continue;}
    try{
     const prior=jobs.find(j=>j.targetId===g.id&&j.deployment.version===pinned.version);

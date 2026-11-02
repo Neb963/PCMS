@@ -86,7 +86,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
   await transact([], 'readwrite',async s=>{
     const saved=await req(s('meta').get('root'));
     requireCore(!saved||(saved.schema===1&&id(saved.dataset)&&Number.isSafeInteger(saved.sequence)&&Number.isSafeInteger(saved.revision)),'UNSUPPORTED_DATASET');
-    if(!saved)await req(s('meta').put({key:'root',schema:1,dataset:crypto.randomUUID(),profileId:crypto.randomUUID(),sequence:0,revision:0,paused:false,createdAt:clock(),updatedAt:clock()}));
+    if(!saved)await req(s('meta').put({key:'root',schema:1,dataRevision:0,contentRevision:0,dataset:crypto.randomUUID(),profileId:crypto.randomUUID(),sequence:0,revision:0,paused:false,createdAt:clock(),updatedAt:clock()}));
   });
   const root=s=>req(s('meta').get('root'));
   const append=async(s,r,event)=>{
@@ -127,6 +127,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       await req(s('versions').add({...row,key:[r.dataset,table,recordId,sequence],table}));
     }
     if(changes.some(c=>['accounts','generators','jobs'].includes(c.table)))r.dataRevision=(r.dataRevision??0)+1;
+    if(changes.length)r.contentRevision=(r.contentRevision??0)+1;
     r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {revision:r.revision,sequence};
   };
   await transact(['events'],'readwrite',async s=>{const r=await root(s);if(!r.profileId){r.profileId=crypto.randomUUID();await append(s,r,{step:'PROFILE_IDENTITY',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}});
@@ -253,7 +254,9 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       if(expected)requireCore(r.dataset===expected.dataset&&r.revision===expected.revision,'STALE_REVISION');
       // Views/drafts are never placed in events or generic public record queries.
       const old=await req(s('views').get([r.dataset,name]));
+      if(old&&JSON.stringify(old.value)===JSON.stringify(value)){const result={revision:r.revision,sequence:old.sequence,unchanged:true};await req(s('commands').put({key:[r.dataset,requestId],result}));return result;}
       const sequence=await append(s,r,{step:'SAVE_VIEW',result:'COMPLETE',targetId:name});
+      if(name!=='shell-view'&&!name.startsWith('module:'))r.contentRevision=(r.contentRevision??0)+1;
       await req(s('views').put({key:[r.dataset,name],value:structuredClone(value),sequence,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;
       const result={revision:r.revision,sequence};await req(s('commands').put({key:[r.dataset,requestId],result}));await req(s('meta').put({...r,updatedAt:clock()}));return result;
     }),

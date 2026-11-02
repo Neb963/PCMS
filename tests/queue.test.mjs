@@ -164,3 +164,11 @@ test('read-only reconciliation may retain its existing uncertain Git lock withou
  const observed=await core.queue.claimGit(j.id,j.rev,'repo');assert.equal(observed.rev,j.rev);assert.equal(observed.git.locked,true);await assert.rejects(core.queue.claimGit(j.id,j.rev,'other'),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');
  await core.queue.reconcile(j.id,j.rev,'same-ref',{matched:true,operationId:'same-ref'});j=await core.read('jobs',j.id);assert.equal(await core.queue.next(),null);await assert.rejects(core.queue.claimGit(j.id,j.rev,'repo'),e=>e.code==='RESTORED_WORK_REVIEW_REQUIRED');
 });
+
+test('R07: unchanged Creator dependency has no idle turn/deadline; a changed upstream wakes the same dependent',async t=>{
+ const core=await openCore({name:'dependency-'+crypto.randomUUID()});t.after(()=>core.close());await core.queue.boot();await core.mutate([{table:'modules',id:'pcms-deployer',value:{enabled:true,generation:1}},{table:'modules',id:'pcms-creator',value:{enabled:true,generation:1}}],{step:'FIXTURE_MODULES',result:'COMPLETE'});
+ const up=await core.queue.enqueue({requestId:'up',logicalKey:'up',moduleId:'pcms-creator',targetId:'generator',kind:'CREATE'}),held=await core.queue.transition(up.id,up.rev,{state:'HELD',recovery:{action:'REPAIR_ROUTE',code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'}});
+ const dep=await core.queue.enqueue({requestId:'dep',logicalKey:'dep',moduleId:'pcms-deployer',targetId:'generator',kind:'DEPLOY'});await core.mutate([{table:'jobs',id:dep.id,expectedRev:dep.rev,value:{...dep,step:'WAIT_CREATOR',deployment:{phase:'WAIT_CREATOR',creatorDependency:{jobId:held.id,revision:held.rev,state:held.state}}}}],{step:'WAIT_CREATOR',result:'WAITING'});
+ const cut=(await core.status()).sequence;assert.equal(await core.queue.next(),null);assert.equal(await core.queue.deadline(),null);assert.equal((await core.status()).sequence,cut);
+ await core.queue.transition(held.id,held.rev,{state:'COMPLETE',recovery:null});assert.ok(await core.queue.deadline());assert.equal((await core.queue.next()).id,dep.id);
+});

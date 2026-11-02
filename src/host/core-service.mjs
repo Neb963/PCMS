@@ -173,6 +173,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'queue.batch':result=await value.queue.batch(message.id);break;
         case 'ui.work':result=await ui.work(message);break;
         case 'ui.search':result=await ui.search(message);break;
+        case 'ui.revision':{const r=await value.status();result={dataset:r.dataset,contentRevision:r.contentRevision??r.revision,paused:r.paused};break;}
         case 'ui.home':result=await ui.home();break;
         case 'ui.review':result=await ui.review(message);break;
         case 'ui.diagnostics':result=await ui.diagnostics();break;

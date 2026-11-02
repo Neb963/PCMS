@@ -10,6 +10,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
  const restoreAllowed=(job,r={},journalMaintenance=false)=>[restoreFence,r.restoreHold].filter(Boolean).every(h=>job.id===h.jobId&&job.moduleId==='pcms-backup'&&job.kind==='RESTORE'||journalMaintenance&&job.moduleId==='pcms-journal');
  const lifecycleJob=(job,a)=>job.moduleId==='pcms-accounts'&&job.id===a?.flow?.jobId&&((a.admission==='REMOVING'&&job.kind==='REMOVE')||(a.admission==='REACTIVATING'&&job.kind==='REACTIVATE'));
  const accountAllowed=(job,a)=>!job.accountId||lifecycleJob(job,a)||!!a&&!accountFences.has(job.accountId)&&!a.admission&&!['ARCHIVED','REMOVING','REMOVED'].includes(a.state)&&(job.moduleId==='pcms-accounts'||a.state==='READY');
+ const waitingForUnchangedCreator=(job,jobs)=>{const d=job.deployment?.creatorDependency,upstream=d?.jobId?jobs.get(d.jobId):null;return job.moduleId==='pcms-deployer'&&job.deployment?.phase==='WAIT_CREATOR'&&upstream&&upstream.rev===d.revision&&upstream.state===d.state;};
  const batchAllowed=(job,parent)=>!job.batchId||!batchFences.has(job.batchId)&&parent?.batchPaused!==true;
  const change=(table,row,value)=>({table,id:row.id,value,expectedRev:row.rev,refs:row.refs??[]});
  const event=(job,step,result,code)=>({jobId:job.id,targetId:job.targetId??job.id,moduleId:job.moduleId,step,result,...code?{code}:{}});
@@ -111,7 +112,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     const jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))),modules=await req(s('modules').index('dataset').getAll(IDBKeyRange.only(r.dataset))),byId=new Map(modules.map(m=>[m.id,m]));
     const accounts=await req(s('accounts').index('dataset').getAll(IDBKeyRange.only(r.dataset))),accountMap=new Map(accounts.map(a=>[a.id,a]));
     const byJob=new Map(jobs.map(j=>[j.id,j]));
-    const ready=jobs.filter(j=>!j.runtimeInvalidated&&restoreAllowed(j,r,maintenance(j,byId.get(j.moduleId)))&&batchAllowed(j,byJob.get(j.batchId))&&accountAllowed(j,accountMap.get(j.accountId))&&['WAITING','READY'].includes(j.state)&&j.dueAt<=clock()&&byId.get(j.moduleId)?.enabled===true&&!byId.get(j.moduleId).lifecycle&&!fenced.has(j.moduleId)&&(!r.paused||maintenance(j,byId.get(j.moduleId))));
+    const ready=jobs.filter(j=>!waitingForUnchangedCreator(j,byJob)&&!j.runtimeInvalidated&&restoreAllowed(j,r,maintenance(j,byId.get(j.moduleId)))&&batchAllowed(j,byJob.get(j.batchId))&&accountAllowed(j,accountMap.get(j.accountId))&&['WAITING','READY'].includes(j.state)&&j.dueAt<=clock()&&byId.get(j.moduleId)?.enabled===true&&!byId.get(j.moduleId).lifecycle&&!fenced.has(j.moduleId)&&(!r.paused||maintenance(j,byId.get(j.moduleId))));
     if(!ready.length)return null;
     const maintain=ready.filter(j=>maintenance(j,byId.get(j.moduleId))),ordinary=ready.filter(j=>!maintenance(j,byId.get(j.moduleId)));
     // One reserved maintenance turn at least every fourth ready turn.
@@ -200,10 +201,10 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
   }),
   acknowledgeWake:(cut=null)=>tx(async(s,r)=>{r.lastWake=clock();r.wakeSequence=cut??r.sequence+1;await append(s,r,{step:'QUEUE_WAKE',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
   deadline:()=>transact(['jobs','modules','accounts'],'readonly',async s=>{
-    const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset)));let next=null;
+    const r=await root(s),jobs=await req(s('jobs').index('dataset').getAll(IDBKeyRange.only(r.dataset))),byJob=new Map(jobs.map(j=>[j.id,j]));let next=null;
     // A wake runs one finite turn. Its acknowledgement cannot consume other
     // due jobs; real WAITING work keeps its deadline until handled or held.
-    for(const job of jobs)if(!job.runtimeInvalidated&&['WAITING','READY'].includes(job.state)){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&!module.lifecycle&&restoreAllowed(job,r,maintenance(job,module))&&batchAllowed(job,job.batchId?await read(s,r,'jobs',job.batchId):null)&&accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null)&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
+    for(const job of jobs)if(!waitingForUnchangedCreator(job,byJob)&&!job.runtimeInvalidated&&['WAITING','READY'].includes(job.state)){const module=await read(s,r,'modules',job.moduleId);if(module?.enabled&&!module.lifecycle&&restoreAllowed(job,r,maintenance(job,module))&&batchAllowed(job,job.batchId?await read(s,r,'jobs',job.batchId):null)&&accountAllowed(job,job.accountId?await read(s,r,'accounts',job.accountId):null)&&(!r.paused||maintenance(job,module)))next=Math.min(next??Infinity,Math.max(clock()+1000,job.dueAt));}
     return next;
   })
  };

@@ -107,3 +107,19 @@ Baseline pixel inspection completed in this session: operator Work screenshot ha
 - Actual installed capture matrix added with exact artifact/viewport/image hashes and hidden/overflow checks. No final screenshot or V PASS yet; [R06 report](docs/remediation/R06-report.md).
 - Full production-code suite running with bounded4-file concurrency before integrated CI. Do not treat screenshot capture or DOM checks as visual acceptance.
 - R06 capture wiring is ready for matching CI; full source run has not yet produced its completion summary. Do not label the in-progress broad run PASS. Published R01 receipt does not qualify these later changes.
+
+## R07 plan (before R07 code)
+
+Full production-code run completed:497 PASS,0 failures (~211s; bounded4-file concurrency). Later optional-detail/capture wiring received focused6-test/syntax checks; exact installed artifacts still require CI.
+
+1. Skip identical view persistence without discarding changed drafts/actions. Track meaningful content revision independently of diagnostic-only events and shell view writes.
+2. Make dashboard refresh non-overlapping and revision-aware, with bounded timed fallback; inputs/explicit actions still query immediately. Measure rather than infer historical latency.
+3. Stop selecting unchanged WAIT_CREATOR dependencies in the existing queue, with prompt wake when the upstream revision/identity changes. Preserve causal recording for actual transitions and no-replay.
+4. Extend actual installed50-account/1000-generator/90k-event workload with repeated query/read metrics, source/history, screenshots and late range/disk evidence. Preserve default30m/90d/Pause/Disable/retention semantics.
+5. Run focused negative/capacity checks and matching installed CI, record actual elapsed/read/memory values and limits in R07 report. Missing long-session/browser evidence stays open; never drop events to improve a benchmark.
+
+### R07 checkpoint / CI selection
+
+- 52 focused corrected T checks PASS. Deployer integration is running. Added real installed repeated-query/version-cursor measurements and standalone pixel capture so a source journey failure cannot hide all UI evidence.
+- Integrated source R06 run41510668203: focused PASS, R01 Journal PASS, actual Git writer PASS; Discover failed its final provider-scope assertion. Its receipt omitted provider calls; now preserved including refused fixture paths. No success inferred for skipped Creator/UI/restore.
+- Independent installed steps now run after earlier failures (job still fails). This avoids repeated serial discovery without suppressing any failure or changing product module enablement. See [R07 report](docs/remediation/R07-report.md).
