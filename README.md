@@ -12,10 +12,12 @@ PCMS is a Firefox extension in development for managing accounts, generators, de
 
 The accepted specification controls product behavior; the design supplies implementation choices. Historical PCMS-Alpha code and research are references, not an alternate product specification.
 
-## Development status
+## Implementation and acceptance
 
-**P01 — Protected packaged host** is implemented with focused and persistently installed Firefox verification. It includes the integrated donor, a dashboard shell, deterministic XPI build and focused/installed checks. It is an incomplete development checkpoint; provider workflows are not implemented. See [current work](todo.md) for exact evidence and holds.
+PCMS includes all seven modules: Accounts, Discover, Creator, Deployer, Refresher, Journal and Backup, sharing one Core dataset, queue and dashboard. Fresh installs enable all seven; existing user packages, settings and disabled state are preserved. P01–P40 implementation and fixture evidence are complete. P41 qualifies the full acceptance candidate; its exact source, tested XPI hash, artifacts and current result are recorded in [current work](todo.md).
 
-Build and installation: [Development guide](docs/DEVELOPMENT.md). Use `npm test` and `npm run build`.
+Authorized live acceptance P42–P49 remains **NOT TESTED**. Fixture records do not establish real routes, current provider compatibility, working restored logins or fleet readiness. The candidate is an unsigned development build; signed/general distribution is unestablished.
 
-Do not commit credentials, account sessions/cookies, native bridge configuration, or credential-inclusive backups. Live provider mutations require explicit authorization and disposable test targets.
+Use the [installation and verification guide](docs/DEVELOPMENT.md) in a dedicated clean Firefox Developer Edition profile with the existing external PersonaMonkey bridge. Keep Alpha profiles intact and retain the configured Gecko ID. Normal sandbox/CSP and donor-first protection remain required.
+
+Do not commit real credentials, sessions/cookies, native bridge configuration, or credential-inclusive backup archives. Live provider effects need named authorized disposable resources as specified in [PHASES.md](PHASES.md).
