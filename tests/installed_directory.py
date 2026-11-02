@@ -65,7 +65,7 @@ def main():
    check(sid);click(sid,'#directory-check');v=wait(lambda:measured(sid),100);assert v['counts']=={'top50':1,'top100':2,'full':3},v
    assert v['positions'][SLUG]['position']==2 and v['positions']['owned-middle']['position']==61 and v['positions']['owned-tail']['position']==112 and v['positions']['owned-absent']['state']=='NOT_SEEN',v
    assert v['filterContext']==[{'name':'listing','value':'public'}];assert len(observer_tabs(sid))==1 and provider.directory_advances==[{'visible':80},{'visible':120},{'visible':160}],provider.directory_advances
-   wait(lambda:'125 displayed' in script(sid,"return document.getElementById('directory-summary').textContent"));click(sid,'nav a[href="#home"]');wait(lambda:'Top 50: 1' in script(sid,"return document.getElementById('home-directory').textContent"))
+   wait(lambda:'125 displayed' in script(sid,"return document.getElementById('directory-summary').textContent"));click(sid,'nav a[href="#home"]');wait(lambda:'Top 50: 1' in script(sid,"return (document.getElementById('home-directory')?.textContent??'')"))
    assert state(sid)['counts']['pool']==1 and provider.save_requests==[] and provider.uploads==[] and provider.generator==original
    receipt['checks'].append('actual-protected-required-iframe/one-owned-observer/native-lazy-More-clicks-once/independent-125-order/pins-first-duplicate/navigation-exclusion/all-owned-three-band-counts-distinct-from-one-pool/Home-UI')
    page(sid);cut=directory_cut(sid);assert cut['lastGood']['displayedSlugs']==ORDER[:-1] and cut['lastGood']['renderedRows']==126
