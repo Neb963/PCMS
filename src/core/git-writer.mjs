@@ -1,3 +1,4 @@
+import {commitIdentity} from './git-commit-identity.mjs';
 // One packaged Git writer over the existing Core queue/credential store.
 // Source/path policy is in git-plan; actual caller admission stays in modules.
 import {requireCore as check,CoreError,publicError} from './records.mjs';
@@ -37,11 +38,11 @@ export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now,
   try{const token=await credential(g.repositoryId);check(typeof token==='string','GIT_CREDENTIAL_REQUIRED');const response=await transport('https://api.github.com/repos/'+g.repository+path,{method,credentials:'omit',cache:'no-store',redirect:'error',signal:timer.signal,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'Content-Type':'application/json','X-GitHub-Api-Version':'2022-11-28'},body:JSON.stringify(body)});
    await core.record({moduleId:job.moduleId,jobId:job.id,targetId:job.targetId,operationId,step:'GIT_HTTP_RESPONSE',result:response.status<400?'OBSERVED':'FAILED',diagnostics:{family:'GIT',method,endpoint:kind==='ref'?'GIT_REF':kind==='commits'?'GIT_COMMIT':kind==='trees'?'GIT_TREE':'GIT_BLOB',httpStatus:response.status,expectedSha:desc.sha}});
    if(kind==='ref'&&[409,422].includes(response.status))return {rejected:true};
-   if([400,401,403,404,409,422,429].includes(response.status))return {failed:response.status===429?'GIT_WRITE_RATE_LIMIT':'GIT_WRITE_DENIED'};
-   check(response.status===200||response.status===201,'GIT_WRITE_OUTCOME_UNKNOWN');try{await response.json();}catch{throw new CoreError('GIT_WRITE_OUTCOME_UNKNOWN');}return {};
+   if([400,401,403,404,409,422,429].includes(response.status))return {failed:({400:'GIT_WRITE_BAD_REQUEST',401:'GIT_WRITE_AUTH_REQUIRED',403:'GIT_WRITE_DENIED',404:'GIT_WRITE_TARGET_MISSING',409:'GIT_WRITE_CONFLICT',422:'GIT_WRITE_VALIDATION',429:'GIT_WRITE_RATE_LIMIT'})[response.status]};
+   check(response.status===200||response.status===201,'GIT_WRITE_OUTCOME_UNKNOWN');let reply;try{reply=await response.json();}catch{throw new CoreError('GIT_WRITE_OUTCOME_UNKNOWN');}const observed=kind==='ref'?reply?.object?.sha:reply?.sha;check(observed===desc.sha,'GIT_POST_IDENTITY_MISMATCH',{failedCheck:'POST_SHA',expectedSha:desc.sha,observedSha:observed,httpStatus:response.status});await core.record({moduleId:job.moduleId,jobId:job.id,targetId:job.targetId,operationId,step:'GIT_POST_IDENTITY',result:'OBSERVED',diagnostics:{expectedSha:desc.sha,observedSha:observed}});return {};
   }finally{clearTimeout(timeout);}
  }
- async function observeObject(g,desc){try{const body=await object(g,desc.kind,desc.sha);if(desc.kind==='commits')check(body.tree?.sha===desc.body.tree&&JSON.stringify(body.parents?.map(p=>p.sha))===JSON.stringify(desc.body.parents)&&body.message===desc.body.message,'GIT_COMMIT_IDENTITY_MISMATCH',{failedCheck:'COMMIT_IDENTITY',expectedSha:desc.sha,observedSha:body.sha,expectedTree:desc.body.tree,observedTree:body.tree?.sha,treeMatches:body.tree?.sha===desc.body.tree,parentsMatch:JSON.stringify(body.parents?.map(p=>p.sha))===JSON.stringify(desc.body.parents),messageMatches:body.message===desc.body.message,expectedLength:desc.body.message.length,observedLength:typeof body.message==='string'?body.message.length:0,expectedTerminalLf:desc.body.message.endsWith('\n'),observedTerminalLf:typeof body.message==='string'&&body.message.endsWith('\n')});return true;}catch(error){if(error.code==='GIT_OBJECT_UNAVAILABLE')return false;throw error;}}
+ async function observeObject(g,desc){try{const body=await object(g,desc.kind,desc.sha);if(desc.kind==='commits'){const identity=commitIdentity(desc,body);check(identity.matched,'GIT_COMMIT_IDENTITY_MISMATCH',identity.diagnostics);};return true;}catch(error){if(error.code==='GIT_OBJECT_UNAVAILABLE')return false;throw error;}}
  async function refState(g,active,reply){
   if(reply?.rejected)return {matched:true,disposition:'REJECTED'};
   const h=await head(g),plan=active.plan;

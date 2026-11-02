@@ -70,3 +70,10 @@ test('the Work Git readback control preserves a separate human-review hold and c
 test('a caller may hold a denied workflow, but readback cannot promote its failed object into known success',async t=>{
  const f=await fixture(t),job=await f.enqueue({kind:'PREPARE',slug:'held-denial'});f.model.deny('blobs');await f.drain();let j=await f.core.read('jobs',job.id);const index=j.git.active.index;await f.core.queue.transition(j.id,j.rev,{state:'HELD',recovery:{action:'CHECK_GIT',code:'GIT_WRITE_DENIED'}});f.model.deny(null);const r=await f.writer.check(j.id);j=await f.core.read('jobs',job.id);assert.equal(r.value.state,'HELD');assert.equal(r.value.code,'GIT_WRITE_DENIED');assert.equal(j.git.active.index,index);assert.deepEqual(j.git.known,{});assert.equal(f.model.calls.length,1);assert.equal(f.model.reachableOperations().length,0);
 });
+
+test('R02: safe HTTP causes distinguish rejection classes; server errors remain unknown with no replay',async t=>{
+ for(const [status,code]of [[400,'GIT_WRITE_BAD_REQUEST'],[401,'GIT_WRITE_AUTH_REQUIRED'],[403,'GIT_WRITE_DENIED'],[404,'GIT_WRITE_TARGET_MISSING'],[409,'GIT_WRITE_CONFLICT'],[422,'GIT_WRITE_VALIDATION'],[429,'GIT_WRITE_RATE_LIMIT'],[500,'GIT_WRITE_OUTCOME_UNKNOWN']]){
+  const f=await fixture(t),j=await f.enqueue({kind:'PREPARE',slug:'http-'+status});f.model.deny('blobs',status);await f.drain();const job=await f.core.read('jobs',j.id),page=await f.core.list({table:'events',search:'GIT_HTTP_RESPONSE'});assert.ok(page.rows.some(r=>r.diagnostics.httpStatus===status));
+  if(status===500){assert.equal(job.effect.boundary,'POSSIBLE');assert.equal(job.diagnostics.causeCode,code);const before=f.model.calls.length;await f.check(j.id);assert.equal(f.model.calls.length,before);}else{assert.equal(job.state,'FAILED');assert.equal(job.recovery.code,code);}
+ }
+});

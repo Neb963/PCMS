@@ -30,7 +30,7 @@ def commit(root,sha):
  def actor(text):
   m=re.fullmatch(r'(.*) <([^<>]*)> (-?\d+) ([+-]\d{4})',text)
   return {'name':m[1],'email':m[2],'date':datetime.datetime.fromtimestamp(int(m[3]),datetime.timezone.utc).isoformat(timespec='milliseconds').replace('+00:00','Z')}
- return {'sha':sha,'tree':{'sha':fields['tree'][0]},'parents':[{'sha':p} for p in fields.get('parent',[])],'message':message,'author':actor(fields['author'][0]),'committer':actor(fields['committer'][0])}
+ return {'sha':sha,'tree':{'sha':fields['tree'][0]},'parents':[{'sha':p} for p in fields.get('parent',[])],'message':message[:-1] if message.endswith('\n') else message,'author':actor(fields['author'][0]),'committer':actor(fields['committer'][0])}
 def head(root):return git(root,'rev-parse','refs/heads/main').decode().strip()
 def ancestor(root,base,tip):return git(root,'merge-base','--is-ancestor',base,tip,check=False).returncode==0
 def update_controls(root,patch):

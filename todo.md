@@ -30,3 +30,19 @@ The P41 candidate was rejected. Its prior fixture receipts do not close the I-Aâ
 - Local Firefox155.0b1 could not create a session: sandbox uid_map EPERM/content-process crashes. No sandbox workaround applied. Extended installed Journal/independent disk test and selected CI for this changed boundary. Required B/DSK pending; see [R01 report](docs/remediation/R01-report.md).
 - CI run 41505996118 passed the R01 installed Journal causal-fault/independent disk step and startup step on source e3c8087b; remaining integration steps were still running at observation. This is evidence of the executed local fault scope, not provider acceptance.
 - Review added per-read Git status witnesses, file failure codes, explicit HELD semantics, bounded redaction metadata and effect timings. Added actual installed 100001-event/90-day tail-export oracle; these last changes require the next matching CI receipt.
+
+## R02 plan (before R02 code)
+
+R01's default installed disk fault/continuity step passed on e3c8087b. Latest diagnostic additions and installed 100k-range measurement are awaiting matching CI; this is not a waived release gate. Continue safe bounded Git implementation, keeping R01 and all final gates open until exact evidence is collected.
+
+1. Verify commit GET identity against exact expected object SHA/tree/ordered parents/author/committer and deterministic message. Permit only the observed omission of exactly one terminal LF; no trim or other normalization.
+2. Validate/persist safe POST identity/status metadata without trusting POST as independent completion. Preserve possible-effect attribution and read-only same-operation recovery, no force and no second commit/ref on ambiguity.
+3. Correct independent Node and actual bare-Git HTTPS fixtures to emulate GitHub's message representation by default. Add negative message/trailer/tree/parent/actor cases and lost-ACK normalized readback.
+4. Run production Git/Discover focused tests; select actual installed Discoverâ†’Git fixture and Git writer/Work journey in CI. Reuse the package's independent public raw-object proof (do not repeat research or mutate a content repository).
+5. Publish R02 report and checkpoints with exact tier scope; merge only verified work. Live G/P43 remains NOT TESTED.
+
+### R02 implementation checkpoint
+
+- Exact commit SHA/tree/ordered parents/name/email/time are required. Only exactly one terminal LF may be absent from GET message presentation; all other bytes and trailer remain exact.
+- POST object identity is checked and recorded, while independent GET/reachability remains required. HTTP rejection classes are typed; server/lost replies remain POSSIBLE and cannot replay.
+- Independent Node/bare-Git HTTPS fixtures now normalize the presentation, so prior writer tests exercise the formerly missing case. New raw `git hash-object` oracle and malicious drift cases pass with the focused Git/Discover suite. Installed matching evidence pending.
