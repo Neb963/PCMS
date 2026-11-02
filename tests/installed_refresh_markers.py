@@ -95,7 +95,16 @@ def main():
    three=verified(sid,3);assert three['j']['effect']['operationId']==op and len(provider.save_requests)==3;assert_bytes(provider,expected,marker,3)
    receipt['checks'].append('server-applied-third-save/actual-process-crash/lost-ACK/readback-outage/original-POSSIBLE-and-counter2-retained/normal-route-reverify/real-Check-control/full-readback-resolves-same-operation/counter3/no-resend')
    # Open is a real scoped handler, needed after a browser that restores no live tabs.
-   click(sid,'button[data-refresh-open="'+SLUG+'"]');editor_handle=editor(sid);dashboard(sid);page(sid);check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');provider.race=True;refresh(sid);held=wait(lambda:refresh_cut(sid) if refresh_cut(sid)['g'].get('sourceSaveCode')=='SOURCE_STALE' else None,100);assert held['j']['effect']['disposition']=='REJECTED' and held['g']['refreshMarker']['counter']==3;assert len(provider.save_requests)==4;assert provider.generator['modelText']=='Independent external editor changed source\n';assert held['g']['previousGood'] is not None
+   click(sid,'button[data-refresh-open="'+SLUG+'"]')
+   try:editor_handle=editor(sid)
+   except AssertionError:
+    dashboard(sid)
+    receipt['openDiagnostic']={'ui':script(sid,"return {result:document.getElementById('refresher-result')?.textContent,open:(b=>b?{disabled:b.disabled,hidden:b.hidden}:null)(document.querySelector('button[data-refresh-open]')),body:document.body.innerText.slice(-1200)}"),'account':account(sid,owner),'urls':[]}
+    for handle in call('GET',f'/session/{sid}/window/handles'):
+     call('POST',f'/session/{sid}/window',{'handle':handle})
+     receipt['openDiagnostic']['urls'].append(script(sid,"return location.href"))
+    raise AssertionError(('REFRESHER_EDITOR_OPEN_FAILED',receipt['openDiagnostic']))
+   dashboard(sid);page(sid);check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');provider.race=True;refresh(sid);held=wait(lambda:refresh_cut(sid) if refresh_cut(sid)['g'].get('sourceSaveCode')=='SOURCE_STALE' else None,100);assert held['j']['effect']['disposition']=='REJECTED' and held['g']['refreshMarker']['counter']==3;assert len(provider.save_requests)==4;assert provider.generator['modelText']=='Independent external editor changed source\n';assert held['g']['previousGood'] is not None
    native_filter(sid,'all');wait(lambda:visibility(sid)['fresh'] and visibility(sid)['size']==127,100);assert provider.generator['modelText']=='Independent external editor changed source\n' and len(provider.save_requests)==4 and provider.unexpected==[]
    receipt['checks'].append('real-Open-protected-editor-after-cold-start/external-version-race/stale-rejection-no-repair/marker-counter-not-advanced/previous-good-and-user-base-preserved/independent-directory-work-continues-on-same-account')
    receipt['markerId']=marker;receipt['operationId']=op;receipt['saves']=provider.save_requests;receipt['final']=refresh_cut(sid);receipt['result']='PASS'
