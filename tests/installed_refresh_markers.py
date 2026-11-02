@@ -30,7 +30,12 @@ def assert_bytes(provider,initial,marker,counter):
  assert provider.generator['isPrivate'] is False
  return files
 def reopen_account(sid,owner):
- script(sid,"location.hash='#accounts/'+arguments[0]",[owner]);wait(lambda:script(sid,"return !!document.getElementById('account-open')&&!document.getElementById('account-open').disabled"));old=account(sid,owner)['flow']['jobId'];click(sid,'#account-open');dashboard(sid);wait(lambda:account(sid,owner)['flow']['jobId']!=old);settle(sid,owner,'READY');page(sid)
+ script(sid,"location.hash='#accounts/'+arguments[0]",[owner]);
+ try:wait(lambda:script(sid,"const b=document.getElementById('account-open');return !!b&&!b.hidden&&!b.disabled"),35)
+ except AssertionError:
+  detail=script(sid,"const b=document.getElementById('account-open');return {hash:location.hash,button:b?{disabled:b.disabled,hidden:b.hidden}:null,accountState:document.getElementById('account-state')?.textContent,accountActions:[...document.querySelectorAll('[id^=account-]')].map(x=>({id:x.id,disabled:x.disabled,hidden:x.hidden}))}")
+  raise AssertionError(('ACCOUNT_OPEN_UNAVAILABLE_AFTER_COLD_RESTART',detail,account(sid,owner)))
+ old=account(sid,owner)['flow']['jobId'];click(sid,'#account-open');dashboard(sid);wait(lambda:account(sid,owner)['flow']['jobId']!=old);settle(sid,owner,'READY');page(sid)
 
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k);receipt={'tier':'B/P37/both-markers','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]};assert receipt['xpiSha256']==identity['xpiSha256']
