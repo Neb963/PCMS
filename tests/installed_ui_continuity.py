@@ -9,6 +9,12 @@ from installed_lifecycle import manage,module
 from installed_source import completed_source
 import account_fixture
 account_fixture.Provider=Provider
+_click=click
+def click(sid,selector):
+ wait(lambda:script(sid,"const e=document.querySelector(arguments[0]);return !!e&&!e.hidden&&!e.disabled&&e.getClientRects().length>0",[selector]),30)
+ return _click(sid,selector)
+def manage(sid,kind):
+ return click(sid,'#records section[data-module="fixture-module"] button[data-lifecycle="'+kind+'"]')
 
 def enter(sid,selector):
  e=call('POST',f'/session/{sid}/element',{'using':'css selector','value':selector})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/element/{e}/value',{'text':'\ue007'})
