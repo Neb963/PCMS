@@ -2,6 +2,7 @@
 production ZIP disk reads. No provider access, real credentials or route effects.
 """
 from installed_packages import *
+from visual_capture import state_matrix
 
 def set_input(sid,selector,text):
  # WebDriver clear does not deliver the input event used by real keyboard
@@ -58,6 +59,7 @@ def main():
    journal(sid);prior_settings=inspect(sid)['journal'];set_input(sid,'#journal-folder','PCMS/../never-export-private-fixture');click(sid,'#save-journal-settings')
    wait(lambda:script(sid,"return document.getElementById('save-journal-settings').nextElementSibling.textContent==='Use a relative folder inside PCMS, without dots or unsafe path characters.'"))
    assert inspect(sid)['journal']['folder']==prior_settings['folder'] and inspect(sid)['journal']['intervalMinutes']==prior_settings['intervalMinutes']
+   state_matrix(sid,'settings-journal-validation-error',receipt)
    set_input(sid,'#journal-folder',prior_settings['folder']);fixture['last']=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),r=await c.status();c.close();return r.sequence;")
    set_input(sid,'#journal-first',str(fixture['first']));set_input(sid,'#journal-last',str(fixture['last']));click(sid,'#export-journal')
    completed=wait(lambda:next((f for f in inspect(sid)['files'] if not f['automatic'] and f['state']=='COMPLETE'),None),30);path=disk/completed['filename'];m,rows=read_zip(path);assert (m['first'],m['last'],m['count'])==(fixture['first'],fixture['last'],fixture['last']-fixture['first']+1);assert [r['targetId'] for r in rows if r['step']=='JOURNAL_FIXTURE']==['fixture-target-'+str(i) for i in range(65)];assert path.stat().st_size==completed['bytes'];assert hashlib.sha256(path.read_bytes()).hexdigest()==completed['sha256'];manual_hash=hashlib.sha256(path.read_bytes()).hexdigest();assert inspect(sid)['journal']['watermark']==0

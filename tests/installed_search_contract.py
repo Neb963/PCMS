@@ -6,6 +6,7 @@ from installed_records import asyncjs,click
 from installed_host import call,script,wait
 from installed_journal import set_input
 import time
+from visual_capture import state_matrix
 
 def run(sid,receipt):
  script(sid,"window.scrollTo(0,0)")
@@ -36,6 +37,7 @@ def run(sid,receipt):
    links=script(sid,"return [...document.querySelectorAll('#global-results a')].map(a=>a.getAttribute('href'))")
    if expected is not None:assert sorted(links)==sorted(expected),(query,links)
    return {'query':query,'hrefs':links,'elapsedMs':(time.monotonic()-start)*1000}
+  suite='integrated' if 'one-profile' in receipt['tier'] else 'shared'
   results=[]
   results.append(search('ŻÓŁĆ 雪 search owner'))
   assert '#accounts/search-account-one' in results[-1]['hrefs'] and '#accounts/search-account-two' in results[-1]['hrefs']
@@ -45,6 +47,7 @@ def run(sid,receipt):
   results.append(search('search-completed-job',['#work/search-completed-job']))
   click(sid,'#global-results a');wait(lambda:script(sid,"return location.hash==='#work/search-completed-job'&&document.getElementById('work-job-state')!==null"))
   results.append(search('no-such-synthetic-result-991',[]));assert script(sid,"return document.getElementById('global-search-status').textContent")=='No matching items.'
+  state_matrix(sid,suite+'-global-search-no-results',receipt)
   asyncjs(sid,"(await browser.runtime.getBackgroundPage()).__searchProbe.delayed=true;return true;")
   set_input(sid,'#global-search','slow-needle');click(sid,'#global-search-form button[type="submit"]')
   wait(lambda:asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__searchProbe.requests.some(r=>r.query==='slow-needle');"))
@@ -57,6 +60,7 @@ def run(sid,receipt):
   set_input(sid,'#global-search','fast-needle');click(sid,'#global-search-form button[type="submit"]')
   wait(lambda:script(sid,"return document.getElementById('global-search-status').textContent==='Search unavailable: STORAGE_UNAVAILABLE'"),30)
   assert script(sid,"return document.getElementById('global-search').value==='fast-needle'&&document.querySelectorAll('#global-results a').length===0")
+  state_matrix(sid,suite+'-global-search-storage-error',receipt)
   results.append(search('fast-needle',['#generators/search-fast','#work/search-completed-job']))
   probe=asyncjs(sid,"const p=(await browser.runtime.getBackgroundPage()).__searchProbe;return {requests:p.requests,responses:p.responses,failed:p.failed};")
   assert probe['failed']==1 and any(not r['ok'] and r['code']=='STORAGE_UNAVAILABLE' for r in probe['responses']),probe

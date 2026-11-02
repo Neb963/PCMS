@@ -1,6 +1,7 @@
 """R06: independent installed pixel capture; functional receipts remain separate."""
 from installed_ui_continuity import *
 from visual_capture import matrix,capture,viewport,state_matrix
+from installed_accounts import page as account_page
 
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k)
@@ -16,8 +17,9 @@ def main():
    for width in [1280,560,390]:
     viewport(sid,width);click(sid,'nav a[href="#generators"]');wait(lambda:script(sid,"return !!document.getElementById('catalog-search')"));capture(sid,'generators-empty',receipt)
    settings(sid);wait(lambda:script(sid,"return !!document.getElementById('allow-userscripts')"));click(sid,'#allow-userscripts');permission_choice(sid,True);wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"))
-   owner=add(sid,'Continuity owner');settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'visual@fixture.test');click(sid,'#account-confirm');settle(sid,owner,'READY')
-   matrix(sid,receipt,click,set_input,owner);receipt['result']='CAPTURED — VISION REVIEW REQUIRED'
+   owner=add(sid,'Continuity owner');settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'visual@fixture.test');state_matrix(sid,'account-awaiting-confirm',receipt);click(sid,'#account-confirm');settle(sid,owner,'READY')
+   matrix(sid,receipt,click,set_input,owner);viewport(sid,1280)
+   account_page(sid,owner);click(sid,'#account-archive');settle(sid,owner,'ARCHIVED');state_matrix(sid,'account-archived',receipt);receipt['result']='CAPTURED — VISION REVIEW REQUIRED'
   except Exception as error:
    receipt['error']=str(error)
    if sid:
