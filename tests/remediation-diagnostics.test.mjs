@@ -54,3 +54,19 @@ test('R01: default checkpoint excludes private labels, principal, routes, source
  const files=unzipSync(archive.bytes);files['diagnostics.json'][0]^=1;
  const {zipSync}=await import('fflate');await assert.rejects(verifyJournalArchive(zipSync(files)),/JOURNAL_ARCHIVE_INVALID/);
 });
+test('R01: five independent jobs keep complete causal chronology across view changes, original failures and cold reopen',async t=>{
+ let {core,name}=await fixture(t);await core.mutate([{table:'modules',id:'causal-fixture',value:{enabled:true,generation:1}}],{step:'MODULE_READY',result:'COMPLETE'});await core.queue.boot();
+ const jobs=await Promise.all(Array.from({length:5},(_,i)=>core.queue.enqueue({requestId:'causal-'+i,logicalKey:'causal-'+i,moduleId:'causal-fixture',targetId:'target-'+i,kind:'WORK'})));
+ const outcomes=new Map();let calls=0;
+ for(let i=0;i<5;i++){
+  const job=await core.queue.next();assert.ok(job);const operationId='causal-effect-'+i;outcomes.set(job.id,{operationId,target:job.targetId,unknown:i>=3});
+  await core.saveView('causal-view',{selected:job.targetId},crypto.randomUUID());
+  await core.queue.dispatch(job.id,job.rev,{operationId,kind:'FIXTURE_WRITE',preflight:async()=>({ok:true}),call:async()=>{calls++;if(i===3)throw new CoreError('TRANSPORT_TIMEOUT');if(i===4)throw new Error('PRIVATE_NON_STORAGE_EXCEPTION');},observe:async()=>({matched:true,operationId})});
+  const current=await core.read('jobs',job.id);if(i<3)await core.queue.transition(job.id,current.rev,{state:'COMPLETE'});else assert.equal(current.effect.boundary,'POSSIBLE');
+ }
+ assert.equal(calls,5);assert.equal(new Set(outcomes.keys()).size,jobs.length);core.close();core=await openCore({name});t.after(()=>core.close());await core.queue.boot();
+ const archive=await journalArchive(core,{first:1,last:(await core.status()).sequence}),files=unzipSync(archive.bytes),rows=strFromU8(files['events.jsonl']).trim().split('\n').map(JSON.parse);
+ assert.deepEqual(rows.map(r=>r.sequence),Array.from({length:archive.manifest.count},(_,i)=>i+1));assert.deepEqual(archive.manifest.gaps,[]);
+ for(const [jobId,expected] of outcomes){const causal=rows.filter(r=>r.operationId===expected.operationId);assert.equal(causal.filter(r=>r.step==='EFFECT_INTENT').length,1);assert.ok(causal.every(r=>r.jobId===jobId&&r.targetId===expected.target));assert.ok(causal.some(r=>r.step===(expected.unknown?'EFFECT_OUTCOME':'EFFECT_READBACK')));}
+ const failures=rows.filter(r=>r.step==='EFFECT_OUTCOME');assert.ok(failures.every(r=>r.code==='OUTCOME_UNKNOWN'));assert.deepEqual(failures.map(r=>r.diagnostics.causeCode).sort(),['INTERNAL_ERROR','TRANSPORT_TIMEOUT']);assert.ok(failures.every(r=>r.diagnostics.noReplay===true));for(const bytes of Object.values(files))assert.ok(!strFromU8(bytes).includes('PRIVATE_NON_STORAGE_EXCEPTION'));assert.equal(await core.queue.next(),null);
+});

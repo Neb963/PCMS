@@ -56,7 +56,11 @@ def unknown(sid,slug,kind):
  s=inspect_creator(sid);g=next((g for g in s['rows'] if g['slug']==slug),None)
  return next((j for j in s['jobs'] if g and j['id']==g.get('creatorJobId') and j['state']=='HELD' and j.get('effect',{}).get('boundary')=='POSSIBLE' and j['effect']['kind']==kind),None)
 def restart_recover(sid,profile,binary,owner,provider,slug):
- prior=stop(sid,profile);sid,_=session15(binary,profile);restart_recover.active_sid=sid;assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);account_page(sid,owner);wait(lambda:(lambda a:a.get('flow',{}).get('purpose')=='RENEW' and a.get('protection',{}).get('state')=='VERIFIED' and a['state']=='READY' and a.get('work',{}).get('state')=='COMPLETE')(account(sid,owner)),75);dashboard(sid)
+ previous=account(sid,owner)['flow']['jobId'];prior=stop(sid,profile);sid,_=session15(binary,profile);restart_recover.active_sid=sid;assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);account_page(sid,owner)
+ def recovered():
+  a=account(sid,owner);f=a.get('flow') or {};w=a.get('work') or {};started=f.get('startedAt') or 0
+  return (a.get('state')=='READY' and f.get('purpose') in ['OPEN','RENEW'] and f.get('jobId')!=previous and w.get('id')==f.get('jobId') and w.get('state')=='COMPLETE' and w.get('effect',{}).get('boundary')=='OBSERVED' and started>0 and (a.get('routeObservedAt') or 0)>=started and ((f['purpose']=='RENEW' and a.get('protection',{}).get('state')=='VERIFIED' and (a.get('identityObservedAt') or 0)>0) or (a.get('identityObservedAt') or 0)>=(a.get('routeObservedAt') or 0)))
+ wait(recovered,75);dashboard(sid)
  with provider.lock:provider.hide=None
  detail(sid,slug);click(sid,'#creator-check');wait(lambda:target(sid,slug).get('creatorState')=='CREATED',60);wait(lambda:'Created' in script(sid,"return document.getElementById('creator-state').textContent"),15);return sid
 
@@ -90,8 +94,15 @@ def main():
    sid=getattr(restart_recover,'active_sid',None) or sid
    receipt['error']=str(error);receipt['writes']=provider.writes;receipt['slugReads']=provider.slug_reads;receipt['unexpected']=provider.unexpected
    if sid:
-    try:dashboard(sid);receipt['page']=script(sid,"return document.body.innerText");receipt['state']=inspect_creator(sid)
+    try:dashboard(sid);receipt['page']=script(sid,"return document.body.innerText");receipt['state']=inspect_creator(sid);receipt['account']=account(sid,owner)
     except Exception:pass
+    try:
+     # Export the ordinary secret-safe product diagnostics even when the
+     # provider journey fails, then independently reopen its exact disk bytes.
+     before={f['id'] for f in journal_files(sid)['files']};journal(sid);click(sid,'#export-journal')
+     failed_export=wait(lambda:next((f for f in journal_files(sid)['files'] if f['id'] not in before and f['state']=='COMPLETE'),None),45);archive=disk/failed_export['filename'];manifest,events=read_zip(archive);destination=OUT/'creator-failure-journal.zip';destination.write_bytes(archive.read_bytes())
+     receipt['failureJournal']={'sha256':hashlib.sha256(destination.read_bytes()).hexdigest(),'first':manifest['first'],'last':manifest['last'],'causes':[r for r in events if r.get('code') or r.get('severity')=='error'][-60:]}
+    except Exception as diagnostic:receipt['failureJournalError']=str(diagnostic)
    print(json.dumps(receipt),flush=True);raise
   finally:
    if sid:

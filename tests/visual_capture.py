@@ -22,6 +22,8 @@ def capture(sid,label,receipt):
  directory=OUT/'visual'/receipt.get('visualSuite','shared-ui');directory.mkdir(parents=True,exist_ok=True)
  state=script(sid,"return {route:location.hash,width:innerWidth,height:innerHeight,outerWidth,outerHeight,scrollX,scrollY,documentWidth:document.documentElement.scrollWidth,devicePixelRatio,platform:navigator.platform}")
  assert state['documentWidth']<=state['width']+1,('HORIZONTAL_OVERFLOW',label,state)
+ navigation=script(sid,"const a=document.querySelector('nav a[aria-current=\"page\"]'),nav=a?.closest('nav');if(!nav)return null;const r=a.getBoundingClientRect(),n=nav.getBoundingClientRect();return {left:r.left,right:r.right,navLeft:n.left,navRight:n.right};")
+ assert navigation is None or navigation['left']>=navigation['navLeft']-1 and navigation['right']<=navigation['navRight']+1,('ACTIVE_NAVIGATION_CLIPPED',label,navigation)
  hidden=script(sid,"return [...document.querySelectorAll('[hidden]')].filter(e=>e.getClientRects().length>0).map(e=>({tag:e.tagName,id:e.id}));")
  assert hidden==[],('VISIBLE_HIDDEN_CONTROL',label,hidden)
  for mode,endpoint in [('viewport','screenshot'),('full','moz/screenshot/full')]:

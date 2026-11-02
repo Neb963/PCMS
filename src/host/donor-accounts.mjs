@@ -255,7 +255,16 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    if(await nativeSettled(scope.routeId))return settle(scope,operationId,stage,fail('ACCOUNT_ROUTE_RECHECK_REQUIRED',{resolved:true}));return fail('ACCOUNT_OUTCOME_UNKNOWN');
   }
   if(stage==='OPEN'){
-   const matches=(await ownedTabs(scope)).filter(x=>x.tag.operationId===operationId);if(matches.length!==1)return fail('ACCOUNT_TAB_OPEN_UNKNOWN');return {ok:true,operationId,stage,...tuple(p),tabId:matches[0].tab.id};
+   // The browser may return the exact newly tagged tab before its first
+   // navigation commits. Observe that local OPEN; IDENTITY still waits for a
+   // loaded Perchance document and checks its principal independently.
+   const matches=[];for(const tab of await api.tabs.query({cookieStoreId:scope.containerId})){
+    const tag=await api.sessions.getTabValue(tab.id,'pcmsAccountTab');
+    if(tag?.accountId!==scope.accountId||tag.personaUid!==scope.personaUid||tag.operationId!==operationId||tab.cookieStoreId!==scope.containerId)continue;
+    const opening=tab.status==='loading'&&['about:blank','about:newtab'].includes(tab.url)&&(!tab.pendingUrl||ownOrigin(tab.pendingUrl));
+    if(ownOrigin(tab.url)||opening)matches.push(tab);
+   }
+   if(matches.length!==1)return fail('ACCOUNT_TAB_OPEN_UNKNOWN');return {ok:true,operationId,stage,...tuple(p),tabId:matches[0].id};
   }
   return fail('ACCOUNT_OUTCOME_UNKNOWN');
  }

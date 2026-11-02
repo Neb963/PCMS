@@ -36,7 +36,9 @@ export function attachCaptureCut(core,{transact,root,checkedRefs,append,req,chec
   const data={format:1,captureId,createdAt:finishedAt,core:{root:structuredClone(r),records,versions,views,commands,credentials:logicalCredentials,pins:pinRows,blobs,journal:{first:(r.journalPrunedThrough??0)+1,last:r.sequence,gaps,events}},external,disclosures:{unencrypted:true,credentialInclusive:true,runtimeAuthority:['leases','boot-nonces','tab-document-chat-context','source-container-ids','route-validation'],excluded:['older-disk-export-payload-bytes','older-derived-capture-payloads','AI-site-workspaces','OS-native-process-lease-state'],derivedCuts,externalPrerequisites:['existing-PersonaMonkey-bridge','WireGuard-setup','native-allowlist']}};
   const receipt={qualified:false,dataset:r.dataset,revision:r.revision,sequence:r.sequence,startedAt,finishedAt,barrierMs:finishedAt-startedAt,blobs:blobs.length,records:Object.fromEntries(Object.entries(records).map(([k,v])=>[k,v.length])),journal:{first:data.core.journal.first,last:r.sequence,count:events.length,gaps},gitCredential:gitName?'CAPTURED':'NOT_CONFIGURED'};
   await req(s('pins').put({key:[r.dataset,pinId],refs}));
-  await req(s('credentials').put({key:[r.dataset,credentialId],value:JSON.stringify(data),captureData:true,accountIds:records.accounts.map(a=>a.id),schema:1,rev:1,captureReceipt:receipt,createdAt:finishedAt,updatedAt:finishedAt}));
+  // IDB clones Blob handles without materializing older immutable cuts during
+  // the next credentials scan. Decode only when a caller reads this exact cut.
+  await req(s('credentials').put({key:[r.dataset,credentialId],value:new Blob([JSON.stringify(data)],{type:'application/json'}),captureData:true,accountIds:records.accounts.map(a=>a.id),schema:1,rev:1,captureReceipt:receipt,createdAt:finishedAt,updatedAt:finishedAt}));
   await append(s,r,{moduleId:'pcms-backup',jobId:guard.jobId,step:'CAPTURE_CORE_CUT',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));
   return {credentialId,pinId,...receipt};
  });

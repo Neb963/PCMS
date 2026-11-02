@@ -27,6 +27,19 @@ test('fixed identity observer checks exact container and isolated document befor
  f.permit(false);const before=f.effects.length;assert.equal((await f.donor.openProtectedTab(f.scope,{operationId:crypto.randomUUID()+'-OPEN'})).code,'USERSCRIPTS_PERMISSION_REQUIRED');assert.equal(f.effects.length,before);
 });
 
+test('exact tagged OPEN observes a loading initial tab without admitting a provider read or replay',async t=>{
+ const f=await fixture(t);for(const stage of ['CREATE','SELECT','CREATE_ROUTE','ASSIGN'])await f.step(stage);
+ const binding=await bindingObservation((await f.step('VERIFY')).binding);await f.core.mutate([{table:'accounts',id:f.scope.accountId,value:{...binding,state:'PREPARING',flow:{stage:'OPEN'}}}],{step:'FIXTURE_OPEN',result:'COMPLETE'});await refreshAccountPins(f.core);
+ const operationId=crypto.randomUUID()+'-OPEN';await f.donor.openProtectedTab(f.scope,{operationId});f.scope.tabId=10;
+ const tab=f.tabs.get(10);Object.assign(tab,{url:'about:blank',pendingUrl:'https://perchance.org/',status:'loading'});
+ const observed=await f.donor.checkBinding(f.scope,{operationId,stage:'OPEN'});assert.equal(observed.ok,true);assert.equal(observed.tabId,10);
+ assert.equal((await f.donor.checkBinding(f.scope,{stage:'DOCUMENT_READY'})).pending,true);
+ assert.equal((await f.donor.checkBinding(f.scope,{stage:'IDENTITY',identity:true})).code,'ACCOUNT_CONTEXT_CHANGED');
+ assert.equal((await f.donor.openProtectedTab(f.scope,{operationId})).tabId,10);assert.equal(f.effects.filter(x=>x==='open').length,1);
+ tab.pendingUrl='https://unrelated.example/';assert.equal((await f.donor.checkBinding(f.scope,{operationId,stage:'OPEN'})).code,'ACCOUNT_TAB_OPEN_UNKNOWN');
+ tab.pendingUrl='https://perchance.org/';f.tags.set(10,{...f.tags.get(10),operationId:'wrong-operation'});assert.equal((await f.donor.checkBinding(f.scope,{operationId,stage:'OPEN'})).code,'ACCOUNT_TAB_OPEN_UNKNOWN');
+});
+
 test('route re-verification withdraws Core pins until fresh unique binding observation is committed',async t=>{
  const f=await fixture(t);for(const stage of ['CREATE','SELECT','CREATE_ROUTE','ASSIGN'])await f.step(stage);const verified=await f.step('VERIFY'),binding=await bindingObservation(verified.binding);let a={...binding,state:'READY',flow:{stage:'READY'}};await f.core.mutate([{table:'accounts',id:f.scope.accountId,value:a}],{step:'FIXTURE_READY',result:'COMPLETE'});await refreshAccountPins(f.core);assert.equal(accountRouteAllowed(f.state.profiles[f.scope.containerId],f.verified.get(f.scope.containerId)),true);
  a=await f.core.read('accounts',f.scope.accountId);await f.core.mutate([{table:'accounts',id:a.id,expectedRev:a.rev,value:{...a,state:'PREPARING',flow:{stage:'VERIFY'}}}],{step:'FIXTURE_VERIFY',result:'COMPLETE'});await refreshAccountPins(f.core);assert.equal(accountRouteAllowed(f.state.profiles[f.scope.containerId],f.verified.get(f.scope.containerId)),false);

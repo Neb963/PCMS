@@ -90,6 +90,10 @@ jobs:
             test-results/visual/
             test-results/installed-ui-continuity.json
             test-results/installed-visual.json
+            test-results/installed-creation.json
+            test-results/installed-deploy-complete.json
+            test-results/installed-develop-complete.json
+            test-results/installed-refresh-markers.json
       - name: Production disk backup and scoped restore activation
         if: ${{ !cancelled() }}
         run: python3 tests/installed_restore_activation.py build/pcms-dev.xpi
