@@ -124,3 +124,6 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 
 
 - P35 run41366198268 qualified protected eligibility/Pause/dirty preservation and an earned full Sleep transition, then found that normal terminateBackground() leaves an active native-messaging background alive. Firefox [ext-backgroundPage.js](https://github.com/mozilla-firefox/firefox/blob/main/toolkit/components/extensions/parent/ext-backgroundPage.js) explicitly exempts hasActiveNativeAppPorts. For the required controlled event-page reconstruction test, use terminateBackground({disableResetIdleForTest:true}), require the actual old context to close, and independently verify a new Core boot/ledger. Keep normal sandbox/CSP and the installed product unchanged; do not infer termination from merely calling the method.
+
+
+- P35 run41367713258 demonstrated an oracle pitfall: webNavigation's existing dashboard-open event legitimately samples eligibility, so the latest clock observedAt was 80ms after reopen despite a background awake for 25s. Prove earlier closed-dashboard accounting with immutable atomic Journal SAVE_VIEW events for refresher-clock between the deadline and reopen; also check new boot and retained budget. A mutable latest timestamp is not a historical-work witness.
