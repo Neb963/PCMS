@@ -49,7 +49,7 @@ def main():
    model=setup_model(sid,ids)
    with zipfile.ZipFile(xpi) as outer:
     with zipfile.ZipFile(io.BytesIO(outer.read('bundled/pcms-backup.zip'))) as package:payload={name:package.read(name) for name in package.namelist()}
-   manifest=json.loads(payload['module.json']);manifest['version']='0.5.0';payload['module.json']=json.dumps(manifest).encode();update=root/'backup-staged.zip'
+   manifest=json.loads(payload['module.json']);manifest['version']='.'.join([*manifest['version'].split('.')[:2],str(int(manifest['version'].split('.')[2])+1)]);payload['module.json']=json.dumps(manifest).encode();update=root/'backup-staged.zip'
    with zipfile.ZipFile(update,'w',compression=zipfile.ZIP_DEFLATED) as package:
     for name,value in payload.items():package.writestr(name,value)
    settings(sid);select(sid,update);click(sid,'#install-module');wait(lambda:'Update staged.' in script(sid,"return document.getElementById('import-result').textContent"))
