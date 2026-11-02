@@ -9,7 +9,9 @@ export function attachCaptureCut(core,{transact,root,checkedRefs,append,req,chec
   const startedAt=clock(),r=await root(s);check(guard?.moduleId==='pcms-backup','INVALID_GUARD');await assertGuard(s,r,guard);
   const credentialId='capture-cut-'+captureId,pinId=credentialId,prior=await req(s('credentials').get([r.dataset,credentialId]));
   if(prior?.captureData){check(prior.captureReceipt?.qualified,'CAPTURE_RECEIPT_MISSING');return {credentialId,pinId,...prior.captureReceipt,existing:true};}
-  const all=async store=>{const out=[];let c=await req(s(store).openCursor());while(c){if(c.value.dataset===r.dataset||Array.isArray(c.value.key)&&c.value.key[0]===r.dataset)out.push(structuredClone(c.value));c=await req(c.continue()||c.request);}return out;};
+  // IDB already clones results. One scoped request avoids a round trip and
+  // second clone per retained Journal row while the logical barrier is held.
+  const all=store=>req(s(store).getAll(IDBKeyRange.bound([r.dataset],[r.dataset,'\uffff'])));
   const records={};for(const table of tables)records[table]=await all(table);
   for(const expected of accounts){const a=records.accounts.find(a=>a.id===expected.id);check(a&&a.state==='READY'&&!a.admission&&a.rev===expected.revision&&a.expectedPrincipal===expected.principalFingerprint&&a.personaUid===expected.personaUid&&a.containerId===expected.containerId,'CAPTURE_ACCOUNT_CHANGED');}
   check(records.accounts.filter(a=>a.personaUid).every(a=>accounts.some(e=>e.id===a.id&&e.personaUid===a.personaUid&&e.containerId===a.containerId)),'CAPTURE_AUTH_COVERAGE_MISSING');

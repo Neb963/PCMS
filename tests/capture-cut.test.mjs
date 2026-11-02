@@ -25,3 +25,13 @@ test('configured Git credential and package/reference failures cannot create a c
 test('new managed account or changed mapped revision invalidates the capture join',async t=>{
  const {c}=await seeded(t),principal=await sha256(new TextEncoder().encode('owner@fixture.test'));await c.mutate([{table:'accounts',id:'a',value:{state:'READY',personaUid:crypto.randomUUID(),containerId:'firefox-container-1',expectedPrincipal:principal}}],event);const j=await selected(c),guard={moduleId:'pcms-backup',generation:j.generation,jobId:j.id,jobRevision:j.rev};await assert.rejects(c.captureCut({captureId:'omitted',guard}),e=>e.code==='CAPTURE_AUTH_COVERAGE_MISSING');const a=await c.read('accounts','a');await assert.rejects(c.captureCut({captureId:'stale',guard,accounts:[{id:a.id,revision:a.rev-1,principalFingerprint:a.expectedPrincipal,personaUid:a.personaUid,containerId:a.containerId}]}),e=>e.code==='CAPTURE_ACCOUNT_CHANGED');
 });
+test('scoped cut excludes inactive restore datasets from every bulk section',async t=>{
+ const {c,name}=await seeded(t),root=await c.status(),foreign=root.dataset+'-inactive',db=await new Promise(resolve=>{const q=indexedDB.open(name);q.onsuccess=()=>resolve(q.result);});
+ const tx=db.transaction(['accounts','events','credentials','views','versions'],'readwrite'),done=new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});
+ tx.objectStore('accounts').put({key:[foreign,'foreign-account'],dataset:foreign,id:'foreign-account',personaUid:'foreign-persona'});
+ tx.objectStore('events').put({key:[foreign,1],dataset:foreign,sequence:1,step:'FOREIGN_DATASET_SENTINEL'});
+ for(const table of ['credentials','views'])tx.objectStore(table).put({key:[foreign,'foreign-secret'],value:'FOREIGN_DATASET_SENTINEL'});
+ tx.objectStore('versions').put({key:[foreign,'accounts','foreign-account',1],dataset:foreign,table:'accounts',id:'foreign-account',sequence:1});await done;db.close();
+ const j=await selected(c),cut=await c.captureCut({captureId:'scoped',guard:{moduleId:j.moduleId,generation:j.generation,jobId:j.id,jobRevision:j.rev}}),raw=await c.credentials.get(cut.credentialId),data=JSON.parse(raw);
+ assert.ok(!raw.includes('FOREIGN_DATASET_SENTINEL'));assert.equal(data.core.records.accounts.length,0);assert.ok(data.core.versions.every(v=>v.dataset===root.dataset));assert.equal(data.core.root.dataset,root.dataset);
+});

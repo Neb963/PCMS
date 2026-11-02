@@ -146,3 +146,5 @@ Add entries only for a real mistake, unexpected behavior or useful improvement w
 - P39: source controls for a new Deployer operation must use Deployer admission, independently of the enabled state of the module that wrote the previous source receipt. Historical Refresher provenance is not Deployer authority.
 
 - P40 first installed load41443831751 exceeded the fixture HTTP60s read while seeding; no archive was verified. Core checkedRefs fetched whole binary chunks merely for existence on every shared source reference. IDB getKey retains the missing-chunk invariant without copying each payload; measure the resulting load before calling capacity complete. Long fixture preparation should expose progress through bounded observations, not conflate a transport timeout with a completed product action.
+
+- P40 local large cut correctly held CAPTURE_BARRIER_EXPIRED after the first optimization. Cursor IPC and a redundant clone per retained event consumed the logical barrier. Dataset-bounded IDB getAll preserves the atomic cut and avoids those round trips; keep the5s check and an inactive-dataset exclusion test, then measure again.
