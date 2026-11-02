@@ -52,8 +52,8 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
    if(['COMPLETE','FAILED'].includes(job.state))throw Error('JOB_FINISHED');const result=await directoryEffect(job,args.name==='directory.status');binding.expectedRevision=result.jobRevision;return result.value;
   }
   if(sourceCall){
-   if(binding.mode!=='background'||!binding.jobId||active.id!=='pcms-deployer'||!sourceEffect||(args.name==='source.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
-   const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.targetId!==binding.targetId||job.accountId!==binding.accountId||job.rev!==binding.expectedRevision||!['SOURCE_INSPECT','SOURCE_SAVE','DEPLOY','DEVELOP'].includes(job.kind))throw Error('STALE_REVISION');if(['COMPLETE','FAILED'].includes(job.state))throw Error('JOB_FINISHED');
+   if(binding.mode!=='background'||!binding.jobId||!['pcms-deployer','pcms-refresher'].includes(active.id)||!sourceEffect||(args.name==='source.status'?operation!=='query':operation!=='action'))throw Error('ACTION_DENIED');
+   const job=await core.read('jobs',binding.jobId);if(job?.moduleId!==binding.moduleId||job.targetId!==binding.targetId||job.accountId!==binding.accountId||job.rev!==binding.expectedRevision||!(active.id==='pcms-refresher'?job.kind==='REFRESH'&&job.refresh?.schema===1:['SOURCE_INSPECT','SOURCE_SAVE','DEPLOY','DEVELOP'].includes(job.kind)))throw Error('STALE_REVISION');if(['COMPLETE','FAILED'].includes(job.state))throw Error('JOB_FINISHED');
    const result=await sourceEffect(job,args.name==='source.status');binding.expectedRevision=result.jobRevision;return result.value;
   }
   if(creatorCall){
