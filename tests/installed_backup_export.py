@@ -100,6 +100,10 @@ def main():
    if sid:
     try:receipt['status']=coverage(sid)
     except Exception:pass
+    try:
+     receipt['downloadDiagnostics']=asyncjs(sid,"const rows=await browser.downloads.search({});return rows.map(d=>({id:d.id,state:d.state,filename:d.filename,fileSize:d.fileSize,totalBytes:d.totalBytes,bytesReceived:d.bytesReceived,exists:d.exists,byExtensionId:d.byExtensionId,error:d.error}));")
+     receipt['diskDiagnostics']=[{'filename':str(p.relative_to(disk)),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in disk.rglob('*.pcms.zip')]
+    except Exception as diagnostic:receipt['downloadDiagnosticError']=str(diagnostic)
     try:(OUT/'backup-export-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise
