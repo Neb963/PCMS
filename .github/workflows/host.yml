@@ -93,6 +93,9 @@ jobs:
             test-results/visual/
             test-results/installed-ui-continuity.json
             test-results/installed-visual.json
+            test-results/installed-journal.json
+            test-results/installed-git-writer.json
+            test-results/installed-discover-preparation.json
             test-results/installed-creation.json
             test-results/installed-deploy-complete.json
             test-results/installed-develop-complete.json
