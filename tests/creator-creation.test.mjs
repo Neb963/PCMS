@@ -5,6 +5,8 @@ import {openCore} from '../src/core/records.mjs';
 import {createCreator} from '../src/modules/creator.mjs';
 import {AVAILABLE,RESERVED} from '../src/modules/slug-observations.mjs';
 import {fixture as nativeFixture,principal} from './creation-fixture.mjs';
+import {journalArchive} from '../src/core/journal-archive.mjs';
+import {unzipSync,strFromU8} from 'fflate';
 const event={step:'FIXTURE_CREATION',result:'COMPLETE'};
 async function fixture(t,{ensureProtection=null}={}){
  const name='creator-create-'+crypto.randomUUID(),native=nativeFixture();let core=await openCore({name}),service,text=AVAILABLE,blocked=null,reads=0;await core.queue.boot();
@@ -18,6 +20,16 @@ async function fixture(t,{ensureProtection=null}={}){
 }
 test('automatic NOT_READY folder becomes one verified unlisted identity, reservation clears and all Git/source history remains',async t=>{
  const f=await fixture(t);await f.drain();const g=await f.c.read('generators','final-name'),j=await f.c.read('jobs',g.creatorJobId);assert.equal(g.creatorState,'CREATED');assert.equal(g.remoteId,'public_created-stable-1');assert.equal(g.listing,'UNLISTED');assert.equal(g.allocation,null);assert.equal(g.sourceManifest,f.source.manifestId);assert.equal(g.previousGood,f.source.manifestId);assert.equal(j.state,'COMPLETE');assert.equal(f.native.writes.filter(w=>w.endpoint==='save').length,1);assert.equal(f.native.writes.filter(w=>w.endpoint==='changeGeneratorName').length,1);assert.equal(j.effects.filter(e=>e.kind==='PERCHANCE_CREATE').length,1);assert.equal(j.effects.filter(e=>e.kind==='PERCHANCE_RENAME').length,1);assert.equal(f.reads,2);await f.restart();await f.drain();assert.equal(f.native.writes.length,2);
+});
+test('R01: default archive retains exact private PREPARE/readback causes and operation correlation without receipt payloads',async t=>{
+ for(const kind of ['PREPARE','READ_CREATE','READ_RENAME']){
+  const f=await fixture(t);if(kind!=='PREPARE')f.native.lose(kind==='READ_CREATE'?'save':'changeGeneratorName');f.block(kind);await f.drain();
+  const g=await f.c.read('generators','final-name'),j=await f.c.read('jobs',g.creatorJobId),archive=await journalArchive(f.c,{first:1,last:(await f.c.status()).sequence}),files=unzipSync(archive.bytes),rows=strFromU8(files['events.jsonl']).trim().split('\n').map(JSON.parse);
+  const row=rows.find(r=>r.jobId===j.id&&r.code==='CREATOR_FIXTURE_READBACK_HELD'&&r.step===(kind==='PREPARE'?'CREATOR_PREPARATION_OBSERVATION':'CREATOR_MUTATION_READBACK'));
+  assert.ok(row,kind);assert.equal(row.operationId,j.effect.operationId);assert.equal(row.targetId,g.id);assert.equal(row.diagnostics.causeCode,'CREATOR_FIXTURE_READBACK_HELD');assert.equal(row.diagnostics.kind,j.effect.kind);assert.equal(row.diagnostics.noReplay,kind!=='PREPARE');
+  for(const bytes of Object.values(files)){const text=strFromU8(bytes);assert.ok(!text.includes('Git source to preserve'));assert.ok(!text.includes('private-empty-1/array'));}
+  assert.equal(f.native.writes.length,kind==='PREPARE'?0:kind==='READ_CREATE'?1:2);
+ }
 });
 test('Taken/reserved and Unknown never create; repaired current Available can continue through explicit check',async t=>{
  for(const text of [RESERVED,'ambiguous unverified provider page']){const f=await fixture(t);f.text(text);await f.drain();assert.equal(f.native.writes.length,0);assert.ok((await f.s.get('final-name')).allocation);f.text(AVAILABLE);await f.s.check({id:'final-name',requestId:crypto.randomUUID()});await f.drain();assert.equal((await f.s.get('final-name')).state,'CREATED');}
@@ -46,4 +58,10 @@ test('lost create readback first synchronizes protection revision, then renames 
  f.native.lose('save');f.block('READ_CREATE');await f.drain();const status=await f.s.get('final-name'),before=await f.c.read('jobs',status.jobId),operation=before.effect.operationId;assert.equal(before.effect.boundary,'POSSIBLE');f.block(null);ready=false;const priorChecks=checks;
  await f.s.check({id:'final-name',requestId:crypto.randomUUID()});assert.ok(checks>priorChecks);assert.equal((await f.c.read('jobs',before.id)).effect.boundary,'POSSIBLE');assert.equal(f.native.writes.length,1);
  ready=true;revise=true;await f.s.check({id:'final-name',requestId:crypto.randomUUID()});await f.drain();const j=await f.c.read('jobs',before.id);assert.equal(j.state,'COMPLETE');assert.equal(j.effects.filter(e=>e.operationId===operation).length,1);assert.equal(f.native.writes.length,2);assert.equal((await f.s.get('final-name')).state,'CREATED');
+});
+test('R08: account context completion wakes only original possible Creator readback and preserves one create/rename',async t=>{
+ let ready=true;const f=await fixture(t,{ensureProtection:async()=>ready?{ready:true}:{ready:false,code:'ACCOUNT_CONTEXT_RECOVERY_PENDING'}});
+ f.native.lose('save');f.block('READ_CREATE');await f.drain();const status=await f.s.get('final-name'),before=await f.c.read('jobs',status.jobId),operation=before.effect.operationId;
+ ready=false;await f.s.check({id:'final-name',requestId:crypto.randomUUID()});const waiting=await f.c.read('jobs',before.id);assert.equal(waiting.creator.protectionWait.code,'ACCOUNT_CONTEXT_RECOVERY_PENDING');const sequence=(await f.c.status()).sequence;await f.s.initialize();assert.equal((await f.c.status()).sequence,sequence);assert.equal(f.native.writes.length,1);
+ ready=true;f.block(null);const a=await f.c.read('accounts','account-one');await f.c.mutate([{table:'accounts',id:a.id,expectedRev:a.rev,value:{...a,tabId:777}}],event);await f.s.initialize();await f.drain();const j=await f.c.read('jobs',before.id);assert.equal(j.state,'COMPLETE');assert.equal(j.effects.filter(e=>e.operationId===operation).length,1);assert.equal(f.native.writes.length,2);assert.equal((await f.s.get('final-name')).state,'CREATED');
 });

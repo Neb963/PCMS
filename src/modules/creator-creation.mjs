@@ -1,6 +1,7 @@
 import {requireCore as check} from '../core/records.mjs';
 import {classifySlug} from './slug-observations.mjs';
 import {eligibleAccount,confirmCreated} from './creator-allocation.mjs';
+import {creatorObservation} from './creator-diagnostics.mjs';
 
 // Finite Creator steps only. The existing Core queue owns every effect/receipt.
 export const creates=m=>m?.manifest?.capabilities?.includes('perchance.create')===true;
@@ -14,15 +15,16 @@ export async function creationReadback({core,donor,job,scope,clock=Date.now,reco
  let proof=ack?.noDispatch?{ok:false,noDispatch:true,code:ack.code}:await donor.creation(scope(a),{...payload(job),temporarySlug:ack?.temporarySlug??job.creator.creation.temporarySlug,kind:kind==='PERCHANCE_CREATE'?'READ_CREATE':'READ_RENAME'});
  if(!ack?.noDispatch&&proof?.noDispatch){proof={...proof};delete proof.noDispatch;}
  if(proof.ok){check(proof.source==='PERCHANCE_CREATION_READBACK_1'&&proof.state==='MATCHED'&&proof.slug===job.input.slug&&proof.principalFingerprint===a.expectedPrincipal&&proof.listing==='UNLISTED'&&proof.sourceFingerprint===job.creator.creation.sourceFingerprint&&/^public_[A-Za-z0-9_-]{1,100}$/.test(proof.remoteId??'')&&Number.isFinite(proof.observedAt)&&proof.observedAt<=clock()&&clock()-proof.observedAt<=60000,'CREATOR_READBACK_UNVERIFIED');proof={...proof,accountId:a.id,accountRevision:a.rev};}
- await core.saveView(key(job,kind==='PERCHANCE_CREATE'?'create-proof':'rename-proof'),proof,crypto.randomUUID());
+ await core.saveView(key(job,kind==='PERCHANCE_CREATE'?'create-proof':'rename-proof'),proof,crypto.randomUUID(),null,creatorObservation(job,'CREATOR_MUTATION_READBACK',proof));
  const current=await core.read('jobs',job.id);if(reconcile&&current.effect?.boundary==='POSSIBLE'&&(proof.ok||proof.noDispatch))await core.queue.reconcile(job.id,current.rev,current.effect.operationId,{matched:true,operationId:current.effect.operationId,disposition:proof.noDispatch?'REJECTED':'APPLIED'});
  return proof;
 }
 export async function advanceCreation({core,donor,job,scope,clock=Date.now,save,hold,output,admit,reconcile=false}){
  const a=await core.read('accounts',job.accountId);check(eligibleAccount(a),'CREATOR_OWNER_CHANGED');
  const observed=async(kind,call)=>{const op=operation(job,kind),receipt=key(job,kind);let current=await core.read('jobs',job.id),value=await core.view(receipt);
-  if(current.effect?.boundary==='POSSIBLE'){check(current.effect.operationId===op,'CREATOR_OPERATION_SCOPE');if(!value){value=await call();await core.saveView(receipt,value,crypto.randomUUID());}current=await core.read('jobs',job.id);await core.queue.reconcile(job.id,current.rev,op,{matched:true,operationId:op});}
-  else if(!value){if(reconcile)return null;await core.queue.dispatch(job.id,current.rev,{operationId:op,kind,write:false,preflight:async()=>({ok:(await admit()).generation===job.generation,accountRevision:a.rev}),call:async()=>{value=await call();await core.saveView(receipt,value,crypto.randomUUID());},observe:async()=>({matched:!!await core.view(receipt),operationId:op})});}
+  const persist=async()=>core.saveView(receipt,value,crypto.randomUUID(),null,creatorObservation(await core.read('jobs',job.id),'CREATOR_PREPARATION_OBSERVATION',value,{operationId:op,kind}));
+  if(current.effect?.boundary==='POSSIBLE'){check(current.effect.operationId===op,'CREATOR_OPERATION_SCOPE');if(!value){value=await call();await persist();}current=await core.read('jobs',job.id);await core.queue.reconcile(job.id,current.rev,op,{matched:true,operationId:op});}
+  else if(!value){if(reconcile)return null;await core.queue.dispatch(job.id,current.rev,{operationId:op,kind,write:false,preflight:async()=>({ok:(await admit()).generation===job.generation,accountRevision:a.rev}),call:async()=>{value=await call();await persist();},observe:async()=>({matched:!!await core.view(receipt),operationId:op})});}
   return await core.view(receipt);
  };
  const fresh=async()=>{const current=await core.read('accounts',a.id),m=await admit(),j=await core.read('jobs',job.id),g=await core.read('generators',job.targetId),s=await core.queue.status(),connection=(await core.view('git-catalog'))?.connection;check(connection?.repositoryId===job.input.repositoryId,'GIT_REPOSITORY_CHANGED');check(!s.paused,'PAUSED');check(current?.rev===a.rev&&current.expectedPrincipal===a.expectedPrincipal,'STALE_ACCOUNT');check(m.generation===job.generation&&j.generation===job.generation&&g?.creatorJobId===job.id&&g.folderPresent==='YES'&&g.gitHoldCode==null&&g.slug===job.input.slug&&g.folder===job.input.folder&&g.repositoryId===job.input.repositoryId,'CREATOR_FOLDER_CHANGED');check(!g.writerHold,'CREATOR_SOURCE_BUSY');return true;};
@@ -46,7 +48,7 @@ export async function advanceCreation({core,donor,job,scope,clock=Date.now,save,
   await fresh();check(job.creator.creation.principalFingerprint===a.expectedPrincipal&&job.creator.creation.accountRevision===a.rev,'CREATOR_OWNER_CHANGED');
   await core.queue.dispatch(job.id,job.rev,{operationId:op,kind:effectKind,write:true,preflight:async()=>{
    await fresh();if(create){check(clock()-job.creator.creation.availability.observedAt<=10000,'CREATOR_AVAILABILITY_STALE');const tab=await core.view('creator-tab:'+job.id),r=await donor.observeSlug(scope(a),{slug:job.input.slug,operationId:operation(job,'CREATOR_AVAILABILITY'),tab,readOnly:true,admit:fresh,saveTab:()=>{throw Error('CREATOR_READ_ONLY');}});check(r?.ok&&classifySlug(r.page).result==='Available','CREATOR_AVAILABILITY_CHANGED');}return {ok:true,accountRevision:a.rev};
-  },call:async()=>{const ack=await donor.creation(scope(a),{...payload(job),kind:create?'CREATE':'RENAME'});await core.saveView(ackKey,ack,crypto.randomUUID());},observe:async()=>{job=await core.read('jobs',job.id);proof=await creationReadback({core,donor,job,scope,clock,reconcile:false});return {matched:proof?.ok===true||proof?.noDispatch===true,operationId:op,disposition:proof?.noDispatch?'REJECTED':'APPLIED'};}});
+  },call:async()=>{const ack=await donor.creation(scope(a),{...payload(job),kind:create?'CREATE':'RENAME'});await core.saveView(ackKey,ack,crypto.randomUUID(),null,creatorObservation(await core.read('jobs',job.id),'CREATOR_MUTATION_ACK',ack));},observe:async()=>{job=await core.read('jobs',job.id);proof=await creationReadback({core,donor,job,scope,clock,reconcile:false});return {matched:proof?.ok===true||proof?.noDispatch===true,operationId:op,disposition:proof?.noDispatch?'REJECTED':'APPLIED'};}});
  }
  job=await core.read('jobs',job.id);proof??=await core.view(key(job,create?'create-proof':'rename-proof'));
  if(job.effect?.boundary==='POSSIBLE')return output(job,'HELD',proof?.code??'CREATOR_OUTCOME_UNKNOWN');

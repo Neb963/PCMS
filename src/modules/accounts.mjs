@@ -158,7 +158,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    a=await core.read('accounts',a.id);await save(a,{holdCode:null,flow:{...a.flow,stage:stage==='REMOVE_TABS'?'REMOVE_PERSONA':'REMOVE_DATA'}},stage==='REMOVE_TABS'?'ACCOUNT_TABS_CLOSED':'ACCOUNT_PERSONA_REMOVED');return result(job,'CONTINUE');
   }catch(error){return hold(await core.read('accounts',a.id),job,errorCode(error));}
  }
- async function ensureProtection(id){return serial(id,async()=>{
+ async function ensureProtection(id,{context=false}={}){return serial(id,async()=>{
   const m=await module(),root=await core.status();if(!available(m)||!m.enabled||m.lifecycle)return {ready:false,code:'ACCOUNTS_DISABLED'};
   let a=await core.read('accounts',id);if(!a?.expectedPrincipal||!a.flow||a.admission||['ARCHIVED','REMOVING'].includes(a.state))return {ready:false,code:'ACCOUNT_NOT_READY'};
   const bootId=(await core.queue.status()).bootId;
@@ -176,6 +176,18 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    const proof=await donor.checkBinding(scope(a),{stage:'PROTECTION',readOnly:true});
    if(proof?.ok===true&&Number.isFinite(proof.observedAt)&&proof.observedAt<=clock()&&clock()-proof.observedAt<RENEW_MS){
     if(a.protection?.bootId!==bootId||a.protection?.observedAt!==proof.observedAt||a.protection?.state!=='VERIFIED')await save(a,{protection:{state:'VERIFIED',bootId,observedAt:proof.observedAt,nextDue:proof.observedAt+RENEW_MS,attempt:0,code:null}},'ACCOUNT_PROTECTION_CURRENT');
+    if(context){
+     const document=await donor.checkBinding(scope(await core.read('accounts',id)),{stage:'DOCUMENT_READY',readOnly:true});
+     if(!document?.ok){
+      if(document?.pending)return {ready:false,code:document.code??'ACCOUNT_DOCUMENT_LOADING'};
+      if(!['ACCOUNT_LOGIN_TAB_MISSING','ACCOUNT_CONTEXT_CHANGED'].includes(document?.code))return {ready:false,code:document?.code??'ACCOUNT_CONTEXT_UNKNOWN'};
+      if(root.paused||root.restoreHold)return {ready:false,code:root.paused?'PAUSED':'RESTORE_MAINTENANCE'};
+      // Reuse the existing durable OPEN/identity workflow. Its operation is
+      // independent of any possible provider write and cannot replay it.
+      await command({id,kind:'OPEN',requestId:crypto.randomUUID()});
+      return {ready:false,code:'ACCOUNT_CONTEXT_RECOVERY_PENDING'};
+     }
+    }
     return {ready:true};
    }
   }

@@ -248,14 +248,15 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       }return out;
     }),
     counts:()=>transact(['accounts','generators','jobs'],'readonly',async s=>{const r=await root(s),range=IDBKeyRange.only(r.dataset);return {accounts:await req(s('accounts').index('dataset').count(range)),generators:await req(s('generators').index('dataset').count(range)),jobs:await req(s('jobs').index('dataset').count(range)),visibility:null};}),
-    saveView:(name,value,requestId,expected=null)=>transact(['views','commands','events'],'readwrite',async s=>{
+    saveView:(name,value,requestId,expected=null,event=null)=>transact(['views','commands','events'],'readwrite',async s=>{
       requireCore(id(name)&&id(requestId),'INVALID_VIEW');const r=await root(s);
+      const observation=event?safeEvent(event):{step:'SAVE_VIEW',result:'COMPLETE',targetId:name};
       const previous=await req(s('commands').get([r.dataset,requestId]));if(previous)return previous.result;
       if(expected)requireCore(r.dataset===expected.dataset&&r.revision===expected.revision,'STALE_REVISION');
       // Views/drafts are never placed in events or generic public record queries.
       const old=await req(s('views').get([r.dataset,name]));
       if(old&&JSON.stringify(old.value)===JSON.stringify(value)){const result={revision:r.revision,sequence:old.sequence,unchanged:true};await req(s('commands').put({key:[r.dataset,requestId],result}));return result;}
-      const sequence=await append(s,r,{step:'SAVE_VIEW',result:'COMPLETE',targetId:name});
+      const sequence=await append(s,r,observation);
       if(name!=='shell-view'&&!name.startsWith('module:'))r.contentRevision=(r.contentRevision??0)+1;
       await req(s('views').put({key:[r.dataset,name],value:structuredClone(value),sequence,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;
       const result={revision:r.revision,sequence};await req(s('commands').put({key:[r.dataset,requestId],result}));await req(s('meta').put({...r,updatedAt:clock()}));return result;

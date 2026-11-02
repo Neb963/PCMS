@@ -15,6 +15,14 @@ test('R01: generic exceptions are not storage; arbitrary exception material is e
  assert.equal(d.httpStatus,403);assert.ok(!JSON.stringify(d).includes(canary));
  assert.equal(diagnosticDetails({message:canary}).redactedCount,1);
 });
+test('R01: receipt and explicit safe observation commit atomically; rejected diagnostics leave both absent',async t=>{
+ const {core}=await fixture(t),secret='PRIVATE_PROVIDER_PAYLOAD',requestId=crypto.randomUUID(),event={moduleId:'pcms-creator',jobId:'job-one',operationId:'one-create',targetId:'target-one',step:'CREATOR_MUTATION_READBACK',result:'UNKNOWN',code:'CREATOR_CREATE_UNOBSERVED',diagnostics:{kind:'PERCHANCE_CREATE',noReplay:true}};
+ const saved=await core.saveView('private-receipt',{ok:false,code:event.code,payload:secret},requestId,null,event);
+ const rows=await core.list({table:'events',first:saved.sequence,last:saved.sequence});assert.equal(rows.rows.length,1);assert.equal(rows.rows[0].operationId,'one-create');assert.equal(rows.rows[0].code,event.code);assert.equal(await core.view('private-receipt').then(x=>x.payload),secret);
+ await core.saveView('private-receipt',{payload:'must not replace'},requestId,null,event);assert.equal((await core.view('private-receipt')).payload,secret);
+ const sequence=(await core.status()).sequence;await assert.rejects(core.saveView('rejected-receipt',{payload:secret},crypto.randomUUID(),null,{...event,payload:secret}),/UNSAFE_EVENT/);assert.equal(await core.view('rejected-receipt'),null);assert.equal((await core.status()).sequence,sequence);
+ const archive=await journalArchive(core,{first:1,last:sequence});for(const bytes of Object.values(unzipSync(archive.bytes)))assert.ok(!strFromU8(bytes).includes(secret));
+});
 test('R01: lost reply retains original typed cause and no-replay operation across cold restart and support ZIP',async t=>{
  let {core,name}=await fixture(t);
  await core.mutate([{table:'modules',id:'fixture',value:{moduleId:'fixture',enabled:true,generation:1}}],{step:'MODULE_READY',result:'COMPLETE'});

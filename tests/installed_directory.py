@@ -30,12 +30,14 @@ function draw(){
 }
 document.getElementById('native-filter').addEventListener('change',e=>{items=e.target.value==='all'?inventory:inventory.filter(s=>!['owned-absent','filter-excluded'].includes(s));visible=40;draw();});
 more.addEventListener('click',()=>{visible+=40;fetch('/fixture/directory-advance',{method:'POST',body:JSON.stringify({visible})});draw();});
-async function update(){try{const data=await (await fetch('/fixture/directory-state')).json();if(data.mode!==mode){mode=data.mode;draw();}}finally{setTimeout(update,500);}}
+async function update(){try{const data=await (await fetch('/fixture/directory-state')).json(),next=JSON.stringify(data.order||ORDER);if(data.mode!==mode||next!==last){mode=data.mode;last=next;const order=data.order||ORDER;items=document.getElementById('native-filter').value==='all'?['owned-absent','filter-excluded',...order]:order;revision='fixture-filtered-'+last;visible=40;draw();}}finally{setTimeout(update,500);}}
 draw();update();
 """.replace('ORDER',json.dumps(ORDER))
    return self.send(('<!doctype html><title>Rendered directory fixture</title><nav><a href="https://perchance.org/owned-absent">Navigation decoy</a></nav><label>Native filter<select id="native-filter" data-directory-filter name="listing"><option value="public">public</option><option value="all">all</option></select></label><ul id="generatorList" aria-busy="true"></ul><button id="more" aria-label="Load more generators" aria-controls="generatorList">Load more</button><script>'+js+'</script>').encode(),'text/html')
   if host==FRAME and self.path=='/fixture/directory-state':
-   with f.lock:f.directory_reads.append({'route':self.route,'mode':f.directory_mode});return self.send({'mode':f.directory_mode})
+   with f.lock:
+    f.directory_reads.append({'route':self.route,'mode':f.directory_mode});demand=getattr(f,'marker_demand',None);order=demand['order'] if demand and len(f.save_requests)==demand['before'] else None
+    return self.send({'mode':f.directory_mode,**({'order':order} if order else {})})
   return super().do_GET()
  def do_POST(self):
   if self.path=='/fixture/directory-advance':
