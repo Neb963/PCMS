@@ -21,9 +21,10 @@ export function createDirectory({core,donor,clock=Date.now}){
   job=await update(job,{directory:{schema:1,phase:'OPEN',cursor:0,partial:null,order:job.sequence??(await core.status()).sequence}},'DIRECTORY_BEGIN');
   await persist({...s,jobId:job.id,accountId:a.id,nextDue:clock()+DIRECTORY_CADENCE});return {state:'WAITING',jobId:job.id};
  }
+ async function unknown(job){const s=await state();if(s.current?.order!==job.directory.order||s.current?.code!=='DIRECTORY_OPERATION_UNKNOWN')await persist(applyDirectory(s,{state:'INCOMPLETE',code:'DIRECTORY_OPERATION_UNKNOWN'},{order:job.directory.order,at:clock()}));return output(job,'HELD','DIRECTORY_OPERATION_UNKNOWN');}
  async function finish(job,result){const s=await state();await persist({...applyDirectory(s,result,{order:job.directory.order,at:clock()}),jobId:job.id,nextDue:s.nextDue??clock()+DIRECTORY_CADENCE});job=await update(job,{directory:{...job.directory,phase:'COMPLETE',result:result.state,code:result.code??null}},'DIRECTORY_MEASUREMENT');return output(job,'COMPLETE',result.code??null);}
  async function step(original,reconcile=false){
-  let job=await core.read('jobs',original.id);check(job?.rev===original.rev,'STALE_REVISION');check(job.moduleId===ID&&job.kind==='DIRECTORY'&&job.directory?.schema===1,'DIRECTORY_JOB_SCOPE');
+  let job=await core.read('jobs',original.id);check(job?.rev===original.rev,'STALE_REVISION');check(job.moduleId===ID&&job.kind==='DIRECTORY'&&job.directory?.schema===1,'DIRECTORY_JOB_SCOPE');check(!job.runtimeInvalidated,'RESTORE_DIRECTORY_RECHECK_REQUIRED');
   if(job.directory.phase==='COMPLETE')return output(job,'COMPLETE',job.directory.code);
   const i=job.directory,opId='directory-'+job.id+'-'+i.cursor,key='directory-receipt:'+opId,a=await core.read('accounts',job.accountId);
   let receipt=await core.view(key);
@@ -36,14 +37,14 @@ export function createDirectory({core,donor,clock=Date.now}){
   };
   try{
    if(job.effect?.boundary==='POSSIBLE'){
-    if(!receipt)await call(true);receipt=await core.view(key);if(!receipt)return output(job,'HELD','DIRECTORY_OPERATION_UNKNOWN');
+    if(!receipt)await call(true);receipt=await core.view(key);if(!receipt)return unknown(job);
     job=await core.read('jobs',job.id);await core.queue.reconcile(job.id,job.rev,opId,{matched:true,operationId:opId});
    }else if(!receipt){
     if(reconcile)return output(job,'CONTINUE');
     const e=await enabled();if(!e.ok)return output(job,'HELD','DIRECTORY_PAUSED');
     await core.queue.dispatch(job.id,job.rev,{operationId:opId,kind:'DIRECTORY_OBSERVE',write:false,preflight:async()=>({ok:eligibleAccount(a)&&a.expectedPrincipal===job.input.principalFingerprint,accountRevision:a.rev}),call:()=>call(false),observe:async()=>({matched:!!await core.view(key),operationId:opId})});receipt=await core.view(key);
    }
-   job=await core.read('jobs',job.id);if(job.effect?.boundary==='POSSIBLE'||!receipt)return output(job,'HELD','DIRECTORY_OPERATION_UNKNOWN');
+   job=await core.read('jobs',job.id);if(job.effect?.boundary==='POSSIBLE'||!receipt)return unknown(job);
    if(i.phase==='OPEN'){if(!receipt.ok)return finish(job,{state:'INCOMPLETE',code:receipt.code});await update(job,{directory:{...i,phase:'READ',cursor:i.cursor+1}},'DIRECTORY_OPENED');return output(job,'WAITING',null,clock()+1000);}
    if(i.phase!=='READ'){if(!receipt.ok)return finish(job,{state:'INCOMPLETE',code:receipt.code});await update(job,{directory:{...i,phase:'READ',cursor:i.cursor+1}},'DIRECTORY_ADVANCED');return output(job,'WAITING',null,clock()+1000);}
    let result;try{result=collectDirectory(i.partial,receipt);}catch(error){result={state:'INCOMPLETE',code:publicError(error)};}
