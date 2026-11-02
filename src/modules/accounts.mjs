@@ -1,5 +1,7 @@
 import {requireCore as check,project,publicError} from '../core/records.mjs';
 import {bindingObservation} from './account-observations.mjs';
+const RENEW_MS=14*60000,RETRY_MS=60000;
+const ROUTE_RETRY=new Set(['ACCOUNT_ROUTE_RECHECK_REQUIRED','ROUTE_CONNECTION_FAILED','MULLVAD_ROUTE_UNCONFIRMED','DONOR_UNAVAILABLE','MULLVAD_BRIDGE_UNAVAILABLE','ACCOUNT_ROUTE_UNVERIFIED','TRANSPORT_TIMEOUT','MULLVAD_STATUS_TIMEOUT','MULLVAD_LOCAL_SERVICE_UNAVAILABLE','MULLVAD_TUNNEL_UNAVAILABLE','MULLVAD_TUNNEL_ROUTE_UNAVAILABLE','MULLVAD_PROXY_UNREACHABLE','MULLVAD_CONNECTION_UNVERIFIED','ACCOUNT_ROUTE_CATALOG_UNAVAILABLE']);
 const MODULE='pcms-accounts',UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const END=new Set(['LOGIN_REQUIRED','READY']);
 const errorCode=e=>typeof e?.code==='string'&&/^[A-Z][A-Z_]*$/.test(e.code)?e.code:publicError(e);
@@ -25,7 +27,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
  }
  const scope=a=>({accountId:a.id,label:a.label,rejectedRouteId:a.flow?.rejectedRouteId,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,preparationId:a.preparationId,tabId:a.tabId,exitAddresses:a.exitAddresses,expectedPrincipal:a.expectedPrincipal});
  const result=async(job,state,code=null)=>({value:{state,code,accountId:job.accountId},jobRevision:(await core.read('jobs',job.id)).rev});
- async function hold(a,job,code){if(a.admission&&a.flow.jobId!==job.id)return result(job,'HELD','ACCOUNT_ADMISSION_HELD');if(a.holdCode!==code||a.state!=='HELD')await save(a,{state:lifecycleStates[a.admission]??'HELD',holdCode:code},'ACCOUNT_HOLD','HELD');return result(job,'HELD',code);}
+ async function hold(a,job,code){if(a.admission&&a.flow.jobId!==job.id)return result(job,'HELD','ACCOUNT_ADMISSION_HELD');if(a.holdCode!==code||a.state!=='HELD')await save(a,{state:lifecycleStates[a.admission]??'HELD',holdCode:code,...a.flow?.purpose==='RENEW'?{protection:{...a.protection,state:job.effect?.boundary==='POSSIBLE'?'UNKNOWN':'HELD',code,nextDue:clock()+Math.min(30*60000,RETRY_MS*2**Math.min(a.protection?.attempt??0,5))}}:{}},'ACCOUNT_HOLD','HELD');return result(job,'HELD',code);}
  async function restoredPending(a){const c=await core.restore?.read(),r=await core.status(),map=c?.mappings?.find(m=>m.accountId===a.id);return a.restoreValidation?.state==='LOGIN_REQUIRED'&&a.restoreValidation.restoreId===c?.id&&a.restoreValidation.dataset===r.dataset&&c.newDataset===r.dataset&&map?.personaUid===a.personaUid&&map.destinationContainerId===a.containerId;}
  async function apply(a,job,stage,value){
   check(value?.ok===true&&value.stage===stage&&value.operationId===job.id+'-'+stage,'ACCOUNT_OPERATION_UNVERIFIED');
@@ -42,7 +44,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    check(binding.routeObservedAt>=flow.startedAt&&binding.routeObservedAt<=clock(),'ACCOUNT_ROUTE_STALE');
    // A verified existing account never silently acquires a different exit.
    if(a.expectedPrincipal&&!await restoredPending(a))check(JSON.stringify(binding.exitAddresses)===JSON.stringify(a.exitAddresses),'ACCOUNT_EXIT_CHANGED');
-   Object.assign(patch,binding);flow.stage=['LOGIN','OPEN'].includes(flow.purpose)?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
+   Object.assign(patch,binding);if(flow.purpose==='RENEW')patch.protection={...a.protection,state:'VERIFIED',bootId:(await core.queue.status()).bootId,observedAt:binding.routeObservedAt,nextDue:clock()+RENEW_MS,code:null};flow.stage=flow.purpose==='RENEW'?'READY':['LOGIN','OPEN'].includes(flow.purpose)?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
   }else if(stage==='OPEN'){
    check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.openedAt=clock();flow.stage=flow.purpose==='OPEN'?'IDENTITY':flow.purpose==='LOGIN'?'LOGIN_REQUIRED':flow.wasReady?'READY':'LOGIN_REQUIRED';
   }else check(false,'ACCOUNT_STAGE_INVALID');
@@ -96,7 +98,7 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    const updated=await core.read('jobs',job.id);if(updated.state==='FAILED'){const value=await donor.checkBinding(scope(a),{stage,operationId,readOnly:true});return hold(await core.read('accounts',a.id),job,updated.recovery?.code??value?.code??'ACCOUNT_SETUP_FAILED');}
    return effect(updated,true);
   }catch(error){
-   const code=error.code??(/^[A-Z][A-Z_]*$/.test(error.message)?error.message:publicError(error));return hold(await core.read('accounts',a.id),job,code);
+   const code=errorCode(error);return hold(await core.read('accounts',a.id),job,code);
   }
  }
  async function command({id,kind,requestId}){
@@ -156,15 +158,44 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    a=await core.read('accounts',a.id);await save(a,{holdCode:null,flow:{...a.flow,stage:stage==='REMOVE_TABS'?'REMOVE_PERSONA':'REMOVE_DATA'}},stage==='REMOVE_TABS'?'ACCOUNT_TABS_CLOSED':'ACCOUNT_PERSONA_REMOVED');return result(job,'CONTINUE');
   }catch(error){return hold(await core.read('accounts',a.id),job,errorCode(error));}
  }
+ async function ensureProtection(id){return serial(id,async()=>{
+  const m=await module(),root=await core.status();if(!available(m)||!m.enabled||m.lifecycle)return {ready:false,code:'ACCOUNTS_DISABLED'};
+  let a=await core.read('accounts',id);if(!a?.expectedPrincipal||!a.flow||a.admission||['ARCHIVED','REMOVING'].includes(a.state))return {ready:false,code:'ACCOUNT_NOT_READY'};
+  const bootId=(await core.queue.status()).bootId;
+  if(!END.has(a.flow.stage)){
+   const job=a.flow.jobId?await core.read('jobs',a.flow.jobId):null;
+   if(job?.effect?.boundary==='POSSIBLE'){
+    const r=await effect(job,true),latest=await core.read('jobs',job.id);
+    if(latest.effect?.boundary!=='POSSIBLE'&&latest.state==='HELD'&&['READY','CONTINUE','COMPLETE'].includes(r.value.state))await core.queue.transition(job.id,latest.rev,{state:r.value.state==='COMPLETE'?'COMPLETE':'WAITING',dueAt:clock(),recovery:null});
+    const current=await core.read('accounts',id);if(current.flow.purpose==='RENEW'&&latest.effect?.boundary==='POSSIBLE')await save(current,{protection:{...current.protection,state:'UNKNOWN',nextDue:clock()+RETRY_MS}},'ACCOUNT_PROTECTION_WAIT','UNKNOWN');
+    return {ready:false,code:'ACCOUNT_RECOVERY_PENDING'};
+   }
+   if(a.flow.purpose!=='RENEW'||!job||!['HELD','FAILED'].includes(job.state)||!ROUTE_RETRY.has(a.holdCode)||a.protection?.nextDue>clock())return {ready:false,code:a.holdCode??'ACCOUNT_RECOVERY_PENDING'};
+   if(job.state!=='FAILED')await core.queue.transition(job.id,job.rev,{state:'FAILED',recovery:{action:'REPAIR_ROUTE',code:'SUPERSEDED_BY_RECHECK'}});
+  }else{
+   const proof=await donor.checkBinding(scope(a),{stage:'PROTECTION',readOnly:true});
+   if(proof?.ok===true&&Number.isFinite(proof.observedAt)&&proof.observedAt<=clock()&&clock()-proof.observedAt<RENEW_MS){
+    if(a.protection?.bootId!==bootId||a.protection?.observedAt!==proof.observedAt||a.protection?.state!=='VERIFIED')await save(a,{protection:{state:'VERIFIED',bootId,observedAt:proof.observedAt,nextDue:proof.observedAt+RENEW_MS,attempt:0,code:null}},'ACCOUNT_PROTECTION_CURRENT');
+    return {ready:true};
+   }
+  }
+  if(root.paused||root.restoreHold)return {ready:false,code:root.paused?'PAUSED':'RESTORE_MAINTENANCE'};
+  a=await core.read('accounts',id);const requestId=crypto.randomUUID();
+  a=await save(a,{state:'PREPARING',holdCode:null,protection:{state:'VERIFYING',bootId,observedAt:a.routeObservedAt??null,nextDue:clock()+RETRY_MS,attempt:(a.protection?.attempt??0)+1,code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'},flow:{requestId,jobId:null,purpose:'RENEW',stage:'VERIFY',startedAt:clock(),wasReady:true}},'ACCOUNT_PROTECTION_RENEW','WAITING');
+  await ensure(a);return {ready:false,code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'};
+ });}
+ async function maintain(){let cursor=null;do{const p=await core.list({table:'accounts',cursor});for(const row of p.rows){const a=await core.read('accounts',row.id);if(a?.expectedPrincipal&&a.flow&&!a.admission&&(a.state==='READY'||a.flow.purpose==='RENEW'&&(a.protection?.nextDue??0)<=clock()))await ensureProtection(a.id);}cursor=p.cursor;}while(cursor);}
+ async function deadline(){const m=await module(),r=await core.status();if(!available(m)||!m.enabled||m.lifecycle||r.paused||r.restoreHold)return null;let cursor=null,next=null;do{const p=await core.list({table:'accounts',cursor});for(const row of p.rows){const a=await core.read('accounts',row.id);if(a?.expectedPrincipal&&a.flow&&!a.admission&&(a.state==='READY'||a.flow.purpose==='RENEW'&&(ROUTE_RETRY.has(a.holdCode)||a.protection?.state==='UNKNOWN')))next=Math.min(next??Infinity,a.protection?.nextDue??clock());}cursor=p.cursor;}while(cursor);return next;}
  return {
+  ensureProtection,maintain,deadline,
   initialize:async()=>{await pins(core);const m=await module();if(!available(m)||!m.enabled||m.lifecycle)return;let cursor=null;do{const page=await core.list({table:'accounts',cursor});for(const p of page.rows){const a=await core.read('accounts',p.id);if(a.admission)core.queue.fenceAccount(a.id);else core.queue.unfenceAccount(a.id);if(a.flow&&!a.flow.jobId&&!END.has(a.flow.stage))await ensure(a);}cursor=page.cursor;}while(cursor);},
   add:({label,requestId})=>serial(requestId,async()=>{await admit();check(UUID.test(requestId??'')&&typeof label==='string'&&label.trim().length>0&&label.trim().length<=128,'ACCOUNT_LABEL_INVALID');label=label.trim();let a=await core.read('accounts',requestId);if(a){check(a.label===label,'REQUEST_CONFLICT');return project('accounts',await ensure(a));}a={id:requestId,accountId:requestId,label,state:'PREPARING',flow:{requestId,jobId:null,purpose:'ENROLL',stage:'CREATE',startedAt:clock(),wasReady:false},bindingVersion:1};a=await save(a,{},'ACCOUNT_ENROLL','COMPLETE',{id:'account-add:'+requestId,signature:JSON.stringify(label)});return project('accounts',await ensure(a));}),
   command:args=>['ARCHIVE','REMOVE','REACTIVATE'].includes(args.kind)?lifecycleCommand(args):serial(args.id,()=>command(args)),
   effect:(job,reconcile=false)=>serial(job.accountId,()=>effect(job,reconcile)),
   async check(id){return serial(id,async()=>{const a=await core.read('accounts',id);check(a,'ACCOUNT_MISSING');if(a.flow?.jobId){const job=await core.read('jobs',a.flow.jobId);if(job&&!['COMPLETE','FAILED'].includes(job.state)){const outcome=await effect(job,true),latest=await core.read('jobs',job.id);if(['READY','CONTINUE','COMPLETE'].includes(outcome.value.state)&&latest.effect?.boundary!=='POSSIBLE'&&latest.state==='HELD')await core.queue.transition(job.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});}}return project('accounts',await core.read('accounts',id));});},
   async status(){const m=await module();return {enabled:m?.enabled===true&&!m.lifecycle,available:available(m)};},
-  async list(args={}){const page=await core.list({table:'accounts',cursor:args.cursor,search:args.search??'',filters:args.state?{state:args.state}:{},limit:50});return {...page,rows:await Promise.all(page.rows.map(async p=>{const a=await core.read('accounts',p.id);return {...p,generatorCount:(await accountRows('generators',p.id)).length,loginStatus:a.state==='READY'?'Login checked':a.admission==='ARCHIVED'?'Archived':'Login: Unknown',routeStatus:a.state==='READY'?'Route checked':a.admission==='ARCHIVED'?'Archived':'Route: Unknown'};}))};},
+  async list(args={}){const page=await core.list({table:'accounts',cursor:args.cursor,search:args.search??'',filters:args.state?{state:args.state}:{},limit:50});return {...page,rows:await Promise.all(page.rows.map(async p=>{const a=await core.read('accounts',p.id);return {...p,generatorCount:(await accountRows('generators',p.id)).length,loginStatus:a.state==='READY'?'Login checked':a.admission==='ARCHIVED'?'Archived':'Login: Unknown',routeStatus:a.admission==='ARCHIVED'?'Archived':a.protection?.state==='VERIFIED'&&a.protection.bootId===(await core.queue.status()).bootId&&clock()-a.protection.observedAt<=900000?'Route verified':a.protection?.state==='VERIFYING'?'Rechecking route':'Route: Unknown'};}))};},
   async related(id,table,cursor=null){check(['jobs','generators'].includes(table),'QUERY_DENIED');return core.list({table,filters:{accountId:id},cursor,limit:50});},
-  async get(id){const a=await core.read('accounts',id);if(!a)return null;const jobs=await accountRows('jobs',id),generators=await accountRows('generators',id);return {...project('accounts',a),admission:a.admission??null,generatorCount:generators.length,unfinishedJobs:jobs.filter(j=>!['COMPLETE','FAILED'].includes(j.state)).map(j=>project('jobs',j)),containerId:a.containerId??null,routeId:a.routeId??null,exitAddresses:a.exitAddresses??[],routeObservedAt:a.routeObservedAt??null,identityObservedAt:a.identityObservedAt??null,confirmedAt:a.confirmedAt??null,stage:a.flow?.stage??null,jobId:a.flow?.jobId??null,work:a.flow?.jobId?project('jobs',await core.read('jobs',a.flow.jobId)):null};}
+  async get(id){const a=await core.read('accounts',id);if(!a)return null;const jobs=await accountRows('jobs',id),generators=await accountRows('generators',id);return {...project('accounts',a),admission:a.admission??null,generatorCount:generators.length,unfinishedJobs:jobs.filter(j=>!['COMPLETE','FAILED'].includes(j.state)).map(j=>project('jobs',j)),containerId:a.containerId??null,routeId:a.routeId??null,exitAddresses:a.exitAddresses??[],protection:a.protection?{state:a.protection.state,observedAt:a.protection.observedAt,nextDue:a.protection.nextDue,code:a.protection.code}:null,routeObservedAt:a.routeObservedAt??null,identityObservedAt:a.identityObservedAt??null,confirmedAt:a.confirmedAt??null,stage:a.flow?.stage??null,jobId:a.flow?.jobId??null,work:a.flow?.jobId?project('jobs',await core.read('jobs',a.flow.jobId)):null};}
  };
 }

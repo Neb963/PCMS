@@ -232,6 +232,11 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
  async function checkBinding(scope,{operationId,stage,identity=false}={}){
   if(stage==='PREREQUISITES')return prerequisites();await initialize();const found=await bound(scope);if(found.code)return fail(found.code);const p=found.profile;
   if(stage==='CREATE')return p.personaUid===scope.accountId?{ok:true,operationId,stage,...tuple(p)}:fail('ACCOUNT_CONTEXT_CHANGED');
+  if(stage==='PROTECTION'){
+   const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);
+   const proof=currentTest(protectedNow.state,protectedNow.profile.containerId),observedAt=Date.parse(proof?.checkedAt);
+   return Number.isFinite(observedAt)?{ok:true,observedAt}:{ok:false,code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'};
+  }
   if(stage==='DOCUMENT_READY'){try{const tab=await api.tabs.get(scope.tabId);if(tab.cookieStoreId!==scope.containerId)return fail('ACCOUNT_CONTEXT_CHANGED');if(tab.status==='loading'||!ownOrigin(tab.url)&&['about:blank','about:newtab'].includes(tab.url))return fail('ACCOUNT_DOCUMENT_LOADING',{pending:true});return ownOrigin(tab.url)?{ok:true}:fail('ACCOUNT_CONTEXT_CHANGED');}catch{return fail('ACCOUNT_LOGIN_TAB_MISSING');}}
   if(identity){
    const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);let tab;try{tab=await api.tabs.get(scope.tabId);}catch{const owned=await ownedTabs(scope);if(owned.length!==1)return fail(owned.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING');tab=owned[0].tab;}if(tab.cookieStoreId!==scope.containerId||!ownOrigin(tab.url))return fail('ACCOUNT_CONTEXT_CHANGED');

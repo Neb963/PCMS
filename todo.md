@@ -46,3 +46,19 @@ R01's default installed disk fault/continuity step passed on e3c8087b. Latest di
 - Exact commit SHA/tree/ordered parents/name/email/time are required. Only exactly one terminal LF may be absent from GET message presentation; all other bytes and trailer remain exact.
 - POST object identity is checked and recorded, while independent GET/reachability remains required. HTTP rejection classes are typed; server/lost replies remain POSSIBLE and cannot replay.
 - Independent Node/bare-Git HTTPS fixtures now normalize the presentation, so prior writer tests exercise the formerly missing case. New raw `git hash-object` oracle and malicious drift cases pass with the focused Git/Discover suite. Installed matching evidence pending.
+
+## R03 plan (before R03 code)
+
+R02 source/T checkpoint: cd6ed32c / tree16e5032cc274c81e21db5b0045cb7fb95f992726, 32 focused tests PASS. R01 exact installed scale and R02 installed checks remain open; no release waiver.
+
+1. Add read-only current protection observation to the existing private donor adapter. Persisted READY is enrollment history; never extend the donor TTL or synthesize positive proof.
+2. Extend the existing Accounts flow with a bounded internal RENEW purpose that verifies the existing route/binding, checks unchanged exits, then returns to enrolled READY without opening another login tab or claiming a fresh login. Use the one queue and immutable effect identity.
+3. Add Accounts maintenance/deadline and on-demand ensureProtection, with boot-scoped proof invalidation, deduplicated current job, conservative backoff for known failures and read-only handling of POSSIBLE outcomes. No new Persona, route selection or native protocol.
+4. Wire startup/wakes/deadlines and truthful account projections. Preserve human login/Confirm, archive/removal/Pause/restore fences and strict DNS/IPv4/IPv6/principal checks.
+5. Test cold/TTL/outage/unchanged-binding/recovery/double-admission/no-extra-open behavior against actual Core and Accounts code; use independent installed native fixture for matching B evidence. Report untested live H distinctly.
+
+### R03 checkpoint
+
+- Implemented existing-binding RENEW flow, donor current proof observation, proactive/cold/on-demand maintenance and deadlines, known-failure backoff, unknown same-operation readback, truthful route projection. No new route/Persona/tab or login confirmation.
+- 56 focused Accounts/donor/binding/source tests PASS. Added stale/cold/dedup/no-extra-setup/backoff/no-replay oracles. Installed native-fixture/process/TTL matrix pending; [R03 report](docs/remediation/R03-report.md).
+- R01 exact CI41506387916 (source f48a4522) completed focused + all installed steps successfully, including actual 100001-event suffix export. Retrieve its receipt before closing the report. R02/R03 are not covered by that artifact.
