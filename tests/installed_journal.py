@@ -12,10 +12,11 @@ def inspect(sid):
  do{const p=await c.list({table:'files',cursor});for(const f of p.rows){const row=await c.read('files',f.id);files.push({id:row.id,state:row.state,filename:row.filename,automatic:row.automatic,metadata:row.metadata,bytes:row.bytes,sha256:row.sha256,downloadId:row.downloadId??null,completedAt:row.completedAt??null,job:await c.read('jobs',row.jobId)});}cursor=p.cursor;}while(cursor);c.close();return {enabled:m.enabled,journal:m.journal,paused:root.paused,files};""")
 def read_zip(path):
  with zipfile.ZipFile(path) as z:
-  assert z.testzip() is None;assert sorted(z.namelist())==['COMPLETE','events.jsonl','manifest.json'];manifest=z.read('manifest.json');m=json.loads(manifest);events=z.read('events.jsonl');done=json.loads(z.read('COMPLETE'))
+  assert z.testzip() is None;assert sorted(z.namelist())==['COMPLETE','diagnostics.json','events.jsonl','manifest.json'];manifest=z.read('manifest.json');m=json.loads(manifest);events=z.read('events.jsonl');done=json.loads(z.read('COMPLETE'))
   assert done=={'schema':1,'manifestSha256':hashlib.sha256(manifest).hexdigest()};assert m['eventSha256']==hashlib.sha256(events).hexdigest() and m['eventBytes']==len(events)
   rows=[json.loads(line) for line in events.splitlines()];assert len(rows)==m['count'];assert m['first']<=m['last'];assert [r['sequence'] for r in rows]==list(range(m['first'],m['last']+1));assert m['coverageComplete'] and m['gaps']==[]
-  assert b'never-export-private-fixture' not in events
+  checkpoint=z.read('diagnostics.json');assert m['schema']==2 and len(checkpoint)==m['checkpointBytes'] and hashlib.sha256(checkpoint).hexdigest()==m['checkpointSha256'];assert json.loads(checkpoint)['cut']==m['checkpointCut']
+  for entry in z.namelist():assert b'never-export-private-fixture' not in z.read(entry)
   return m,rows
 
 def disk_files(root):

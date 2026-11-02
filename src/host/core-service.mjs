@@ -1,3 +1,4 @@
+import {failureDetails} from '../core/diagnostics.mjs';
 import {createUiQueries} from './ui-queries.mjs';
 import {createRefreshController} from '../modules/refresh-controller.mjs';
 import {createRefreshSave} from '../modules/refresh-save.mjs';
@@ -68,6 +69,10 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     return value;
   })().catch(error=>{pending=null;throw error;});
   async function handle(message,sender={}) {
+    const started=Date.now(),requestId=crypto.randomUUID();
+    const queries={'ui.search':'GLOBAL_SEARCH','ui.work':'WORK_SEARCH','catalog.list':'GENERATOR_SEARCH','accounts.list':'ACCOUNT_SEARCH','events':'JOURNAL_SEARCH'};
+    const action=queries[message?.operation];
+    async function trace(result,error=null){if(!action)return;const c=await core(),query=message.query??message.search??'',text=typeof query==='string'?query:'';await c.record({operationId:requestId,step:'UI_QUERY',result:error?'FAILED':'OBSERVED',...error?{code:publicError(error)}:{},diagnostics:{...error?failureDetails(error):{},action,queryLength:text.length,queryFingerprint:await (await import('../core/records.mjs')).sha256(new TextEncoder().encode(text)),resultCount:Array.isArray(result?.rows)?result.rows.length:0,durationMs:Date.now()-started}});}
     try {
       const value=await core();let result;
       if((await value.status()).restoreHold&&['refresher.open','refresher.refresh','directory.check','directory.open','refresher.configure','backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.draftSet','source.draftPrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
@@ -181,8 +186,8 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         }
         default:return {ok:false,code:'OPERATION_DENIED'};
       }
-      return {ok:true,result};
-    } catch(error){return {ok:false,code:error instanceof PackageError||error instanceof ArchiveError?error.code:/^(MODULE_[A-Z_]+|PAGE_[A-Z_]+|DOCUMENT_DENIED|CAPABILITY_DENIED|TARGET_DENIED|ACTION_DENIED)$/.test(error?.message)?error.message:publicError(error)};}
+      await trace(result);return {ok:true,result};
+    } catch(error){try{await trace(null,error);}catch{}return {ok:false,code:error instanceof PackageError||error instanceof ArchiveError?error.code:/^(MODULE_[A-Z_]+|PAGE_[A-Z_]+|DOCUMENT_DENIED|CAPABILITY_DENIED|TARGET_DENIED|ACTION_DENIED)$/.test(error?.message)?error.message:publicError(error)};}
   }
   async function schedule(value){const times=[await value.queue.deadline(),await journal?.deadline(),await git?.deadline(),await backup?.deadline(),await refresher?.deadline(),await directory?.deadline(),await refreshController?.deadline()].filter(Number.isFinite),due=times.length?Math.max(Date.now()+1000,Math.min(...times)):null;if(alarms){if(due)await alarms.create('pcms-queue',{when:due});else await alarms.clear('pcms-queue');}}
   return {start:core,handle,editor:async(message,sender)=>{try{const value=await core(),result=await deployer.editor(message,sender);if(message.operation==='editor.finish'&&modules)void modules.turn().catch(()=>{});await schedule(value);return {ok:true,result};}catch(error){return {ok:false,code:publicError(error)};}},closeDocument:id=>modules?.closeDocument(id),website:async details=>{const value=await core();await scripts?.inject(details);await backup.changed();await refresher.changed();if(modules)void modules.turn().catch(()=>{});await schedule(value);},downloadsChanged:async()=>{const value=await core();await journal.changed();await discover.changed();await backup.changed();if(lifecycle)await lifecycle.recover();if(modules)await modules.turn();await schedule(value);},wake:async()=>{const value=await core(),cut=(await value.status()).sequence;await wake(value);if(lifecycle)await lifecycle.recover();await journal.changed();await backup.changed();await journal.tick();await backup.tick();await directory.tick();await refresher.tick();await refreshSave.recover();await refreshController.tick();await deployer.recover();if(modules)await modules.turn();await git.tick();await creator.initialize();await deployer?.initialize();await value.queue.acknowledgeWake(cut);await schedule(value);}};

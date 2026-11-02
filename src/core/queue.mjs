@@ -1,3 +1,4 @@
+import {failureDetails,errorCode} from './diagnostics.mjs';
 // Finite queue primitives. Modules own their steps; Core owns admission/effects.
 export function createQueue({transact,root,writeRows,append,req,check,clock}) {
  const bootId=crypto.randomUUID(),active=new Map(),fenced=new Set(),accountFences=new Set(),accountEpochs=new Map(),batchFences=new Set(),batchEpochs=new Map();let restoreFence=null,blocked=true,initialized=false,gateVersion=0,arbiter=Promise.resolve();
@@ -128,6 +129,7 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
     check(valid(operationId)&&valid(kind)&&typeof preflight==='function'&&typeof call==='function'&&typeof observe==='function','INVALID_EFFECT');
     check(accountScopeId===null||valid(accountScopeId)&&write===false&&!sourceWrite,'OBSERVATION_SCOPE_DENIED');
     const evidence=await preflight();check(evidence?.ok===true,'PREFLIGHT_HELD');
+    const startedAt=clock();
     const admitted=await serial(async()=>{
       let accountEpoch,batchEpoch,dispatchAccountId,admittedMaintenance;const job=await tx(async(s,r)=>{
         const job=await read(s,r,'jobs',jobId);check(job&&job.rev===expectedRev,'STALE_REVISION');
@@ -158,8 +160,8 @@ export function createQueue({transact,root,writeRows,append,req,check,clock}) {
       await admitted.sent;
       const observation=await observe({operationId});check(observation?.matched===true||observation?.resolved===true&&observation.outcome==='FAILED','OUTCOME_UNKNOWN');
       return await api.reconcile(jobId,admitted.job.rev,operationId,observation);
-    } catch {
-      await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);if(current.effect?.operationId===operationId&&current.effect.boundary==='POSSIBLE')await save(s,r,current,{state:'HELD',recovery:{action:'RECONCILE',code:'OUTCOME_UNKNOWN'}},'EFFECT_OUTCOME','UNKNOWN');});
+    } catch(error) {
+      await tx(async(s,r)=>{const current=await read(s,r,'jobs',jobId);if(current.effect?.operationId===operationId&&current.effect.boundary==='POSSIBLE')await save(s,r,current,{state:'HELD',diagnostics:failureDetails(error,{durationMs:Math.max(0,clock()-startedAt),decision:'READBACK_ONLY',noReplay:true}),recovery:{action:'RECONCILE',code:'OUTCOME_UNKNOWN'}},'EFFECT_OUTCOME','UNKNOWN');});
       return {state:'HELD',code:'OUTCOME_UNKNOWN'};
     } finally {active.delete(operationId);}
   },
