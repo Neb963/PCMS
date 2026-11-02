@@ -29,6 +29,18 @@ def capture(sid,label,receipt):
   receipt.setdefault('screenshots',[]).append({'path':str(directory.relative_to(OUT)/name),'sha256':hashlib.sha256(data).hexdigest(),'source':receipt['source'],'xpiSha256':receipt['xpiSha256'],'browserVersion':receipt.get('browserVersion'),'buildId':receipt.get('buildId'),'mode':mode,'state':state,'capturedAt':time.time()})
  (directory/'manifest.json').write_text(json.dumps(receipt['screenshots'],indent=2)+'\n')
 
+def state_matrix(sid,label,receipt):
+ # Called only after the owning installed journey verified this actual state.
+ # Keep every pixel and its real viewport; never replace the operational DOM.
+ previous=receipt.get('visualSuite');receipt['visualSuite']='journey-'+label
+ try:
+  for width in [1280,560,390]:
+   viewport(sid,width);capture(sid,label,receipt)
+ finally:
+  viewport(sid,1280)
+  if previous is None:receipt.pop('visualSuite',None)
+  else:receipt['visualSuite']=previous
+
 def matrix(sid,receipt,click,set_input,owner):
  # No raw source/user input or authority is injected into the UI. The fixtures
  # below are persisted Core records, rendered by the packaged UI/RPC queries.

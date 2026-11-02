@@ -40,6 +40,12 @@ Run351 passes Discover but Creator and post-save publication recoveries stall af
 
 Run351 pixel review found an unbounded66-job account link block and raw Work phase identifiers/self-links in the normal task view. Group the account preview with the existing full filtered Work link, keep technical steps in optional details, and remove the self-target deployment link on its own Work page. All targets and controls remain available. Recapture and inspect matching installed pixels before any V claim.
 
+### Remaining R05/R07 evidence plan (before test edits)
+
+Extend the existing installed shared-UI journey with actual IndexedDB records and real global/Work/Generators query controls. Delay completed Core RPC responses at the test-side Port boundary to force out-of-order delivery, inject one IndexedDB transaction failure after cache invalidation, and verify explicit field error/retry. Preserve exact query/target identities and record the exercised scope; the unknown historical operator query is not invented. Add loaded session latency/resource rounds using the existing scoped-profile sampler and explicit duration. Reuse the already completed retention/restart tests. Missing real-duration/automatic rounds remain open until actually executed.
+
 ### Resumed checkpoint results
 
 Run351/41516312430 failed with Creator and post-publication cold context gaps; Discover now passes. Implemented atomic Creator causal events and existing Accounts context recovery/dependency wake, corrected automatic Refresher fixture dispatch, and compacted pixel-reviewed problem areas.33T records/diagnostics/Creator PASS;127T Accounts/Creator/Deployer/source PASS;28T final Accounts/Creator PASS. Matching installed and final V evidence pending. No release/merge or live acceptance.
+
+Current verified remote checkpointded70205/treea6a864c1566493209be00733ab29a3239731c669. Run41524792814 is still running: focused, Journal, Git/Discover, DEPLOY and DEVELOP PASS observed; Creator FAIL awaits its completed receipt. Downloaded candidate artifact13178592669 ZIPd6154a3f6f69571c5b45d394ef47344d259ae98d6e011c648fc16b5024650916 contains exact XPI036981e6a58d2f582aa556466db312e1e7adb6021dd7b34a20e1428c0584bb7a. Not a designated release. Next test-only changes expand actual workflow-state screenshots and real search negative/order cases; Python syntax and six focused query/lifetime tests PASS, new B remains pending.

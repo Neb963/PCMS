@@ -9,6 +9,7 @@ from installed_accounts import add,settle,login,account,account_session
 from installed_lifecycle import permission_choice
 from installed_journal import set_input,close_dashboard
 from installed_packages import *
+from visual_capture import state_matrix
 from account_fixture import Fixture
 import account_fixture
 account_fixture.Provider=Provider
@@ -74,7 +75,7 @@ def main():
    asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),g=await c.read('generators','existing-sentinel');await c.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,poolMember:true,pool:{schema:1,member:true,sourceManifest:g.sourceManifest,addedAt:Date.now()},refreshCycle:{schema:1,cycleId:crypto.randomUUID(),phase:'PENDING',activeUsedMs:0}}}],{step:'FIXTURE_QUALIFIED_P22_POOL',result:'COMPLETE'});c.close();return true;");page(sid)
    check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');baseline=source['generator']['sourceManifest'];refresh(sid,provider);one=verified(sid,1);marker=one['g']['refreshMarker']['id'];assert one['g']['previousGood']==baseline and one['j']['kind']=='REFRESH' and one['j']['effect']['disposition']=='APPLIED';assert_bytes(provider,expected,marker,1);assert len(provider.save_requests)==1 and provider.save_requests[0]['valid'] and not provider.save_requests[0]['forced']
    refresh(sid,provider);two=verified(sid,2);assert two['g']['previousGood']==one['g']['sourceManifest'];assert_bytes(provider,expected,marker,2);assert len(provider.save_requests)==2
-   wait(lambda:'Source save verified:' in script(sid,"return document.getElementById('refresher-list').textContent"));receipt['checks'].append('actual-rendered-directory-demand/automatic-controller/shared-native-guarded-save/both-markers-counter1-then2/no-duplicates/full-independent-root-and-binary-bytes/public-state/previous-good/receipt-separate-from-position')
+   wait(lambda:'Source save verified:' in script(sid,"return document.getElementById('refresher-list').textContent"));state_matrix(sid,'refresher-active-measured',receipt);receipt['checks'].append('actual-rendered-directory-demand/automatic-controller/shared-native-guarded-save/both-markers-counter1-then2/no-duplicates/full-independent-root-and-binary-bytes/public-state/previous-good/receipt-separate-from-position')
    call('POST',f'/session/{sid}/window',{'handle':editor_handle});set_input(sid,'#fixture-source-model','Human unsaved text must stay');dashboard(sid);page(sid)
    # The real backend immediately rechecks dirty state even before its next heartbeat.
    refresh(sid,provider);wait(lambda:'EDITOR_DIRTY' in script(sid,"return document.getElementById('refresher-result').textContent") or state(sid)['rows'][0]['holdCode']=='EDITOR_DIRTY',45);assert len(provider.save_requests)==2;provider.marker_demand=None;call('POST',f'/session/{sid}/window',{'handle':editor_handle});assert script(sid,"return document.getElementById('fixture-source-model').value")=='Human unsaved text must stay';script(sid,"modelTextEditor.getDoc().text=arguments[0];modelTextEditor.getDoc().clean=true;menuBar.saveState='saved';document.getElementById('fixture-source-model').value=arguments[0];return true;",[provider.generator['modelText']]);dashboard(sid);page(sid);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher')
@@ -111,7 +112,7 @@ def main():
    dashboard(sid);page(sid);check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');provider.race=True;refresh(sid,provider);held=wait(lambda:refresh_cut(sid) if refresh_cut(sid)['g'].get('sourceSaveCode')=='SOURCE_STALE' else None,100);assert held['j']['effect']['disposition']=='REJECTED' and held['g']['refreshMarker']['counter']==3;assert len(provider.save_requests)==4;assert provider.generator['modelText']=='Independent external editor changed source\n';assert held['g']['previousGood'] is not None
    native_filter(sid,'all');wait(lambda:visibility(sid)['fresh'] and visibility(sid)['size']==127,100);assert provider.generator['modelText']=='Independent external editor changed source\n' and len(provider.save_requests)==4 and provider.unexpected==[]
    receipt['checks'].append('real-Open-protected-editor-after-cold-start/external-version-race/stale-rejection-no-repair/marker-counter-not-advanced/previous-good-and-user-base-preserved/independent-directory-work-continues-on-same-account')
-   receipt['markerId']=marker;receipt['operationId']=op;receipt['saves']=provider.save_requests;receipt['final']=refresh_cut(sid);receipt['result']='PASS'
+   state_matrix(sid,'refresher-stale-source-held',receipt);receipt['markerId']=marker;receipt['operationId']=op;receipt['saves']=provider.save_requests;receipt['final']=refresh_cut(sid);receipt['result']='PASS'
   except Exception as error:
    receipt['error']=str(error)
    if sid:
