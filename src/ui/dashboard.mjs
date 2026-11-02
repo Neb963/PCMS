@@ -27,9 +27,9 @@ function directorySummary(v){
  return (v.fresh?'Directory measured':'Directory Unknown · '+v.code)+' · Top 50: '+(v.fresh?counts.top50:'Unknown')+' · Top 100: '+(v.fresh?counts.top100:'Unknown')+' · Full list: '+(v.fresh?counts.full:'Unknown')+' · '+(v.fresh?v.size+' displayed':('last good '+Math.floor((v.ageMs??0)/1000)+' seconds ago · '+v.lastGoodSize+' displayed · counts '+counts.top50+' / '+counts.top100+' / '+counts.full));
 }
 
-let renderedRoute=null,routeOrder=0;
+let renderedRoute=null,routeOrder=0,viewTimer,restoringPage=false;
 async function route() {
-  const target=location.hash.slice(1)||'home',order=++routeOrder;view.pages??={};if(renderedRoute){const saved=rememberPage(document,window);if(document.activeElement?.closest('nav,.global-control,.global-search'))saved.focus=view.pages[renderedRoute]?.focus??null;view.pages[renderedRoute]=saved;}renderedRoute=target;void persist();
+  const target=location.hash.slice(1)||'home',order=++routeOrder;clearTimeout(viewTimer);view.pages??={};if(renderedRoute&&!restoringPage){const saved=rememberPage(document,window);if(document.activeElement?.closest('nav,.global-control,.global-search'))saved.focus=view.pages[renderedRoute]?.focus??null;view.pages[renderedRoute]=saved;}renderedRoute=target;const restore=structuredClone(view.pages[target]??null);restoringPage=true;void persist();
   const primary=location.hash.slice(1).split('/')[0];
   const key=primary==='module'?'module':primary in titles?primary:'home';
   document.getElementById('heading').textContent = titles[key]??'Module';
@@ -40,7 +40,7 @@ async function route() {
     if (selected) link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
   }
-  await ready;if(order===routeOrder)restorePage(view.pages?.[target],document,window);
+  await ready;if(order===routeOrder){restorePage(restore,document,window);restoringPage=false;}
 }
 function show(status) {
   document.getElementById('status').textContent = messages[status.code] || messages.STATUS_UNAVAILABLE;
@@ -96,7 +96,7 @@ async function renderRecords(key){
 }
 const initial=await core('view.get');
 if(initial.ok&&initial.result){view=initial.result;if(!location.hash)history.replaceState(null,'','#'+view.route);}
-const shared=sharedPages({core,node,view,persist,document});await shared.search();await updateModuleNavigation();window.addEventListener('hashchange',route);void route();let viewTimer;window.addEventListener('scroll',()=>{clearTimeout(viewTimer);viewTimer=setTimeout(()=>{if(renderedRoute){view.pages??={};view.pages[renderedRoute]=rememberPage(document,window);void persist();}},250);},{passive:true});document.addEventListener('focusin',()=>{if(renderedRoute&&!document.activeElement?.closest('nav,.global-control,.global-search')){view.pages??={};view.pages[renderedRoute]=rememberPage(document,window);}});
+const shared=sharedPages({core,node,view,persist,document});await shared.search();await updateModuleNavigation();window.addEventListener('hashchange',route);void route();window.addEventListener('scroll',()=>{if(restoringPage)return;clearTimeout(viewTimer);const from=renderedRoute;viewTimer=setTimeout(()=>{if(renderedRoute===from&&!restoringPage){view.pages??={};view.pages[renderedRoute]=rememberPage(document,window);void persist();}},250);},{passive:true});document.addEventListener('focusin',()=>{if(renderedRoute&&!restoringPage&&!document.activeElement?.closest('nav,.global-control,.global-search')){view.pages??={};view.pages[renderedRoute]=rememberPage(document,window);}});
 
 async function queueStatus(){
  const response=await core('queue.status'),status=document.getElementById('queue-status'),button=document.getElementById('pause-core');
