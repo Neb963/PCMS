@@ -1,11 +1,12 @@
 import {initialControl,selectRefresh,settleRefresh,providerBackoff,controlContext} from './refresh-control.mjs';
 import {publicError} from '../core/records.mjs';
+import {currentRows} from '../core/current-rows.mjs';
 const ID='pcms-refresher',KEY='refresher-control';
 export function createRefreshController({core,refresher,directory,save,clock=Date.now,random=Math.random}) {
  let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
  const state=async()=>({...initialControl(),...await core.view(KEY)});
  async function persist(s){await core.saveView(KEY,s,crypto.randomUUID());return s;}
- async function rows(table){let cursor=null;const out=[];do{const p=await core.list({table,cursor,limit:200});for(const g of p.rows)out.push(await core.read(table,g.id));cursor=p.cursor;}while(cursor);return out;}
+ const rows=table=>currentRows(core,table);
  async function enabled(){const m=await core.read('modules',ID),r=await core.status();return !!m?.enabled&&!m.lifecycle&&!m.refresher?.paused&&!r.paused&&!r.restoreHold&&m.manifest?.capabilities?.includes('perchance.source');}
  async function tick() {
   let s=await state();const now=clock();
