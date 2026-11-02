@@ -29,13 +29,37 @@ def assert_bytes(provider,initial,marker,counter):
   if path.startswith('src/'):assert files[path]==expected,(path,files[path],expected)
  assert provider.generator['isPrivate'] is False
  return files
-def reopen_account(sid,owner):
- script(sid,"location.hash='#accounts/'+arguments[0]",[owner]);
- try:wait(lambda:script(sid,"const b=document.getElementById('account-open');return !!b&&!b.hidden&&!b.disabled"),35)
+def reopen_account(sid,owner,previous_job):
+ script(sid,"location.hash='#accounts/'+arguments[0]",[owner])
+ # Cold startup can automatically finish Accounts OPEN/route re-verification.
+ # Do not insist on a second Open when that real operation is already done,
+ # or treat a stale account-details button as authoritative Core state.
+ def fresh_ready(a):
+  f=a.get('flow') or {};w=a.get('work') or {}
+  started=f.get('startedAt') or 0
+  return (a.get('state')=='READY' and f.get('purpose')=='OPEN'
+   and f.get('jobId')!=previous_job and w.get('id')==f.get('jobId')
+   and w.get('state')=='COMPLETE' and w.get('effect',{}).get('boundary')=='OBSERVED'
+   and started>0 and (a.get('routeObservedAt') or 0)>=started
+   and (a.get('identityObservedAt') or 0)>=(a.get('routeObservedAt') or 0))
+ def admission():
+  a=account(sid,owner)
+  if fresh_ready(a):return 'AUTO_OPEN_VERIFIED'
+  b=script(sid,"const b=document.getElementById('account-open');return !!b&&!b.hidden&&!b.disabled")
+  return 'MANUAL_OPEN_AVAILABLE' if b else None
+ try:choice=wait(admission,60)
  except AssertionError:
-  detail=script(sid,"const b=document.getElementById('account-open');return {hash:location.hash,button:b?{disabled:b.disabled,hidden:b.hidden}:null,accountState:document.getElementById('account-state')?.textContent,accountActions:[...document.querySelectorAll('[id^=account-]')].map(x=>({id:x.id,disabled:x.disabled,hidden:x.hidden}))}")
-  raise AssertionError(('ACCOUNT_OPEN_UNAVAILABLE_AFTER_COLD_RESTART',detail,account(sid,owner)))
- old=account(sid,owner)['flow']['jobId'];click(sid,'#account-open');dashboard(sid);wait(lambda:account(sid,owner)['flow']['jobId']!=old);settle(sid,owner,'READY');page(sid)
+  a=account(sid,owner);detail=script(sid,"return {hash:location.hash,state:document.getElementById('account-state')?.textContent,button:(b=>b?{disabled:b.disabled,hidden:b.hidden}:null)(document.getElementById('account-open'))}")
+  raise AssertionError(('ACCOUNT_RECOVERY_UNAVAILABLE',detail,a))
+ if choice=='MANUAL_OPEN_AVAILABLE':
+  before=account(sid,owner)['flow']['jobId'];click(sid,'#account-open');dashboard(sid)
+  wait(lambda:account(sid,owner)['flow']['jobId']!=before)
+  a=settle(sid,owner,'READY')
+  assert fresh_ready(a),('ACCOUNT_REOPEN_NOT_FRESH',a)
+ else:
+  assert fresh_ready(account(sid,owner))
+ page(sid)
+ return choice
 
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k);receipt={'tier':'B/P37/both-markers','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]};assert receipt['xpiSha256']==identity['xpiSha256']
@@ -53,9 +77,9 @@ def main():
    script(sid,"document.querySelector('button[data-refresh=\"'+arguments[0]+'\"]').click();return true;",[SLUG]);wait(lambda:'EDITOR_DIRTY' in script(sid,"return document.getElementById('refresher-result').textContent") or state(sid)['rows'][0]['holdCode']=='EDITOR_DIRTY',45);assert len(provider.save_requests)==2;call('POST',f'/session/{sid}/window',{'handle':editor_handle});assert script(sid,"return document.getElementById('fixture-source-model').value")=='Human unsaved text must stay';script(sid,"modelTextEditor.getDoc().text=arguments[0];modelTextEditor.getDoc().clean=true;menuBar.saveState='saved';document.getElementById('fixture-source-model').value=arguments[0];return true;",[provider.generator['modelText']]);dashboard(sid);page(sid);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher')
    receipt['checks'].append('actual-dirty-human-editor/zero-stage-or-save/preserved-human-text/normal-undo-and-Pause-Resume-recheck')
    # Lose the third save acknowledgement after independent server application.
-   provider.delay_after_apply=True;provider.delay_save_number=3;refresh(sid);assert provider.applied.wait(30),'THIRD_SAVE_NOT_APPLIED';provider.readback_outage=True;possible=refresh_cut(sid);assert possible['j']['effect']['boundary']=='POSSIBLE';op=possible['j']['effect']['operationId'];assert_bytes(provider,expected,marker,3);close_dashboard(sid);old=hard_stop(sid,profile);sid=None;provider.release_ack.set();provider.delay_after_apply=False
+   provider.delay_after_apply=True;provider.delay_save_number=3;refresh(sid);assert provider.applied.wait(30),'THIRD_SAVE_NOT_APPLIED';provider.readback_outage=True;possible=refresh_cut(sid);assert possible['j']['effect']['boundary']=='POSSIBLE';op=possible['j']['effect']['operationId'];assert_bytes(provider,expected,marker,3);previous_account_job=account(sid,owner)['flow']['jobId'];close_dashboard(sid);old=hard_stop(sid,profile);sid=None;provider.release_ack.set();provider.delay_after_apply=False
    sid,_=account_session(binary,profile);assert not old.intersection(pids(profile));toolbar(sid);dashboard(sid);page(sid);cold=refresh_cut(sid);assert cold['j']['effect']['operationId']==op and cold['j']['effect']['boundary']=='POSSIBLE' and cold['g']['refreshMarker']['counter']==2;assert len(provider.save_requests)==3
-   reopen_account(sid,owner);page(sid);wait(lambda:script(sid,"return !!document.querySelector('button[data-refresh=\"'+arguments[0]+'\"]').closest('li')",[SLUG]));selector='[data-refresher="'+SLUG+'"]';button=script(sid,"return [...document.querySelector(arguments[0]).querySelectorAll('button')].find(b=>b.textContent==='Check Refresh result')?.hidden===false",[selector]);assert button;check_button=call('POST',f'/session/{sid}/element',{'using':'xpath','value':'//li[@data-refresher="'+SLUG+'"]//button[text()="Check Refresh result"]'})['element-6066-11e4-a52e-4f735466cecf'];before_check=refresh_cut(sid)['j']['rev'];call('POST',f'/session/{sid}/element/{check_button}/click',{});wait(lambda:refresh_cut(sid)['j']['rev']>before_check,30);assert refresh_cut(sid)['j']['effect']['boundary']=='POSSIBLE';provider.readback_outage=False;page(sid);wait(lambda:script(sid,"return [...document.querySelectorAll('[data-refresher] button')].some(b=>b.textContent==='Check Refresh result'&&!b.disabled&&!b.hidden)"));check_button=call('POST',f'/session/{sid}/element',{'using':'xpath','value':'//li[@data-refresher="'+SLUG+'"]//button[text()="Check Refresh result"]'})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/element/{check_button}/click',{});three=verified(sid,3);assert three['j']['effect']['operationId']==op and len(provider.save_requests)==3;assert_bytes(provider,expected,marker,3)
+   receipt['accountRecovery']=reopen_account(sid,owner,previous_account_job);page(sid);wait(lambda:script(sid,"return !!document.querySelector('button[data-refresh=\"'+arguments[0]+'\"]').closest('li')",[SLUG]));selector='[data-refresher="'+SLUG+'"]';button=script(sid,"return [...document.querySelector(arguments[0]).querySelectorAll('button')].find(b=>b.textContent==='Check Refresh result')?.hidden===false",[selector]);assert button;check_button=call('POST',f'/session/{sid}/element',{'using':'xpath','value':'//li[@data-refresher="'+SLUG+'"]//button[text()="Check Refresh result"]'})['element-6066-11e4-a52e-4f735466cecf'];before_check=refresh_cut(sid)['j']['rev'];call('POST',f'/session/{sid}/element/{check_button}/click',{});wait(lambda:refresh_cut(sid)['j']['rev']>before_check,30);assert refresh_cut(sid)['j']['effect']['boundary']=='POSSIBLE';provider.readback_outage=False;page(sid);wait(lambda:script(sid,"return [...document.querySelectorAll('[data-refresher] button')].some(b=>b.textContent==='Check Refresh result'&&!b.disabled&&!b.hidden)"));check_button=call('POST',f'/session/{sid}/element',{'using':'xpath','value':'//li[@data-refresher="'+SLUG+'"]//button[text()="Check Refresh result"]'})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/element/{check_button}/click',{});three=verified(sid,3);assert three['j']['effect']['operationId']==op and len(provider.save_requests)==3;assert_bytes(provider,expected,marker,3)
    receipt['checks'].append('server-applied-third-save/actual-process-crash/lost-ACK/readback-outage/original-POSSIBLE-and-counter2-retained/normal-route-reverify/real-Check-control/full-readback-resolves-same-operation/counter3/no-resend')
    # Open is a real scoped handler, needed after a browser that restores no live tabs.
    click(sid,'button[data-refresh-open="'+SLUG+'"]');editor_handle=editor(sid);dashboard(sid);page(sid);check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');provider.race=True;refresh(sid);held=wait(lambda:refresh_cut(sid) if refresh_cut(sid)['g'].get('sourceSaveCode')=='SOURCE_STALE' else None,100);assert held['j']['effect']['disposition']=='REJECTED' and held['g']['refreshMarker']['counter']==3;assert len(provider.save_requests)==4;assert provider.generator['modelText']=='Independent external editor changed source\n';assert held['g']['previousGood'] is not None
