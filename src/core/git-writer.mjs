@@ -5,10 +5,10 @@ import {createGitReader,decodeGitBlob,gitSha,verifyGitTree,validRepository} from
 import {normalizeGitRequest,requestSignature,planGitWrite,createGitGraph} from './git-plan.mjs';
 const code=e=>typeof e?.code==='string'?e.code:publicError(e);
 export function createGitWriter({core,transport=globalThis.fetch,clock=Date.now,validateJob=async()=>{}}){
- const read=createGitReader({transport,clock}),turns=new Map();
+ const read=createGitReader({transport,clock,record:async e=>core.record({step:'GIT_HTTP_READ',result:e.result,...e.operationId?{operationId:e.operationId}:{},diagnostics:e.diagnostics})}),turns=new Map();
  const serial=(key,fn)=>{const p=(turns.get(key)??Promise.resolve()).catch(()=>{}).then(fn);turns.set(key,p);return p.finally(()=>{if(turns.get(key)===p)turns.delete(key);});};
  const current=()=>core.view('git-catalog'),credential=id=>core.credentials.get('github:'+id);
- async function reader(g,path){return (await read({repository:g.repository,token:await credential(g.repositoryId),path})).body;}
+ async function reader(g,path){return (await read({repository:g.repository,token:await credential(g.repositoryId),path,operationId:g.active?.operationId})).body;}
  async function object(g,kind,sha){check(gitSha(sha),'GIT_OBJECT_INVALID');const body=await reader(g,'/git/'+kind+'/'+sha);check(body?.sha===sha,'GIT_OBJECT_INVALID');if(kind==='trees'){check(body.truncated===false&&Array.isArray(body.tree),'GIT_TREE_INCOMPLETE');await verifyGitTree(body.tree,sha);}if(kind==='blobs')await decodeGitBlob(body,sha);return body;}
  async function head(g){const r=await reader(g,'/git/ref/heads/main');check(r?.ref==='refs/heads/main'&&r.object?.type==='commit'&&gitSha(r.object.sha),'GIT_MAIN_UNVERIFIED');return r.object.sha;}
  async function relation(g,base,tip){if(base===tip)return 'identical';const r=await reader(g,'/compare/'+base+'...'+tip);check(r?.base_commit?.sha===base&&gitSha(r.merge_base_commit?.sha)&&['ahead','behind','diverged','identical'].includes(r.status),'GIT_HISTORY_UNVERIFIED');return r.status;}

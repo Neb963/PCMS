@@ -19,7 +19,7 @@ export function diagnosticDetails(value={}) {
    if([...enums,...numbers,...hashes,...booleans].includes(key))out.redactedFields.push(key);
   }
  }
- return out;
+ out.redactedFields=[...new Set(out.redactedFields)];return out;
 }
 export function errorCode(error) {
  if(error?.name==='QuotaExceededError')return 'STORAGE_FULL';
@@ -36,12 +36,13 @@ export function failureDetails(error,extra={}) {
 export function transitionEvent(event,changes,now) {
  const job=changes.find(c=>c.table==='jobs'&&c.value)?.value;
  const affected=changes.find(c=>['accounts','generators'].includes(c.table)&&c.value)?.value;
- const code=event.code??job?.recovery?.code??job?.git?.code??affected?.creatorHoldCode??affected?.deploymentCode??affected?.holdCode;
+ const code=event.code??job?.recovery?.code??job?.git?.code??affected?.creatorHoldCode??affected?.deploymentCode??affected?.holdCode??changes.find(c=>c.value?.code)?.value.code;
+ const result=/^HOLD_|_HOLD$/.test(event.step)&&code?'HELD':event.result;
  const effect=job?.effect;
  const details=diagnosticDetails({...job?.diagnostics,...event.diagnostics,
   ...(job?{toState:job.state,phase:job.creator?.phase??job.deployment?.phase??job.git?.active?.phase??job.step,revision:(changes.find(c=>c.table==='jobs')?.expectedRev??0)+1,generation:job.generation,dueAt:job.dueAt,action:job.recovery?.action}:{}),
   ...(effect?{kind:effect.kind,boundary:effect.boundary,write:effect.write,sourceWrite:effect.sourceWrite,noReplay:effect.boundary==='POSSIBLE'}:{}),
   ...(affected?.routeObservedAt!=null?{observedAt:affected.routeObservedAt,proofAgeMs:Math.max(0,now-affected.routeObservedAt),proofExpiresAt:affected.routeObservedAt+900000}:{})});
- return {...event,...!event.jobId&&affected?.flow?.jobId?{jobId:affected.flow.jobId}:{},...!event.operationId&&effect?.operationId?{operationId:effect.operationId}:{},...code?{code}:{},diagnostics:details,
+ return {...event,result,...!event.jobId&&affected?.flow?.jobId?{jobId:affected.flow.jobId}:{},...!event.operationId&&effect?.operationId?{operationId:effect.operationId}:{},...code?{code}:{},diagnostics:details,
   severity:event.severity??(code||['HELD','FAILED','UNKNOWN'].includes(event.result)?'error':'info')};
 }
