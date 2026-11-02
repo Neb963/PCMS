@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base: R01 source `f48a45228ba0fca83fd43c502a5113a072b68faf`, tree `cb1e1fe8467bec453e73a53a5a5db79863272297`. Accepted v42/design2 and repository governance unchanged.
 
-**Status: FIXED_PENDING_B / PARTIAL. R01 final and R02 installed gates remain open.**
+**Status: PARTIAL — independent installed Git writer PASS; Discover caller scope assertion failed.**
 
 ## Inspection and root causes
 
@@ -23,3 +23,9 @@ Installed Firefox cannot run locally with its normal sandbox (R01 report). Requi
 ## Safety and remaining work
 
 No trim, force update, shortened identity, arbitrary branch/path, replay or uncertainty clearing. POST is not completion proof. Readback, exact scoped trees/blobs, ancestry and operation attribution remain required. Available does not reserve a slug; existing folder/source is never overwritten. Historical inaccessible candidate/slug remains unknown; no live repair was attempted. Checkpoint publication and exact B/CI identities will be recorded once produced. R03 route work can be implemented safely while these release gates remain explicitly open; none is waived.
+
+## Actual installed outcome
+
+CI [41510668203](https://github.com/Neb963/PCMS/actions/runs/41510668203), source `2c83d531f024ac8df15610ab1fdde588991002b9` / tree `e22327330ca912c61b7b1545518fd0e617b9f3c9`: focused and installed Git writer PASS. Downloaded artifact13172184193 includes independent Git writer receipt and actual screenshot. The actual Discover caller verified both normalized commits, including lost-ref reply/restart/same-operation readback; its final provider-inventory/unexpected-call assertion failed. That test is FAIL, not partial PASS. Provider calls were omitted from its failure receipt; follow-up checkpoint bef12ba9 preserves them and refused paths without weakening the assertion. No live Git mutation was attempted.
+
+Follow-up CI41512200622 (bef12ba9) did **not** reach that same final assertion: it timed out waiting for existing-folder text because its pure PLAN read had received404 while the fixture hid the newly applied commit. Independent provider receipt also confirms refused read-only Creator ownership/page-data requests, not a provider mutation. Follow-up test explicitly invokes the existing visible Check folder preparations after unhiding, still requires GIT_FOLDER_EXISTS and no extra writes, and supplies authenticated nonownership/missing-template fixture responses while refusing all provider writes. This is a fixture scope/timing correction, not a weaker Git identity check. Matching rerun pending.

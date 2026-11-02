@@ -64,6 +64,15 @@ jobs:
       - name: R03-R04 protected local Creator and no-replay integration
         if: ${{ !cancelled() }}
         run: python3 tests/installed_creation.py build/pcms-dev.xpi
+      - name: R08 full DEPLOY publication pool and DONE
+        if: ${{ !cancelled() }}
+        run: python3 tests/installed_deploy_complete.py build/pcms-dev.xpi
+      - name: R08 native DEVELOP review Finish and source preservation
+        if: ${{ !cancelled() }}
+        run: python3 tests/installed_develop_complete.py build/pcms-dev.xpi
+      - name: R08 Refresher full-source negative and restart journey
+        if: ${{ !cancelled() }}
+        run: python3 tests/installed_refresh_markers.py build/pcms-dev.xpi
       - name: Persistent complete-candidate startup and user registry
         if: ${{ !cancelled() }}
         run: python3 tests/installed_release.py build/pcms-dev.xpi
@@ -73,6 +82,14 @@ jobs:
       - name: R06 independent actual installed pixel matrix
         if: ${{ !cancelled() }}
         run: python3 tests/installed_visual.py build/pcms-dev.xpi
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: visual-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            test-results/visual/
+            test-results/installed-ui-continuity.json
+            test-results/installed-visual.json
       - name: Production disk backup and scoped restore activation
         if: ${{ !cancelled() }}
         run: python3 tests/installed_restore_activation.py build/pcms-dev.xpi

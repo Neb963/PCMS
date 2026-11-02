@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R05 `fc4a2bcf0480fadf3f245c702a65c104e4a58a99` / tree `c6c03a5470b320fde6ec4469cb52eb58959f4966`. Authority unchanged; todo plan preceded code.
 
-**Status: BLOCKED pending actual installed captures, interaction and vision inspection.**
+**Status: FAIL / BLOCKED — first installed pixel review found blockers; corrected source/capture needs reinspection.**
 
 ## Baseline pixel review
 
@@ -26,3 +26,5 @@ No controls are replaced with mockups or new permissions. Existing IDs, Core/RPC
 `tests/visual_capture.py` is integrated into the installed native/source UI journey. It captures real viewport/full-page PNGs at requested1280/560/390 widths, primary pages, six Settings sections, account, DEPLOY WAIT_CREATOR, module pages and global results. It records actual viewport, browser/build/source/XPI/hash and checks hidden geometry/horizontal overflow. Capture is explicitly not a vision verdict. Remaining operation-state/large-list screenshots and keyboard/accessibility oracles must be recorded, not silently inferred.
 
 **No final pixels have yet been captured/reviewed for this source.** Mandatory V remains NOT TESTED. The final R08 review must use its exact XPI and record image-grounded defects, corrections and reinspection. Missing visual/interaction evidence blocks qualification even if source tests pass. Historical IB-09 remains unclosed; live P42–P49 remains NOT TESTED.
+
+Observed sourcebef12ba9 CI41512200622: installed shared UI/controls/hidden geometry/overflow captures PASS;102PNG files retained, but the separate visual fixture FAILED (missing generator initialization). [Iteration1 actual pixel review](R06-vision-iteration-1.md) is FAIL: raw account route identifiers, duplicate READY, primary raw dependency code, stale global-result block from keyboard-event omission, narrow viewport clamped500, and filtered module captures missing. Corrected source/capture now collapses account evidence, labels route dependency, uses real keyboard deletion, records real zoom/DPR/size, asserts <=420 CSS pixels, namespaces receipts, waits for real module READY, and seeds1005 visible generator records. No V PASS or complete matrix claim. Full source499 PASS preceded these small changes; focused page1 and Creator16 checks executed.

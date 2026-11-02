@@ -4,7 +4,10 @@ production ZIP disk reads. No provider access, real credentials or route effects
 from installed_packages import *
 
 def set_input(sid,selector,text):
- element=call('POST',f'/session/{sid}/element',{'using':'css selector','value':selector});call('POST',f'/session/{sid}/element/'+element['element-6066-11e4-a52e-4f735466cecf']+'/clear',{});type_text(sid,selector,text)
+ # WebDriver clear does not deliver the input event used by real keyboard
+ # deletion. Exercise the actual input/debounce/continuity path, also for ''.
+ type_text(sid,selector,'\ue009a\ue000\ue003')
+ if text:type_text(sid,selector,text)
 def journal(sid):
  click(sid,'nav a[href="#settings"]');wait(lambda:script(sid,"return !!document.querySelector('#records a[href=\"#settings/journal\"]')"));click(sid,'#records a[href="#settings/journal"]');wait(lambda:script(sid,"return !!document.getElementById('export-journal')||!!document.getElementById('enable-journal')"))
 def inspect(sid):

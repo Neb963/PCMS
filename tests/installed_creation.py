@@ -2,7 +2,7 @@
 Independent native-protocol/provider/bare-Git fixtures; no external forwarding.
 """
 from installed_creator import session15,inspect_creator,target,detail
-from installed_accounts import add,settle,login,page as account_page
+from installed_accounts import add,settle,login,account,page as account_page
 from installed_lifecycle import permission_choice
 from installed_journal import set_input
 from installed_git_catalog import connections
@@ -55,7 +55,7 @@ def unknown(sid,slug,kind):
  s=inspect_creator(sid);g=next((g for g in s['rows'] if g['slug']==slug),None)
  return next((j for j in s['jobs'] if g and j['id']==g.get('creatorJobId') and j['state']=='HELD' and j.get('effect',{}).get('boundary')=='POSSIBLE' and j['effect']['kind']==kind),None)
 def restart_recover(sid,profile,binary,owner,provider,slug):
- prior=stop(sid,profile);sid,_=session15(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);account_page(sid,owner);click(sid,'#account-open');settle(sid,owner,'READY');dashboard(sid)
+ prior=stop(sid,profile);sid,_=session15(binary,profile);restart_recover.active_sid=sid;assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);account_page(sid,owner);wait(lambda:(lambda a:a.get('flow',{}).get('purpose')=='RENEW' and a.get('protection',{}).get('state')=='VERIFIED' and a['state']=='READY' and a.get('work',{}).get('state')=='COMPLETE')(account(sid,owner)),75);dashboard(sid)
  with provider.lock:provider.hide=None
  detail(sid,slug);click(sid,'#creator-check');wait(lambda:target(sid,slug).get('creatorState')=='CREATED',60);wait(lambda:'Created' in script(sid,"return document.getElementById('creator-state').textContent"),15);return sid
 
@@ -70,7 +70,7 @@ def main():
    for ca in [provider.ca,remote.ca]:script(sid,"Components.classes['@mozilla.org/security/x509certdb;1'].getService(Components.interfaces.nsIX509CertDB).addCertFromBase64(arguments[0],'C,,');return true;",[base64.b64encode(ca).decode()])
    prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content');assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid);settings(sid);wait(lambda:script(sid,"return !!document.getElementById('allow-userscripts')"));click(sid,'#allow-userscripts');permission_choice(sid,True);wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"))
    owner=add(sid,'Creator fixture owner');settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'creator@fixture.test');click(sid,'#account-confirm');settle(sid,owner,'READY');connections(sid);set_input(sid,'#git-repository','fixture/catalog');set_input(sid,'#git-token',TOKEN);click(sid,'#git-save');wait(lambda:'Connection saved' in script(sid,"return document.getElementById('git-result').textContent"));j=wait(lambda:unknown(sid,'lost-create-name','PERCHANCE_CREATE'),90);first_job=j['id'];first_operation=j['effect']['operationId'];assert len(provider.writes)==1;detail(sid,'lost-create-name');assert script(sid,"return document.getElementById('creator-override').hidden");sid=restart_recover(sid,profile,binary,owner,provider,'lost-create-name');g=target(sid,'lost-create-name');assert g['creatorJobId']==first_job and g['remoteId']=='public_created-stable-1' and g['listing']=='UNLISTED' and g['allocation'] is None;assert len(provider.writes)==2;assert len([e for e in next(j for j in inspect_creator(sid)['jobs'] if j['id']==first_job)['effects'] if e['operationId']==first_operation])==1
-   receipt['checks'].append('actual-folder/Available/private-template/empty-top-level-manifest/create-body-loss/real-Firefox-restart/actual-account-Open-and-recorded-check/same-operation/one-create-one-rename/exact-stable-ID/unlisted/source-preserved')
+   receipt['checks'].append('actual-folder/Available/private-template/empty-top-level-manifest/create-body-loss/real-Firefox-restart/automatic-protected-renewal-and-recorded-check/same-operation/one-create-one-rename/exact-stable-ID/unlisted/source-preserved')
    with provider.lock:provider.active_slug='lost-rename-name';provider.loss='RENAME'
    add_folder(remote,'lost-rename-name');check_main(sid);j=wait(lambda:unknown(sid,'lost-rename-name','PERCHANCE_RENAME'),90);second_job=j['id'];second_operation=j['effect']['operationId'];assert len(provider.writes)==4;sid=restart_recover(sid,profile,binary,owner,provider,'lost-rename-name');g=target(sid,'lost-rename-name');assert g['creatorJobId']==second_job and g['remoteId']=='public_created-stable-2' and g['listing']=='UNLISTED';assert len(provider.writes)==4;assert len([e for e in next(j for j in inspect_creator(sid)['jobs'] if j['id']==second_job)['effects'] if e['operationId']==second_operation])==1
    receipt['checks'].append('second-folder/rename-body-loss/real-process-restart/read-both-names/same-stable-ID/one-rename/no-create-or-rename-replay')
@@ -79,6 +79,7 @@ def main():
    add_folder(remote,'reserved-name');check_main(sid);wait(lambda:target(sid,'reserved-name') and target(sid,'reserved-name').get('creatorHoldCode')=='CREATOR_SLUG_TAKEN',60);assert len(provider.writes)==5;assert provider.created==3;assert provider.model['existing-sentinel']==existing;assert provider.unexpected==[];assert all(r['method']=='GET' for r in remote.requests());assert all(w['routeId']==provider.writes[0]['routeId'] for w in provider.writes);assert provider.model['lost-create-name']['modelText']==provider.model['lost-rename-name']['modelText']=='';assert provider.model['lost-create-name']['srcManifest']==provider.model['lost-rename-name']['srcManifest']==[]
    receipt['checks'].append('ambiguous-inventory/actual-protected-inspection-and-check/retained-reservation/no-replay/independent-Reserved-target-continues-queue/no-write/no-existing-source-or-Git-change');receipt['writes']=provider.writes;receipt['slugReads']=provider.slug_reads;receipt['result']='PASS'
   except Exception as error:
+   sid=getattr(restart_recover,'active_sid',None) or sid
    receipt['error']=str(error);receipt['writes']=provider.writes;receipt['slugReads']=provider.slug_reads;receipt['unexpected']=provider.unexpected
    if sid:
     try:dashboard(sid);receipt['page']=script(sid,"return document.body.innerText");receipt['state']=inspect_creator(sid)

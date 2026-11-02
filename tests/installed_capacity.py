@@ -6,16 +6,39 @@ from installed_packages import *
 from installed_journal import set_input
 import threading,platform
 
-metrics={'tier':'S/B/DSK/P40','hardware':{'platform':platform.platform(),'logicalCpus':os.cpu_count()},'archives':[],'exports':[],'aggregateFirefoxRssPeakBytes':0}
+metrics={'tier':'S/B/DSK/P40','hardware':{'platform':platform.platform(),'logicalCpus':os.cpu_count()},'archives':[],'exports':[],'aggregateFirefoxRssPeakBytes':0,'sampledFirefoxCpuSeconds':0}
 fixture=None
+capacity_profile=None
+original_session=base.account_session
+def scoped_session(binary,profile):
+ global capacity_profile
+ capacity_profile=str(profile)
+ return original_session(binary,profile)
+
+def scoped_pids():
+ parents={};roots=[]
+ for p in pathlib.Path('/proc').iterdir():
+  if not p.name.isdigit():continue
+  try:
+   fields=(p/'stat').read_text().rsplit(')',1)[1].split();parents[p.name]=fields[1]
+   if capacity_profile and capacity_profile.encode() in (p/'cmdline').read_bytes() and (p/'exe').resolve().name in ['firefox','firefox-bin']:roots.append(p.name)
+  except (OSError,IndexError):pass
+ selected=set(roots)
+ for _ in range(12):
+  more={pid for pid,parent in parents.items() if parent in selected}-selected
+  if not more:break
+  selected.update(more)
+ return selected
+
 original_setup=base.setup_model
 original_read=base.read_archive
 original_completed=base.completed
 
 def rss():
  total=0
+ selected=scoped_pids()
  for p in pathlib.Path('/proc').iterdir():
-  if not p.name.isdigit():continue
+  if p.name not in selected:continue
   try:
    exe=(p/'exe').resolve().name
    if exe not in ['firefox','firefox-bin']:continue
@@ -77,12 +100,25 @@ def completed(sid,id):
 def main():
  identity=json.loads((pathlib.Path(sys.argv[1]).resolve().parent/'identity.json').read_text());metrics.update(source=identity['source'],xpiSha256=identity['xpiSha256'])
  metrics['hardware']['memoryBytes']=int(next(line.split()[1] for line in pathlib.Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemTotal:')))*1024
+ metrics['hardware']['cpu']=next((line.split(':',1)[1].strip() for line in pathlib.Path('/proc/cpuinfo').read_text().splitlines() if line.startswith('model name')),'Unknown')
+ started=time.monotonic()
  stop=threading.Event()
  def sample():
-  while not stop.wait(.25):metrics['aggregateFirefoxRssPeakBytes']=max(metrics['aggregateFirefoxRssPeakBytes'],rss())
- worker=threading.Thread(target=sample,daemon=True);worker.start();base.setup_model=setup;base.read_archive=read;base.completed=completed
+  previous={};ticks=os.sysconf('SC_CLK_TCK')
+  while not stop.wait(.25):
+   metrics['aggregateFirefoxRssPeakBytes']=max(metrics['aggregateFirefoxRssPeakBytes'],rss());current={}
+   selected=scoped_pids()
+   for p in pathlib.Path('/proc').iterdir():
+    if p.name not in selected:continue
+    try:
+     if (p/'exe').resolve().name not in ['firefox','firefox-bin']:continue
+     fields=(p/'stat').read_text().rsplit(')',1)[1].split();value=int(fields[11])+int(fields[12]);current[p.name]=value
+     metrics['sampledFirefoxCpuSeconds']+=max(0,value-previous.get(p.name,value))/ticks
+    except (OSError,ValueError,IndexError):pass
+   previous=current
+ worker=threading.Thread(target=sample,daemon=True);worker.start();base.account_session=scoped_session;base.setup_model=setup;base.read_archive=read;base.completed=completed
  try:
   base.main();assert len(metrics['archives'])>=2 and len(metrics['exports'])>=2;metrics['result']='PASS'
  finally:
-  stop.set();worker.join();(OUT/'installed-capacity.json').write_text(json.dumps(metrics,indent=2)+'\n');print(json.dumps(metrics),flush=True)
+  stop.set();worker.join();metrics['wallSeconds']=time.monotonic()-started;(OUT/'installed-capacity.json').write_text(json.dumps(metrics,indent=2)+'\n');print(json.dumps(metrics),flush=True)
 if __name__=='__main__':main()

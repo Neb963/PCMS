@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base: `a3a084dcdb52cb51ff1ef82d1287d18fa7661129` / tree `9fa5ffa20dd70ef2c4570541ee49255eacd2f6d0`. Authority: accepted v42, design revision 2, AGENTS.md, CI-GUIDELINES.md; unchanged.
 
-**Status: PARTIAL — installed evidence pending. No operator testing.**
+**Status: PARTIAL — default installed export and bounded suffix evidence PASS; broader diagnostic matrix remains open. No operator testing.**
 
 ## Actual state and plan
 
@@ -40,3 +40,9 @@ Intent remains durable before effect. Lost replies stay POSSIBLE and readback-on
 Source checkpoint `c6b96096a02728cbcd703375f2d5d7d94495a54f`, tree `dd678fdd1364b3b141c9d511b399d3801786f876`, independently matched to local source tree through GitHub API. Git CLI write authentication is unavailable; GitHub connector writes use compare-and-swap refs and verified trees, no force.
 
 R01 is not closed. Complete installed/disk fault semantics, real Firefox 90-day suffix measurement, remaining transport/Creator/route error matrix and subsequent integrated checks. R02–R08 remain unaccepted. Real P42–P49 G/H/P acceptance is NOT TESTED. No ready-for-operator claim or release artifact is authorized by these partial results.
+
+## Observed installed receipt (supersedes pending entries above)
+
+CI [41506387916](https://github.com/Neb963/PCMS/actions/runs/41506387916), source `f48a45228ba0fca83fd43c502a5113a072b68faf`, tree `cb1e1fe8467bec453e73a53a5a5db79863272297`: all configured focused/installed steps PASS. Installed artifact `13170544259` was downloaded and independently inspected. `installed-journal.json` reports Firefox155.0 / build20260817142839, sandbox6 / multiprocess enabled; XPI SHA-256 `40111aec89f9227f96afed31f825fc8aa027a46132bef7952aef9ae7911470d1`. Default ZIP/disk causal faults, private canary exclusion, interruption/restart/Pause/Disable checks PASS. Actual100001-event/90-day tail export: one row, five cursor reads,107ms; archive SHA-256 `7d697e143e00bbe8baed12410a944767fbaddfbf70724888d54779aa251a542c`. This is the executed synthetic local fault scope, not all provider failures.
+
+Later source `2c83d531`, CI41510668203, default installed Journal and Git-writer steps also PASS. Discover's final fixture provider-scope assertion failed; later steps skipped. Exact final R08 and comprehensive transport/Creator/route failure matrix remain open.

@@ -14,6 +14,17 @@ from git_write_https_fixture import GitWriteFixture
 from git_https_fixture import TOKEN
 MARKER=b'Format: PCMS-1\nVersion: v1\nAction: DEVELOP\nStatus: NOT_READY\n'
 class Provider(SlugProvider):
+ def do_POST(self):
+  if self.path not in ['/api/checkGeneratorOwnership','/api/getGeneratorPageData']:return super().do_POST()
+  f=self.server.fixture;b=self.body()
+  with f.lock:
+   user=f.logins.get(self.route);valid=user and b.get('email')==user['email'] and b.get('sessionToken')==user['sessionToken']
+   if self.path=='/api/checkGeneratorOwnership':
+    if not valid:f.unexpected.append('WRONG_OWNERSHIP_PRINCIPAL');return self.send({'status':'session-token-error'})
+    return self.send({'status':'is-not-owner'})
+   # This fixture has no supported private template. Creator may observe it,
+   # then must hold without any provider write. All write endpoints still fail.
+   return self.send({'status':'generator-does-not-exist'})
  def do_GET(self):
   if self.headers.get('Host','').split(':')[0]=='perchance.org' and self.path in ['/lost-name','/existing-sentinel']:
    f=self.server.fixture
@@ -56,7 +67,7 @@ def main():
    discover(sid);wait(lambda:script(sid,"return document.getElementById('discover-state').textContent.startsWith('UNKNOWN')"),30);top(sid);before_reads=list(provider.slug_reads);prior=stop(sid,profile);sid=None;sid,_=session15(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);work(sid,lost_job)
    # Hidden candidate bytes prevent premature verification. Check is read-only.
    click(sid,'#git-job-check');time.sleep(1);assert len(writes(remote))==write_count;check=next(j for j in state(sid)['jobs'] if j['id']==lost_job);assert not check['git']['active'].get('receipt');assert check['discoverPreparation']['checkedAt']==date
-   remote.controls(hide_applied_commits=False);click(sid,'#git-job-check');wait(lambda:'verified' in script(sid,"return document.getElementById('git-job-result').textContent").lower(),30);discover(sid);wait(lambda:script(sid,"return document.querySelector('#discover-rows li .prep-status').textContent.includes('VERIFIED')"));wait(lambda:script(sid,"return [...document.querySelectorAll('#discover-rows li .prep-status')].some(e=>e.textContent.includes('folder already exists'))"),30);top(sid)
+   remote.controls(hide_applied_commits=False);click(sid,'#git-job-check');wait(lambda:'verified' in script(sid,"return document.getElementById('git-job-result').textContent").lower(),30);discover(sid);wait(lambda:script(sid,"return document.querySelector('#discover-rows li .prep-status').textContent.includes('VERIFIED')"));activate(sid,'#discover-preparations');wait(lambda:script(sid,"return [...document.querySelectorAll('#discover-rows li .prep-status')].some(e=>e.textContent.includes('folder already exists'))"),30);top(sid)
    final=remote.snapshot();receipt['provider']=provider.receipt();s=state(sid);job=next(j for j in s['jobs'] if j['id']==lost_job);batch=next(j for j in s['jobs'] if j['id']==parent);assert batch['discover']['rows'][0]['result']=='Available' and batch['discover']['rows'][0]['checkedAt']==date;assert job['git']['active']['phase']=='COMPLETE' and len([e for e in job['effects'] if e['operationId']==operation])==1
    assert len(writes(remote))==write_count and len(final['operations'])==2;assert base64.b64decode(final['files']['generators/lost-name/DEPLOYMENT.md']['bytes'])==MARKER;assert [p for p in final['files'] if p.startswith('generators/lost-name/')]==['generators/lost-name/DEPLOYMENT.md'];assert all(final['files'][p]==v for p,v in baseline['files'].items());assert provider.slug_reads==before_reads;assert len([r for r in writes(remote) if r['method']=='PATCH'])==2 and all(r.get('force') is False for r in writes(remote) if r['method']=='PATCH');assert set(provider.receipt()['remoteInventory'])=={'remote-sentinel'} and provider.receipt()['unexpected']==[]
    receipt['checks'].append('second-Available/applied-ref-body-loss/no-early-verification/real-process-restart/same-operation-actual-Work-readback/no-new-writes/no-completed-classifier-recheck/existing-folder-preserved/Available-date-kept/no-provider-create')

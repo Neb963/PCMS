@@ -3,8 +3,8 @@ import {advanceCreation,creationReadback,creates} from './creator-creation.mjs';
 import {nativeSlug} from './slug-observations.mjs';
 import {eligibleAccount,validCreatorTarget,reserveCreator,adoptCreator,creationDispatched,accountLoads} from './creator-allocation.mjs';
 
-// Creator's finite policy on the one Core queue. This version never creates,
-// renames, saves, changes listing or acquires a source writer.
+// Creator's finite allocation/create/readback policy on the one Core queue.
+// Source editing and publication remain with their existing scoped services.
 export function createCreator({core,donor,clock=Date.now,ensureProtection=null}){
  const id='pcms-creator';let serial=Promise.resolve();
  const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
@@ -64,8 +64,8 @@ if(creates(m)&&j?.generation===m.generation&&j.creator?.phase==='RESERVED'&&j.st
    if(job.effect?.boundary==='POSSIBLE'&&['PERCHANCE_CREATE','PERCHANCE_RENAME'].includes(job.effect.kind)&&(!g||g.creatorJobId!==job.id||g.slug!==job.input.slug||g.folder!==job.input.folder||!validCreatorTarget(g)||connection?.repositoryId!==job.input.repositoryId)){await creationReadback({core,donor,job,scope,clock});job=await core.read('jobs',job.id);}
    check(g?.creatorJobId===job.id&&g.slug===job.input.slug&&g.folder===job.input.folder&&validCreatorTarget(g),'CREATOR_FOLDER_CHANGED');check(connection?.repositoryId===job.input.repositoryId,'GIT_REPOSITORY_CHANGED');
    if(nativeSlug(job.input.slug)!==job.input.slug)return hold(job,'CREATOR_SLUG_INVALID');
-   if(ensureProtection&&!reconcile&&['RESERVED','CREATE_PREPARED','CREATE_AVAILABLE','CREATE_VERIFIED'].includes(job.creator.phase)&&job.effect?.boundary!=='POSSIBLE'){
-    const protection=await ensureProtection(job.accountId);if(!protection.ready)return hold(job,protection.code??'ACCOUNT_ROUTE_RECHECK_REQUIRED');
+   if(ensureProtection&&['RESERVED','CREATE_PREPARED','CREATE_AVAILABLE','CREATE_VERIFIED'].includes(job.creator.phase)){
+    const protection=await ensureProtection(job.accountId);if(!protection.ready){const code=protection.code??'ACCOUNT_ROUTE_RECHECK_REQUIRED';if(job.effect?.boundary==='POSSIBLE'){await core.record({moduleId:id,jobId:job.id,targetId:job.targetId,operationId:job.effect.operationId,step:'WAIT_CREATOR_PROTECTION',result:'WAITING',code,diagnostics:{decision:'READBACK_ONLY',noReplay:true}});return output(job,'HELD',code);}return hold(job,code);}
    }
    if(creates(m)&&['RESERVED','CREATE_PREPARED','CREATE_AVAILABLE','CREATE_VERIFIED'].includes(job.creator.phase))return await advanceCreation({core,donor,job,scope,clock,save,hold,output,admit,reconcile});
    if(job.creator.phase==='RESERVED')return output(job,'RESERVED','CREATOR_CREATE_PENDING');

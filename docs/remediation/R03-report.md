@@ -23,3 +23,5 @@ Installed TTL boundaries/native mock/outage/process restart on the matching XPI 
 ## Safety / remaining work
 
 One Core queue; no route controller/native protocol/allowlist change. No Direct fallback, no TTL extension, no exit reassignment and no uncertain write replay. Archive, module, Pause and restore fences still govern dispatch. Required installed evidence and actual provider principal mismatch/recovery matrix remain open. R04 must connect safe Creator holds to this renewed proof and expose dependent causes; R06/R08 must verify UI and final pixels. Publication/source/live acceptance is not inferred.
+
+Observed B: CI41512200622/sourcebef12ba9/XPI87ac1cf4b0afef3cdb6e0d7d0bac01df4e0a80b11a799503046c5a1836be7f00, installed-ui-continuity.json PASS with AUTO_RENEW_VERIFIED after real Firefox death/restart and preserved source draft. This closes that specific cold renewal path, not TTL/outage/two-account/full matrix. Strict helper now waits for automatic renewal without racing a manual Open.

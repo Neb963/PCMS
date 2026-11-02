@@ -29,7 +29,7 @@ def assert_bytes(provider,initial,marker,counter):
   if path.startswith('src/'):assert files[path]==expected,(path,files[path],expected)
  assert provider.generator['isPrivate'] is False
  return files
-def reopen_account(sid,owner,previous_job):
+def reopen_account(sid,owner,previous_job,automatic=False):
  script(sid,"location.hash='#accounts/'+arguments[0]",[owner])
  # Cold startup can automatically finish Accounts OPEN/route re-verification.
  # Do not insist on a second Open when that real operation is already done,
@@ -46,7 +46,7 @@ def reopen_account(sid,owner,previous_job):
   a=account(sid,owner)
   if fresh_ready(a):return 'AUTO_RENEW_VERIFIED' if a.get('flow',{}).get('purpose')=='RENEW' else 'AUTO_OPEN_VERIFIED'
   b=script(sid,"const b=document.getElementById('account-open');return !!b&&!b.hidden&&!b.disabled")
-  return 'MANUAL_OPEN_AVAILABLE' if b else None
+  return 'MANUAL_OPEN_AVAILABLE' if b and not automatic else None
  try:choice=wait(admission,60)
  except AssertionError:
   a=account(sid,owner);detail=script(sid,"return {hash:location.hash,state:document.getElementById('account-state')?.textContent,button:(b=>b?{disabled:b.disabled,hidden:b.hidden}:null)(document.getElementById('account-open'))}")
