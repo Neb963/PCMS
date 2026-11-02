@@ -95,6 +95,7 @@ def main():
    three=verified(sid,3);assert three['j']['effect']['operationId']==op and len(provider.save_requests)==3;assert_bytes(provider,expected,marker,3)
    receipt['checks'].append('server-applied-third-save/actual-process-crash/lost-ACK/readback-outage/original-POSSIBLE-and-counter2-retained/normal-route-reverify/real-Check-control/full-readback-resolves-same-operation/counter3/no-resend')
    # Open is a real scoped handler, needed after a browser that restores no live tabs.
+   wait(lambda:script(sid,"const b=document.querySelector('button[data-refresh-open=\"'+arguments[0]+'\"]');return !!b&&!b.disabled&&!b.hidden",[SLUG]),30)
    click(sid,'button[data-refresh-open="'+SLUG+'"]')
    try:editor_handle=editor(sid)
    except AssertionError:
