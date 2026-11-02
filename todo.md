@@ -19,3 +19,5 @@ Branch p41-acceptance-candidate from verified P40 main. Keep all seven existing 
 - Publish checkpoints, record candidate source→XPI hash and artifact link, merge verified P41, verify postmerge main and update accurate handoff docs. Then inspect P42/P43 eligibility: both need named external resources; P44–P49 depend on authorized acceptance. Do not claim live or full fleet acceptance.
 
 Current: plan written before implementation. P41 code/docs/preflight/B pending. No external live resource authorization is available.
+
+P41 implementation checkpoint: build0.49.0/P41, source/XPI/package trust preflight, actual startup/seven-enabled/retained-Journal-Disable/wrong-profile wrapper, current safe installation/build/backup/holds documentation and three selected installed journeys are authored. Existing two jobs remain. Python syntax and diff checks pass; candidate build/preflight/focused T/B/DSK remain pending at the committed source. No product behavior/permissions/provider recipe changed in P41.
