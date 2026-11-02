@@ -90,3 +90,20 @@ R02 source/T checkpoint: cd6ed32c / tree16e5032cc274c81e21db5b0045cb7fb95f992726
 - Joined generator search by human owner/slug/folder; owner/listing/work filters, retained multi-select and selected-only paging; stale response fencing and bounded RPC errors.
 - Bounded immutable data-revision projection cache; UI diagnostic/view writes do not force full data scans; real mutations invalidate it. 15 query/record/continuity T tests PASS, including1005 Unicode-owner generators/later pages and instrumented cache oracle.
 - Actual installed owner/filter/selection/query-diagnostic and cold AUTO_RENEW checks added; not yet executed. IB-09 historical universal search cause remains UNKNOWN; [R05 report](docs/remediation/R05-report.md). R06 can safely refine actual UI while this acceptance gate stays open.
+
+## R06 plan (before R06 code)
+
+Baseline pixel inspection completed in this session: operator Work screenshot has roughly the first third of the viewport spent on shell/search/host notice; concatenated Journal/generator/back links; raw UUID/hash facts dominate the task; repeated deployment metadata; irrelevant AI attestation on DEPLOY; weak action grouping and long vertical whitespace. CI Settings screenshot similarly leaves a narrow, sparsely styled link list below a large repeated host notice. These are image-grounded findings; raw operator pixels remain private.
+
+1. Rework the existing CSS/components into compact consistent shell, controls, rows, filters and action groups; preserve every real control and exact navigation.
+2. Enforce authored [hidden] visibility, hidden focus exclusion and responsive layout. Keep status global vs account-specific distinct. Place technical IDs/hashes/startup detail in optional details and keep causes/next actions primary.
+3. Add descriptions to Other and concise task labels; remove repeated default host banners and empty instructional copy without removing security failures.
+4. Capture actual installed screenshots for primary/settings/module/work states at1280/560/390 widths, with artifact/browser/state/hash provenance. Inspect actual pixels with the vision-capable assistant, record defects and repeat after fixes. Capture alone is not PASS.
+5. Run actual keyboard/controls/conditional-state/accessibility checks. Missing or failed screenshot/model/functional tiers keep R06 BLOCKED. Required final R08 review must use the exact final XPI.
+
+### R06 checkpoint
+
+- Pixel baseline inspected directly (private operator Work + CI Settings). Implemented compact shell/controls/rows/filters/focus, authored hidden rule, optional technical evidence, contextual dependency and module descriptions; all existing controls retained.
+- Actual installed capture matrix added with exact artifact/viewport/image hashes and hidden/overflow checks. No final screenshot or V PASS yet; [R06 report](docs/remediation/R06-report.md).
+- Full production-code suite running with bounded4-file concurrency before integrated CI. Do not treat screenshot capture or DOM checks as visual acceptance.
+- R06 capture wiring is ready for matching CI; full source run has not yet produced its completion summary. Do not label the in-progress broad run PASS. Published R01 receipt does not qualify these later changes.

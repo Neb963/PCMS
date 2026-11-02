@@ -24,7 +24,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: python3 scripts/release-preflight.py build/pcms-dev.xpi
-      - run: node --test tests/host.test.mjs tests/seed.test.mjs tests/modules.test.mjs tests/queue.test.mjs tests/source-writer.test.mjs tests/capture-cut.test.mjs tests/records.test.mjs tests/journal.test.mjs tests/retention.test.mjs tests/git-writer.test.mjs tests/remediation-diagnostics.test.mjs
+      - run: node --test tests/host.test.mjs tests/seed.test.mjs tests/modules.test.mjs tests/queue.test.mjs tests/source-writer.test.mjs tests/capture-cut.test.mjs tests/records.test.mjs tests/journal.test.mjs tests/retention.test.mjs tests/git-writer.test.mjs tests/remediation-diagnostics.test.mjs tests/git-commit-identity.test.mjs tests/accounts.test.mjs tests/donor-accounts.test.mjs tests/creator-allocation.test.mjs tests/creator-creation.test.mjs tests/ui-queries.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-candidate-${{ github.event.pull_request.head.sha || github.sha }}
@@ -57,6 +57,12 @@ jobs:
       - run: python3 scripts/release-preflight.py build/pcms-dev.xpi
       - name: R01 default diagnostic export, causal faults and disk continuity
         run: python3 tests/installed_journal.py build/pcms-dev.xpi
+      - name: R02 independent Git writer and actual Discover caller
+        run: |
+          python3 tests/installed_git_writer.py build/pcms-dev.xpi
+          python3 tests/installed_discover_preparation.py build/pcms-dev.xpi
+      - name: R03-R04 protected local Creator and no-replay integration
+        run: python3 tests/installed_creation.py build/pcms-dev.xpi
       - name: Persistent complete-candidate startup and user registry
         run: python3 tests/installed_release.py build/pcms-dev.xpi
       - name: Full shared UI, module lifecycle and source recovery
