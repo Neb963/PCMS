@@ -17,3 +17,6 @@ Actual base main003faa9138; branch p35-refresher-cycles. P22 dependency complete
 - Push meaningful checkpoints with accurate evidence. Merge after required T/B, verify main, then continue P36–P41 and any safely eligible work. P47/P49 live qualification remains NOT TESTED.
 
 P35 code checkpoint: batched durable clock policy, session/boot/monotonic fencing, guarded accounting cut, protected route/editor/activity census, actual module/global controls, Settings defaults and searchable/paged cycle UI implemented. Local focused build/70T PASS, including restore-clock authority invalidation and isolated trusted-activity tests. Installed B fixture now exercises actual protected source inspection, settings/Pause, dirty text preservation, earned Active/full Sleep, native background termination and actual browser closure. Its required run remains pending. No refresh writes introduced.
+
+
+Checkpoint90245f1/tree60f5897c: [41365811347](https://github.com/Neb963/PCMS/actions/runs/41365811347) focused71T/build PASS; installed B stopped before cycles because its reused settings() helper opens Modules, where no Refresher section link belongs. Correct the fixture to click Settings index explicitly and wait for the real link. Product settings/defaults and account enrollment were reached; the cycle journey remains unverified, not passed.

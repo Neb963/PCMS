@@ -18,7 +18,7 @@ def clock_cut(sid):
 def page(sid):
  click(sid,'nav a[href="#refresher"]');wait(lambda:script(sid,"return !!document.getElementById('refresher-list')"))
 def settings_clock(sid,active=None,sleep=None):
- settings(sid);click(sid,'a[href="#settings/refresher"]');wait(lambda:script(sid,"return !!document.getElementById('refresher-active-hours')"))
+ click(sid,'nav a[href="#settings"]');wait(lambda:script(sid,"return !!document.querySelector('a[href=\"#settings/refresher\"]')"));click(sid,'a[href="#settings/refresher"]');wait(lambda:script(sid,"return !!document.getElementById('refresher-active-hours')"))
  if active is not None:
   set_input(sid,'#refresher-active-hours',str(active));set_input(sid,'#refresher-sleep-hours',str(sleep));click(sid,'#refresher-save-settings');wait(lambda:'Defaults saved' in script(sid,"return document.getElementById('refresher-settings-result').textContent"));wait(lambda:script(sid,"return !document.getElementById('refresher-save-settings').disabled"))
 def pause(sid,label):
