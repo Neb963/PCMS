@@ -14,3 +14,5 @@
 #backup-accounts { padding-left: 1.25rem; overflow-wrap: anywhere; }
 #backup-accounts li { padding: .75rem 0; border-bottom: 1px solid #dfe4ea; }
 #backup-coverage { overflow-wrap: anywhere; }
+
+.global-search{max-width:980px;margin:1rem auto;padding:0 32px}.global-search form{display:flex;align-items:end;gap:.5rem;flex-wrap:wrap}.global-search label{margin:0}.global-search input{margin:0;flex:1;min-width:12rem}.global-search p:empty,.global-search ul:empty{display:none}#home-attention button{margin-left:.75rem}#home-attention li,#home-current li{padding:.4rem 0}#records a{overflow-wrap:anywhere}button,select{max-width:100%}#global-results{max-height:18rem;overflow:auto}#global-results li{padding:.3rem 0}#global-results span{font-size:.85rem;color:#596573}@media(max-width:600px){.global-search{padding:0 20px}.global-search form{align-items:stretch}.global-search label{width:100%}#home-attention button{display:block;margin:.4rem 0}}

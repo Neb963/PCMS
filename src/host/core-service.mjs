@@ -1,3 +1,4 @@
+import {createUiQueries} from './ui-queries.mjs';
 import {createRefreshController} from '../modules/refresh-controller.mjs';
 import {createRefreshSave} from '../modules/refresh-save.mjs';
 import {createDirectory} from '../modules/directory.mjs';
@@ -28,7 +29,7 @@ import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,sourceWriter,deployer,backup,retention,refresher,directory,refreshSave,refreshController,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,sourceWriter,deployer,backup,retention,refresher,directory,refreshSave,refreshController,ui,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -36,7 +37,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
   }
   const core=()=>pending??=(async()=>{
     const value=await open();
-    await value.queue.boot();
+    await value.queue.boot();ui=createUiQueries({core:value});
     await value.record({step:'CORE_START',result:'COMPLETE'});
     await seed(value);
     git=createGitCatalog({core:value});await git.initialize();gitWriter=createGitWriter({core:value,validateJob:j=>j.deployment?deployer.validate(j):undefined});
@@ -69,7 +70,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
   async function handle(message,sender={}) {
     try {
       const value=await core();let result;
-      if((await value.status()).restoreHold&&['refresher.open','refresher.refresh','directory.check','directory.open','refresher.configure','backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
+      if((await value.status()).restoreHold&&['refresher.open','refresher.refresh','directory.check','directory.open','refresher.configure','backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.draftSet','source.draftPrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
       switch(message?.operation) {
         case 'directory.status':result=await directory.projection();break;
         case 'directory.check':result=await directory.check();if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
@@ -101,10 +102,13 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'deployment.cancel':result=await deployer.cancelAi(message);break;
         case 'deployment.get':result=await deployer.get(message.id);break;
         case 'deployment.check':result=await deployer.check(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.draftGet':result=await sourceWriter.draftGet(message.id);break;
+        case 'source.draftSet':result=await sourceWriter.draftSet(message);break;
+        case 'source.draftPrepare':result=await sourceWriter.prepareDraft(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.saveGet':result=await sourceWriter.get(message.id);break;
         case 'source.savePrepare':result=await sourceWriter.prepare(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.saveRestore':result=await sourceWriter.enqueue({...message,restore:true});if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
-        case 'source.saveCheck':{const state=await sourceWriter.get(message.id),job=state.jobId?await value.read('jobs',state.jobId):null;result=job?.deployment?await deployer.check(message):await sourceWriter.check(message);}if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
+        case 'source.saveCheck':{const state=await sourceWriter.get(message.id),job=state.jobId?await value.read('jobs',state.jobId):null;result=job?.refresh?await refreshSave.check(message):job?.deployment?await deployer.check(message):await sourceWriter.check(message);}if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'source.saveAdopt':result=await sourceWriter.adopt(message);await schedule(value);break;
         case 'source.saveFile':{const s=await sourceWriter.get(message.id),manifestId=({candidate:s.candidateManifest,baseline:s.baselineManifest,remote:s.remoteManifest})[message.version];if(!manifestId)throw new Error('SOURCE_FILE_MISSING');const files=await value.verifySource(manifestId),entry=files.find(f=>f.path===message.path);if(!entry)return {ok:false,code:'SOURCE_FILE_MISSING'};const offset=message.offset??0;if(!Number.isSafeInteger(offset)||offset<0||offset>entry.bytes)return {ok:false,code:'SOURCE_CHUNK_INVALID'};const bytes=(await value.bytes(entry.blobId)).subarray(offset,offset+65536);let raw='';for(let i=0;i<bytes.length;i+=8192)raw+=String.fromCharCode(...bytes.subarray(i,i+8192));result={path:entry.path,version:message.version,offset,total:entry.bytes,sha256:entry.sha256,base64:btoa(raw),next:offset+bytes.length<entry.bytes?offset+bytes.length:null};break;}
         case 'source.get':{const {current,previous,changes,...summary}=await source.get(message.id);result={...summary,currentFiles:current.length,previousFiles:previous.length};break;}
@@ -162,12 +166,17 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'queue.list':{const page=await value.queue.list({cursor:message.cursor,search:message.search??'',state:message.state??''});result={...page,rows:page.rows.map(j=>project('jobs',j))};break;}
         case 'queue.get':{const job=await value.read('jobs',message.id),m=job?.moduleId==='pcms-backup'?await value.read('modules','pcms-backup'):null,exportFile=job?.moduleId==='pcms-backup'&&job.kind==='EXPORT'?await value.read('files',job.id):null,restore=job?.moduleId==='pcms-backup'&&job.kind==='RESTORE'?await value.restore.read():null;result=job?{...project('jobs',job),git:gitWriter.status(job),target:await value.get('generators',job.targetId),...m?{backup:job.kind==='RESTORE'?{restore:true,restoreId:job.input.restoreId,state:restore?.jobId===job.id?restore.state:job.state,code:restore?.jobId===job.id?restore.code:null,canCheck:restore?.jobId===job.id&&m.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('backup.restore')}:job.kind==='EXPORT'?{export:true,state:exportFile?.state??job.backupExport?.phase??job.state,code:exportFile?.code??job.backupExport?.code??job.recovery?.code??null,canCheck:m.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('backup.export')}:{coverageOnly:job.input?.coverageOnly===true,state:job.input?.coverageOnly===true?job.capture?.state??'COLLECTING':job.fullCapture?.phase??'STAGE',code:job.input?.coverageOnly===true?null:job.fullCapture?.code??null,complete:job.input?.coverageOnly===true?job.capture?.state==='COMPLETE':job.fullCapture?.phase==='COMPLETE',canCheck:job.input?.coverageOnly===false&&m.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('backup.captureCut')}}:{}}:null;break;}
         case 'queue.batch':result=await value.queue.batch(message.id);break;
+        case 'ui.work':result=await ui.work(message);break;
+        case 'ui.search':result=await ui.search(message);break;
+        case 'ui.home':result=await ui.home();break;
+        case 'ui.review':result=await ui.review(message);break;
+        case 'ui.diagnostics':result=await ui.diagnostics();break;
         case 'counts':result=await value.counts();break;
         case 'events':result=await journal.events(message);break;
         case 'view.get':result=await value.view('shell-view');break;
         case 'view.save': {
           const v=message.value;
-          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount','sourceSelection','sourceSearch','sourceVersions','backupSearch','backupPage','backupDraftFolder','backupDraftInterval','backupDraftRetention','refresherSearch','refresherPhase','refresherOffset','refresherActiveDraft','refresherSleepDraft'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
+          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['pages','globalSearch','globalCursor','settingsSearch','otherSearch','workCursor','workModule','journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount','sourceSelection','sourceSearch','sourceVersions','backupSearch','backupPage','backupDraftFolder','backupDraftInterval','backupDraftRetention','refresherSearch','refresherPhase','refresherOffset','refresherActiveDraft','refresherSleepDraft'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
           result=await value.saveView('shell-view',v,message.requestId);break;
         }
         default:return {ok:false,code:'OPERATION_DENIED'};
