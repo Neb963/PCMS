@@ -79,6 +79,9 @@ jobs:
       - name: Full shared UI, module lifecycle and source recovery
         if: ${{ !cancelled() }}
         run: python3 tests/installed_ui_continuity.py build/pcms-dev.xpi
+      - name: R08 one-profile seven-module local rehearsal
+        if: ${{ !cancelled() }}
+        run: python3 tests/installed_integrated.py build/pcms-dev.xpi
       - name: R06 independent actual installed pixel matrix
         if: ${{ !cancelled() }}
         run: python3 tests/installed_visual.py build/pcms-dev.xpi
@@ -94,11 +97,14 @@ jobs:
             test-results/installed-deploy-complete.json
             test-results/installed-develop-complete.json
             test-results/installed-refresh-markers.json
+            test-results/installed-integrated.json
       - name: Production disk backup and scoped restore activation
         if: ${{ !cancelled() }}
         run: python3 tests/installed_restore_activation.py build/pcms-dev.xpi
       - name: R07 installed representative capacity and disk export
         if: ${{ !cancelled() }}
+        env:
+          PCMS_REAL_JOURNAL_ROUNDS: '2'
         run: python3 tests/installed_capacity.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
@@ -107,3 +113,4 @@ jobs:
           path: |
             test-results/
             build/identity.json
+            build/pcms-dev.xpi

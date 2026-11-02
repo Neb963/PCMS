@@ -71,7 +71,8 @@ const directory=`PCMS.defineModule({
  outcome(r){if(r.state==='COMPLETE')return {kind:'complete'};if(r.state==='CONTINUE')return {kind:'checkpoint'};if(r.state==='WAITING')return {kind:'wait',dueAt:r.dueAt||Date.now()+1000};return {kind:'hold',reason:r.code||'DIRECTORY_UNKNOWN',recovery:{action:'OPEN_REFRESHER'}};},
  stop(){}
 });\n`;
-const stamp=new Date('1980-01-01T00:00:00.000Z');
+// ZIP DOS timestamps contain local calendar fields, not a UTC instant.
+const stamp=new Date(1980,0,1,0,0,0);
 export function bundledPackage(id,name){
  const definition=bundledContract[id],background=strToU8(id==='pcms-journal'?journal:id==='pcms-accounts'?accounts:id==='pcms-discover'?discover:id==='pcms-creator'?creator:id==='pcms-deployer'?source:id==='pcms-backup'?backup:id==='pcms-refresher'?directory:pending);
  const manifest={format:1,id,name,version:definition.version,coreApi:1,jobSchema:1,

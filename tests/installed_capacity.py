@@ -118,7 +118,11 @@ def main():
    previous=current
  worker=threading.Thread(target=sample,daemon=True);worker.start();base.account_session=scoped_session;base.setup_model=setup;base.read_archive=read;base.completed=completed
  try:
-  base.main();assert len(metrics['archives'])>=2 and len(metrics['exports'])>=2;metrics['result']='PASS'
+  if os.environ.get('PCMS_REAL_JOURNAL_ROUNDS')=='2':
+   from installed_long_session import run
+   base.main(after_checks=lambda sid,profile,disk,receipt:run(sid,profile,disk,receipt,lambda:{'aggregateFirefoxRssPeakBytes':metrics['aggregateFirefoxRssPeakBytes'],'sampledFirefoxCpuSeconds':metrics['sampledFirefoxCpuSeconds'],'currentFirefoxRssBytes':rss()}))
+  else:base.main()
+  assert len(metrics['archives'])>=2 and len(metrics['exports'])>=2;metrics['result']='PASS'
  finally:
   stop.set();worker.join();metrics['wallSeconds']=time.monotonic()-started;(OUT/'installed-capacity.json').write_text(json.dumps(metrics,indent=2)+'\n');print(json.dumps(metrics),flush=True)
 if __name__=='__main__':main()
