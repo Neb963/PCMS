@@ -53,3 +53,11 @@ test('successful unchanged view writes and read-only host polling do not add rej
  assert.deepEqual(await core.status(),before);
  assert.equal((await core.list({table:'events',search:'CORE_REQUEST'})).rows.length,0);
 });
+
+test('the actual trusted UI failure report records a fixed page/type and rejects untrusted vocabulary in the support ZIP',async t=>{
+ const core=await openCore({name:'ui-failure-report-'+crypto.randomUUID()});t.after(()=>core.close());const service=createCoreService({open:async()=>core,api:null});await service.start();const first=(await core.status()).sequence+1,secret='PRIVATE_RENDER_SOURCE_TOKEN';
+ for(const exceptionType of ['TYPE_ERROR','QUOTA_EXCEEDED_ERROR'])assert.deepEqual(await service.handle({operation:'ui.renderFailure',page:'accounts',exceptionType,message:secret,source:secret}),{ok:true,result:{recorded:true}});
+ assert.deepEqual(await service.handle({operation:'ui.renderFailure',page:secret,exceptionType:'TYPE_ERROR'}),{ok:false,code:'INVALID_DIAGNOSTIC'});
+ const archive=await journalArchive(core,{first,last:(await core.status()).sequence}),files=unzipSync(archive.bytes);await verifyJournalArchive(archive.bytes);for(const bytes of Object.values(files))assert.ok(!strFromU8(bytes).includes(secret));
+ const events=strFromU8(files['events.jsonl']).trim().split('\n').map(JSON.parse),render=events.filter(e=>e.step==='UI_RENDER');assert.equal(render.length,2);assert.ok(render.every(e=>e.code==='UI_RENDER_FAILED'&&e.diagnostics.action==='UI_ACCOUNTS_RENDER'&&e.diagnostics.failedCheck==='UI_ACCOUNTS_RENDER'));assert.equal(render[0].diagnostics.exceptionType,'TYPE_ERROR');assert.equal(render[1].diagnostics.causeCode,'STORAGE_FULL');assert.equal(render[1].diagnostics.family,'STORAGE');
+});

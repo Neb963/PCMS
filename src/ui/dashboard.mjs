@@ -1,3 +1,4 @@
+import {renderBoundary} from './render-boundary.mjs';
 import {taskName,workState,taskLabel,stateLabel} from './labels.mjs';
 import {rememberPage,restorePage} from './continuity.mjs';
 import {sharedPages} from './shared-pages.mjs';
@@ -82,7 +83,7 @@ async function persist(){
 async function renderRecords(key){
  void queueStatus();
  refreshJournal=null;refreshAccounts=null;refreshCatalog=null;refreshWork=null;refreshBackup=null;refreshRefresher=null;refreshHome=null;const target=location.hash.slice(1)||'home',mount=document.getElementById('records'),area=node('div');mount.setAttribute('aria-busy','true');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
- try{
+ return renderBoundary({mount,area,target,page:key,isCurrent:()=>area.isConnected&&(location.hash.slice(1)||'home')===target,node,report:data=>core('ui.renderFailure',data),retry:()=>renderRecords(key),reveal:revealNavigation,render:async()=>{
  if(key==='module'){await renderModule(area);return;}
  if(key==='other'){await renderOther(area);return;}
  if(key==='home'){
@@ -101,7 +102,7 @@ async function renderRecords(key){
    await shared.settings(area);
 
  }
- }finally{if(area.isConnected&&(location.hash.slice(1)||'home')===target){mount.dataset.routeReady=target;mount.setAttribute('aria-busy','false');revealNavigation();}}
+ }});
 }
 const initial=await core('view.get');
 if(initial.ok&&initial.result){view=initial.result;if(!location.hash)history.replaceState(null,'','#'+view.route);}
@@ -271,7 +272,7 @@ async function renderAccounts(area){
  form.addEventListener('submit',async event=>{event.preventDefault();add.disabled=true;input.disabled=true;const requestId=view.accountAddRequestId??crypto.randomUUID(),value=view.accountAddRequestId?view.accountAddLabel:input.value;view.accountAddRequestId=requestId;view.accountAddLabel=value;await persist();outcome.textContent='Saving enrollment…';const r=await core('accounts.add',{requestId,label:value});if(!area.isConnected)return;add.disabled=false;
   if(!r.ok){outcome.textContent=accountError(r.code);return;}if(view.accountAddRequestId===requestId){delete view.accountAddRequestId;delete view.accountAddLabel;view.accountDraftLabel='';input.value='';input.disabled=false;await persist();}outcome.textContent='Enrollment saved. Preparation continues in the background.';view.accountSelection=r.result.id;location.hash='#accounts/'+r.result.id;await persist();await load();
  });
- const filters=node('div'),search=node('input'),state=node('select'),searchLabel=node('label','Search accounts'),stateLabel=node('label','Account state');search.id='account-search';search.type='search';search.value=view.accountSearch??'';searchLabel.htmlFor=search.id;state.id='account-filter';stateLabel.htmlFor=state.id;for(const v of ['','PREPARING','LOGIN_REQUIRED','READY','HELD','ARCHIVED','REMOVING']){const option=node('option',v?stateLabel(v):'All states');option.value=v;state.append(option);}state.value=view.accountState??'';filters.append(searchLabel,search,stateLabel,state);area.append(filters);
+ const filters=node('div'),search=node('input'),state=node('select'),searchLabel=node('label','Search accounts'),accountStateLabel=node('label','Account state');search.id='account-search';search.type='search';search.value=view.accountSearch??'';searchLabel.htmlFor=search.id;state.id='account-filter';accountStateLabel.htmlFor=state.id;for(const v of ['','PREPARING','LOGIN_REQUIRED','READY','HELD','ARCHIVED','REMOVING']){const option=node('option',v?stateLabel(v):'All states');option.value=v;state.append(option);}state.value=view.accountState??'';filters.append(searchLabel,search,accountStateLabel,state);area.append(filters);
  const list=node('ul'),next=node('button','Next accounts'),first=node('button','First page'),detail=node('section');list.id='account-list';next.id='next-accounts';first.id='first-accounts';detail.id='account-detail';detail.setAttribute('aria-label','Selected account');area.append(list,first,next,detail);let cursor=view.accountCursor??null,nextCursor=null,query=0,selected=null,detailBusy=false;const rows=new Map(),controls=new Map();
  function buildDetail(a){detail.replaceChildren();controls.clear();const heading=node('h3',a.label),related=node('p'),summary=node('p'),binding=node('p'),times=node('p');summary.id='account-state';summary.setAttribute('role','status');binding.id='account-binding';times.id='account-observations';related.id='account-links';const evidence=node('details');evidence.id='account-evidence';evidence.append(node('summary','Route and identity evidence'),binding,times);detail.append(heading,summary,related,evidence);
   const confirmation=node('div'),confirmText=node('p','Remove local account data, its protected tabs and login session? Perchance generators stay unchanged.'),yes=node('button','Remove local data'),cancel=node('button','Keep account');confirmation.hidden=true;confirmation.id='account-remove-confirmation';yes.id='account-remove-confirm';cancel.id='account-remove-cancel';confirmation.append(confirmText,yes,cancel);cancel.addEventListener('click',()=>{confirmation.hidden=true;controls.get('REMOVE').focus();});

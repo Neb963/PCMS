@@ -3,6 +3,7 @@ production ZIP disk reads. No provider access, real credentials or route effects
 """
 from installed_packages import *
 from visual_capture import state_matrix
+from installed_render_failure import run as render_failure
 
 def set_input(sid,selector,text):
  # WebDriver clear does not deliver the input event used by real keyboard
@@ -47,7 +48,8 @@ def main():
    context(sid,'chrome');script(sid,"Services.prefs.setStringPref('browser.download.dir',arguments[0]);Services.prefs.setIntPref('browser.download.folderList',2);Services.prefs.setBoolPref('browser.download.useDownloadDir',true);return true;",[str(disk)]);context(sid,'content')
    assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid);status(sid,'BRIDGE_MISSING')
    context(sid,'chrome');prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content')
-   fixture=asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();await c.credentials.set('github','never-export-private-fixture');let first=(await c.status()).sequence+1,last;
+   render_first=render_failure(sid,receipt)
+   fixture=asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();await c.credentials.set('github','never-export-private-fixture');let first=arguments[0],last;
     // Exercise the production dispatch/transaction/error projection with a
     // deterministic local call boundary. No native/provider call is possible.
     const {CoreError}=await import(browser.runtime.getURL('core/records.mjs'));
@@ -55,7 +57,7 @@ def main():
     const job=await c.queue.enqueue({requestId:'r01-fault',logicalKey:'r01-fault',moduleId:'r01-fault',targetId:'synthetic-git-target',kind:'WORK'}),turn=await c.queue.next();if(turn.id!==job.id)throw Error('FAULT_FIXTURE_TURN');
     await c.queue.dispatch(job.id,turn.rev,{operationId:'r01-lost-reply',kind:'GIT_COMMITS',preflight:async()=>({ok:true}),call:async()=>{throw new CoreError('GIT_COMMIT_IDENTITY_MISMATCH',{failedCheck:'COMMIT_IDENTITY',messageMatches:false,expectedLength:77,observedLength:76});},observe:async()=>({matched:false})});
     await c.mutate([{table:'accounts',id:'synthetic-account',value:{state:'HELD',holdCode:'ACCOUNT_ROUTE_RECHECK_REQUIRED',routeObservedAt:Date.now()-901000,expectedPrincipal:'never-export-private-fixture'}},{table:'generators',id:'synthetic-held',value:{state:'HELD',creatorState:'HELD',creatorHoldCode:'CREATOR_TEMPLATE_SCHEMA',source:'never-export-private-fixture'}}],{step:'FIXTURE_PREPARE_HOLD',result:'HELD'});
-    for(let i=0;i<65;i++){const r=await c.record({step:'JOURNAL_FIXTURE',result:i===64?'FAILED':'COMPLETE',targetId:'fixture-target-'+i,...i===64?{code:'EXPECTED_ERROR'}:{}});first??=r.sequence;last=r.sequence;}c.close();return {first,last};""")
+    for(let i=0;i<65;i++){const r=await c.record({step:'JOURNAL_FIXTURE',result:i===64?'FAILED':'COMPLETE',targetId:'fixture-target-'+i,...i===64?{code:'EXPECTED_ERROR'}:{}});first??=r.sequence;last=r.sequence;}c.close();return {first,last};""",[render_first])
    journal(sid);prior_settings=inspect(sid)['journal'];set_input(sid,'#journal-folder','PCMS/../never-export-private-fixture');click(sid,'#save-journal-settings')
    wait(lambda:script(sid,"return document.getElementById('save-journal-settings').nextElementSibling.textContent==='Use a relative folder inside PCMS, without dots or unsafe path characters.'"))
    assert inspect(sid)['journal']['folder']==prior_settings['folder'] and inspect(sid)['journal']['intervalMinutes']==prior_settings['intervalMinutes']
@@ -65,6 +67,7 @@ def main():
    completed=wait(lambda:next((f for f in inspect(sid)['files'] if not f['automatic'] and f['state']=='COMPLETE'),None),30);path=disk/completed['filename'];m,rows=read_zip(path);assert (m['first'],m['last'],m['count'])==(fixture['first'],fixture['last'],fixture['last']-fixture['first']+1);assert [r['targetId'] for r in rows if r['step']=='JOURNAL_FIXTURE']==['fixture-target-'+str(i) for i in range(65)];assert path.stat().st_size==completed['bytes'];assert hashlib.sha256(path.read_bytes()).hexdigest()==completed['sha256'];manual_hash=hashlib.sha256(path.read_bytes()).hexdigest();assert inspect(sid)['journal']['watermark']==0
    fault=next(r for r in rows if r['step']=='EFFECT_OUTCOME');assert fault['operationId']=='r01-lost-reply' and fault['diagnostics']['causeCode']=='GIT_COMMIT_IDENTITY_MISMATCH' and fault['diagnostics']['messageMatches'] is False and fault['diagnostics']['noReplay'] is True
    rejection=next(r for r in rows if r['step']=='CORE_REQUEST' and r['code']=='EXPORT_DESTINATION_INVALID');assert rejection['diagnostics']['action']=='JOURNAL_SETTINGS' and rejection['diagnostics']['decision']=='REQUEST_FAILED' and rejection['operationId']
+   render=next(r for r in rows if r['step']=='UI_RENDER');assert render['code']=='UI_RENDER_FAILED' and render['diagnostics']['exceptionType']=='TYPE_ERROR' and render['diagnostics']['action']=='UI_ACCOUNTS_RENDER'
    receipt['checks'].append('actual-invalid-settings-control/unchanged-prior-settings/default-causal-host-rejection/independent-disk-original-code/action-correlation/request-canary-excluded')
    with zipfile.ZipFile(path) as z:checkpoint=json.loads(z.read('diagnostics.json'))
    account=next(a for a in checkpoint['tables']['accounts'] if a['id']=='synthetic-account');assert account['code']=='ACCOUNT_ROUTE_RECHECK_REQUIRED' and account['diagnostics']['proofAgeMs']>=901000
