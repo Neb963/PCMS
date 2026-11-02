@@ -51,3 +51,9 @@ test('three measured useful rounds speed up with p95 floor; provider Retry-After
  state=providerBackoff(state,{now,retryAfterMs:180000,jitter:50});assert.equal(state.backoffUntil,now+180000);
  state=providerBackoff(state,{now,jitter:0});assert.equal(state.backoffUntil,now+180000);
 });
+
+test('rendered revision/document identities can advance without erasing movement; actual filter changes reset it',()=>{
+ const before={...snapshot(others(160),now-60000),url:'https://perchance.org/generators',filterContext:[{name:'listing',value:'public'}],context:'old-document:revision1'};
+ const after={...snapshot(['new-0',...others(159)]),url:before.url,filterContext:before.filterContext,context:'same-document:revision2'};
+ assert.equal(movement(after,before),1);assert.equal(movement({...after,filterContext:[{name:'listing',value:'all'}]},before),0);
+});

@@ -5,7 +5,7 @@ import {createRefreshController} from '../src/modules/refresh-controller.mjs';
 const event={step:'CONTROLLER_FIXTURE',result:'COMPLETE'};
 async function fixture(t) {
  const {c}=await seeded(t);await c.queue.resume('fixture');let now=Date.now(),calls=[],observations=[],fresh=true;
- const others=Array.from({length:160},(_,i)=>'other-'+i),snapshot=order=>({schema:1,displayedSlugs:order,entries:order.map((slug,i)=>({slug,position:i+1,pinned:i===0})),pinned:[order[0]],observedAt:now,context:'public',size:order.length});
+ const others=Array.from({length:160},(_,i)=>'other-'+i),snapshot=order=>({schema:1,displayedSlugs:order,entries:order.map((slug,i)=>({slug,position:i+1,pinned:false})),pinned:[],observedAt:now,context:'document/revision-'+now,url:'https://perchance.org/generators',filterContext:[],size:order.length});
  const put=async(table,id,patch)=>{const old=await c.read(table,id);await c.mutate([{table,id,expectedRev:old?.rev,refs:old?.refs??[],value:{...old,...patch}}],event);};
  await put('accounts','owner',{expectedPrincipal:'principal'});
  for(const id of ['first','second'])await put('generators',id,{slug:id+'-slug',remoteId:'public_'+id,ownerPrincipal:'principal',accountId:'owner'});

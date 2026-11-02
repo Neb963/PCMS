@@ -3,13 +3,16 @@ export const INITIAL_SPACING = 30000;
 const MINUTE = 60000, MAX_BACKOFF = 30 * MINUTE;
 export const median = xs => xs.length ? [...xs].sort((a,b)=>a-b)[Math.floor(xs.length/2)] : 0;
 export const compareGain = (a,b) => a[0]-b[0] || a[1]-b[1] || a[2]-b[2];
+// Collector context includes document/revision for within-snapshot consistency.
+// Control comparisons span revisions but keep the same rendered filter/pin scope.
+export const controlContext = s => s.url?JSON.stringify([s.url,s.filterContext??[],s.pinned??[]]):s.context;
 const vector = (order,owned) => [50,100,order.length].map(n=>order.slice(0,n).filter(s=>s&&owned.has(s)).length);
 const recent = (xs,x) => [...(xs??[]),x].slice(-20);
 export function initialControl() {
  return {schema:1,spacingMs:INITIAL_SPACING,nextDue:0,pending:null,rounds:0,failures:0,backoffUntil:0,lastAccount:null,insertions:[],propagations:[],durations:[],targets:{},last:null};
 }
 export function movement(current,previous,excluded=new Set()) {
- if(!previous || previous.context!==current.context || current.observedAt<=previous.observedAt)return 0;
+ if(!previous || controlContext(previous)!==controlContext(current) || current.observedAt<=previous.observedAt)return 0;
  const before=new Map(previous.displayedSlugs.map((s,i)=>[s,i]));
  return median(current.displayedSlugs.flatMap((s,i)=>before.has(s)&&!excluded.has(s)&&!current.pinned.includes(s)?[Math.max(0,i-before.get(s))*MINUTE/(current.observedAt-previous.observedAt)]:[]));
 }

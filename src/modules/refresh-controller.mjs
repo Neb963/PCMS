@@ -1,4 +1,4 @@
-import {initialControl,selectRefresh,settleRefresh,providerBackoff} from './refresh-control.mjs';
+import {initialControl,selectRefresh,settleRefresh,providerBackoff,controlContext} from './refresh-control.mjs';
 import {publicError} from '../core/records.mjs';
 const ID='pcms-refresher',KEY='refresher-control';
 export function createRefreshController({core,refresher,directory,save,clock=Date.now,random=Math.random}) {
@@ -43,7 +43,7 @@ export function createRefreshController({core,refresher,directory,save,clock=Dat
    if(j.state!=='COMPLETE'||g?.refreshLast?.decisionId!==p.decisionId)return persist({...s,code:j.refresh.context?.loading?'REFRESH_EDITOR_LOADING':'SAVING'});
    if(!p.savedAt){p={...p,savedAt:g.refreshLast.verifiedAt,observeAfter:g.refreshLast.verifiedAt+5000};s.pending=p;await directory.afterSave(p.savedAt);}
    if(!snapshot||snapshot.observedAt<p.observeAfter)return persist({...s,code:'WAITING_FOR_MEASUREMENT'});
-   if(snapshot.context!==p.before.context){s.pending=null;s.nextDue=now+s.spacingMs;s.code='DIRECTORY_CONTEXT_CHANGED';return persist(s);}
+   if(controlContext(snapshot)!==controlContext(p.before)){s.pending=null;s.nextDue=now+s.spacingMs;s.code='DIRECTORY_CONTEXT_CHANGED';return persist(s);}
    s=settleRefresh(s,{pending:p,snapshot,owned,now});s.code=s.pending?'WAITING_FOR_PROPAGATION':s.last.responded?'MEASURED_RESPONSE':'NO_VISIBILITY_RESPONSE';
    if(!s.pending&&!s.last.responded){const target=await core.read('generators',p.id);await core.mutate([{table:'generators',id:p.id,expectedRev:target.rev,refs:target.refs,value:{...target,refreshBackoffUntil:s.targets[p.id].until}}],{moduleId:ID,targetId:p.id,step:'REFRESH_TARGET_BACKOFF',result:'WAITING'});await refresher.changed?.();}
    if(s.pending)await directory.afterSave(s.pending.observeAfter-5000);
@@ -51,7 +51,7 @@ export function createRefreshController({core,refresher,directory,save,clock=Dat
   }
   if(!await enabled())return persist({...s,code:'PAUSED'});
   if(!snapshot)return persist({...s,code:d.code??'DIRECTORY_NOT_MEASURED'});
-  if(s.context!==snapshot.context){s.context=snapshot.context;s.insertions=[];s.propagations=[];}
+  if(s.context!==controlContext(snapshot)){s.context=controlContext(snapshot);s.insertions=[];s.propagations=[];}
   if(s.nextDue>now||s.backoffUntil>now)return s;
   const available=[];let offset=0;
   do{const page=await refresher.status({phase:'AVAILABLE',offset,limit:200});for(const row of page.rows){const g=gs.find(g=>g.id===row.id);if(g&&!s.waiting[g.id])available.push(g);}offset=page.next;}while(offset!==null);
