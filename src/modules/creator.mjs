@@ -5,7 +5,7 @@ import {eligibleAccount,validCreatorTarget,reserveCreator,adoptCreator,creationD
 
 // Creator's finite policy on the one Core queue. This version never creates,
 // renames, saves, changes listing or acquires a source writer.
-export function createCreator({core,donor,clock=Date.now}){
+export function createCreator({core,donor,clock=Date.now,ensureProtection=null}){
  const id='pcms-creator';let serial=Promise.resolve();
  const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
  const capable=m=>m?.manifest?.capabilities?.includes('jobs.creator')&&m.manifest.capabilities.includes('perchance.ownership');
@@ -23,7 +23,11 @@ export function createCreator({core,donor,clock=Date.now}){
   const m=await core.read('modules',id),connection=(await core.view('git-catalog'))?.connection;if(!enabled(m)||!connection)return;
   for(let g of await all('generators')){
    if(!validCreatorTarget(g)||g.repositoryId!==connection.repositoryId||g.remoteId)continue;
-   if(g.creatorJobId){const j=await core.read('jobs',g.creatorJobId);if(creates(m)&&j?.generation===m.generation&&j.creator?.phase==='RESERVED'&&j.state==='HELD'&&j.recovery?.code==='CREATOR_CREATE_PENDING'&&j.effect?.boundary!=='POSSIBLE')await save(j,{state:'WAITING',dueAt:clock(),recovery:null},'RESUME_PRIVATE_CREATION');if(j?.state==='HELD'&&j.recovery?.code==='CREATOR_NO_ELIGIBLE_ACCOUNT'&&(await accounts()).some(eligibleAccount))await restartScan(j);continue;}
+   if(g.creatorJobId){let j=await core.read('jobs',g.creatorJobId);
+    if(ensureProtection&&j?.state==='HELD'&&['RESERVED','CREATE_PREPARED','CREATE_AVAILABLE','CREATE_VERIFIED'].includes(j.creator?.phase)&&j.effect?.boundary!=='POSSIBLE'&&(!creationDispatched(j)||j.creator.phase==='CREATE_VERIFIED'&&!j.effects?.some(e=>e.kind==='PERCHANCE_RENAME'))&&['ACCOUNT_ROUTE_RECHECK_REQUIRED','ACCOUNT_RECOVERY_PENDING'].includes(j.recovery?.code)){
+     const protection=await ensureProtection(j.accountId);if(protection.ready){const a=await core.read('accounts',j.accountId),created=j.creator.phase==='CREATE_VERIFIED';check(!created||a.expectedPrincipal===j.creator.creation.principalFingerprint,'CREATOR_OWNER_CHANGED');j=await save(j,{state:'WAITING',dueAt:clock(),recovery:null,creator:created?{...j.creator,creation:{...j.creator.creation,accountRevision:a.rev}}:{...j.creator,phase:'RESERVED',creation:null,cycle:j.creator.cycle+1}},'RESUME_PROTECTED_CREATION',{creatorState:'PREPARING',creatorHoldCode:null});}
+    }
+if(creates(m)&&j?.generation===m.generation&&j.creator?.phase==='RESERVED'&&j.state==='HELD'&&j.recovery?.code==='CREATOR_CREATE_PENDING'&&j.effect?.boundary!=='POSSIBLE')await save(j,{state:'WAITING',dueAt:clock(),recovery:null},'RESUME_PRIVATE_CREATION');if(j?.state==='HELD'&&j.recovery?.code==='CREATOR_NO_ELIGIBLE_ACCOUNT'&&(await accounts()).some(eligibleAccount))await restartScan(j);continue;}
    const job=await core.queue.enqueue({requestId:'creator-intake-'+g.id,logicalKey:'creator:'+g.id,moduleId:id,targetId:g.id,kind:'CREATE',jobSchema:1,input:{slug:g.slug,folder:g.folder,repositoryId:g.repositoryId},dueAt:clock()+86400000});g=await core.read('generators',g.id);
    await core.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,creatorJobId:job.id,creatorState:'OBSERVING',creatorHoldCode:null}},{table:'jobs',id:job.id,expectedRev:job.rev,refs:job.refs,value:{...job,dueAt:clock(),creator:{schema:1,phase:'SCAN',cycle:0,cursor:0,accounts:null,observations:[]}}}],{moduleId:id,jobId:job.id,targetId:g.id,step:'INTAKE_CREATOR_FOLDER',result:'COMPLETE'},null,{moduleId:id,generation:m.generation,jobId:job.id,jobRevision:job.rev});
   }
@@ -60,6 +64,9 @@ export function createCreator({core,donor,clock=Date.now}){
    if(job.effect?.boundary==='POSSIBLE'&&['PERCHANCE_CREATE','PERCHANCE_RENAME'].includes(job.effect.kind)&&(!g||g.creatorJobId!==job.id||g.slug!==job.input.slug||g.folder!==job.input.folder||!validCreatorTarget(g)||connection?.repositoryId!==job.input.repositoryId)){await creationReadback({core,donor,job,scope,clock});job=await core.read('jobs',job.id);}
    check(g?.creatorJobId===job.id&&g.slug===job.input.slug&&g.folder===job.input.folder&&validCreatorTarget(g),'CREATOR_FOLDER_CHANGED');check(connection?.repositoryId===job.input.repositoryId,'GIT_REPOSITORY_CHANGED');
    if(nativeSlug(job.input.slug)!==job.input.slug)return hold(job,'CREATOR_SLUG_INVALID');
+   if(ensureProtection&&!reconcile&&['RESERVED','CREATE_PREPARED','CREATE_AVAILABLE','CREATE_VERIFIED'].includes(job.creator.phase)&&job.effect?.boundary!=='POSSIBLE'){
+    const protection=await ensureProtection(job.accountId);if(!protection.ready)return hold(job,protection.code??'ACCOUNT_ROUTE_RECHECK_REQUIRED');
+   }
    if(creates(m)&&['RESERVED','CREATE_PREPARED','CREATE_AVAILABLE','CREATE_VERIFIED'].includes(job.creator.phase))return await advanceCreation({core,donor,job,scope,clock,save,hold,output,admit,reconcile});
    if(job.creator.phase==='RESERVED')return output(job,'RESERVED','CREATOR_CREATE_PENDING');
    if(['ADOPTED','CREATED'].includes(job.creator.phase))return output(job,'COMPLETE');

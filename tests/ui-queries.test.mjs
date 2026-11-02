@@ -5,7 +5,7 @@ import {createUiQueries} from '../src/host/ui-queries.mjs';
 const event={step:'UI_FIXTURE',result:'COMPLETE'};
 async function fixture(t) {
  const {c}=await seeded(t),ui=createUiQueries({core:c});
- await c.mutate([{table:'accounts',id:'owner',value:{label:'Visible account',principalLabel:'fixture@invalid',state:'HELD',secret:'DO_NOT_PROJECT'}},{table:'generators',id:'g',value:{slug:'visible-generator',accountId:'owner',folder:'generators/visible-generator',folderPresent:true,listing:'UNKNOWN'}}],event);
+ await c.mutate([{table:'accounts',id:'owner',value:{label:'Visible account',principalLabel:'fixture@invalid',state:'HELD',secret:'DO_NOT_PROJECT'}},{table:'generators',id:'g',value:{slug:'visible-generator',accountId:'owner',folder:'generators/visible-generator',folderPresent:'YES',listing:'UNKNOWN'}}],event);
  return {c,ui,put:async(id,value)=>{const j=await c.read('jobs',id);await c.mutate([{table:'jobs',id,expectedRev:j?.rev,value:{...j,kind:'DEPLOY',targetId:'g',accountId:'owner',moduleId:'pcms-deployer',state:'HELD',recovery:{action:'OPEN_SOURCE',code:'SOURCE_OUTCOME_UNKNOWN'},secret:'DO_NOT_PROJECT',...value}}],event);}};
 }
 test('global search joins accounts/slugs/folders/jobs, pages past early results and preserves an immutable cut',async t=>{

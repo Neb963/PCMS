@@ -62,3 +62,17 @@ R02 source/T checkpoint: cd6ed32c / tree16e5032cc274c81e21db5b0045cb7fb95f992726
 - Implemented existing-binding RENEW flow, donor current proof observation, proactive/cold/on-demand maintenance and deadlines, known-failure backoff, unknown same-operation readback, truthful route projection. No new route/Persona/tab or login confirmation.
 - 56 focused Accounts/donor/binding/source tests PASS. Added stale/cold/dedup/no-extra-setup/backoff/no-replay oracles. Installed native-fixture/process/TTL matrix pending; [R03 report](docs/remediation/R03-report.md).
 - R01 exact CI41506387916 (source f48a4522) completed focused + all installed steps successfully, including actual 100001-event suffix export. Retrieve its receipt before closing the report. R02/R03 are not covered by that artifact.
+
+## R04 plan (before R04 code)
+
+1. Require `folderPresent === 'YES'` in Creator intake/allocation and final creation preflight. Update legacy test fixtures to the real catalog value and add explicit NO/malformed negative cases.
+2. Before new Creator preparation, ask existing Accounts to ensure current protection. A pre-mutation route hold records its dependency and resumes the original RESERVED job after proof returns, with a new observation cycle only; never override/replay CREATE or RENAME.
+3. Propagate upstream Creator job/account/cause into Deployer projections and Work. Wake on changed dependency/verified identity; retain WAIT_CREATOR as waiting without a source claim or premature publication.
+4. Coalesce unchanged dependency checkpoints while retaining meaningful transitions and bounded fallback reconciliation. Test same-job repair, allocation/override/no-replay, rejected folder values and unrelated work.
+5. Record exact focused/installed scope in R04 report; native/Creator/Deployer installed checks remain required on the integrated XPI.
+
+### R04 checkpoint
+
+- Exact YES catalog guard; Accounts protection prerequisite and same-job safe Creator wake; current Creator dependency/account/cause in Deployer/Work; unchanged dependency records coalesced; truthful still-waiting check feedback.
+- 84 Creator/allocation/creation/Deployer T tests PASS (~76s), with same-job/no-owner-rescan/no-write-before-proof and exact YES negatives. Narrowed refinement is checked separately. Matching B/visual remains pending; [R04 report](docs/remediation/R04-report.md).
+- R01 downloaded receipt independently identifies Firefox155.0/build20260817142839, sandbox6, XPI40111aec89f9227f96afed31f825fc8aa027a46132bef7952aef9ae7911470d1:100001 events/90days,1 tail row,5 tail cursor reads,107ms actual UI→Downloads→disk. No provider acceptance inferred.
