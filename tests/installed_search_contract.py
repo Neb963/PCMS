@@ -19,12 +19,12 @@ def run(sid,receipt):
  {table:'jobs',id:'search-completed-job',value:{moduleId:'pcms-deployer',generation:1,jobSchema:1,kind:'SOURCE_INSPECT',targetId:'search-fast',accountId:'search-account-one',state:'COMPLETE',step:'COMPLETE'}}
  ],{step:'SEARCH_FIXTURE_RECORDS',result:'COMPLETE'});const sequence=(await c.status()).sequence;c.close();return sequence;""")
  assert isinstance(seeded,int) and seeded>0,seeded
- installed=asyncjs(sid,"""const bg=await browser.runtime.getBackgroundPage();if(bg.__searchProbe)throw Error('DUPLICATE_SEARCH_PROBE');const p=bg.__searchProbe={requests:[],responses:[],ports:[],delayed:false,fail:false,failed:0};
+ installed=asyncjs(sid,"""const bg=await browser.runtime.getBackgroundPage();if(bg.__searchProbe)throw Error('DUPLICATE_SEARCH_PROBE');const p=bg.__searchProbe={requests:[],responses:[],ports:[],originalPosts:new Map(),timers:new Set(),delayed:false,fail:false,failed:0};
  const transaction=bg.IDBDatabase.prototype.transaction;p.transaction=transaction;
  bg.IDBDatabase.prototype.transaction=function(names,...rest){if(this.name==='pcms-core'&&p.fail&&Array.from(typeof names==='string'?[names]:names).includes('versions')){p.fail=false;p.failed++;throw new bg.DOMException('Synthetic IndexedDB transaction unavailable','InvalidStateError');}return transaction.call(this,names,...rest);};
- p.listener=port=>{if(port.name!=='pcms-core-rpc')return;p.ports.push(port);const requests=new Map(),send=port.postMessage.bind(port);
+ p.listener=port=>{if(port.name!=='pcms-core-rpc')return;p.ports.push(port);p.originalPosts.set(port,port.postMessage);const requests=new Map(),send=port.postMessage.bind(port);
  port.onMessage.addListener(m=>{if(m.operation==='ui.search'){requests.set(m.rpcId,m.query);p.requests.push({id:m.rpcId,query:m.query,at:Date.now()});}});
- port.postMessage=packet=>{const query=requests.get(packet.rpcId);if(query===undefined)return send(packet);const deliver=()=>{p.responses.push({id:packet.rpcId,query,ok:packet.response.ok,code:packet.response.code??null,at:Date.now()});send(packet);};if(query==='slow-needle'&&p.delayed)setTimeout(deliver,1400);else deliver();};};
+ port.postMessage=packet=>{const query=requests.get(packet.rpcId);if(query===undefined)return send(packet);const deliver=()=>{p.responses.push({id:packet.rpcId,query,ok:packet.response.ok,code:packet.response.code??null,at:Date.now()});send(packet);};if(query==='slow-needle'&&p.delayed){const timer=setTimeout(()=>{p.timers.delete(timer);deliver();},1400);p.timers.add(timer);}else deliver();};};
  bg.browser.runtime.onConnect.addListener(p.listener);return true;""")
  assert installed is True,installed
  try:
@@ -66,4 +66,4 @@ def run(sid,receipt):
   receipt['searchContract']={'scope':'real packaged DOM/RPC/Core/IndexedDB; synthetic records; delivery/IDB fault injection only','queries':results,'delivery':probe,'causalEvents':diagnostics}
   receipt['checks'].append('R05-real-IDB/Unicode-case/duplicate-label-distinct-ID/folder-job-exact-navigation/no-match/out-of-order-valid-Core-replies/stale-result-fence/actual-IDB-boundary-failure/explicit-error-preserved-input/retry/default-causal-record')
  finally:
-  asyncjs(sid,"const bg=await browser.runtime.getBackgroundPage(),p=bg.__searchProbe;if(p){bg.IDBDatabase.prototype.transaction=p.transaction;bg.browser.runtime.onConnect.removeListener(p.listener);p.delayed=false;p.fail=false;delete bg.__searchProbe;}return true;")
+  asyncjs(sid,"const bg=await browser.runtime.getBackgroundPage(),p=bg.__searchProbe;if(p){bg.IDBDatabase.prototype.transaction=p.transaction;bg.browser.runtime.onConnect.removeListener(p.listener);p.delayed=false;p.fail=false;for(const timer of p.timers)bg.clearTimeout(timer);for(const [port,method]of p.originalPosts)try{port.postMessage=method;}catch{}delete bg.__searchProbe;}return true;")

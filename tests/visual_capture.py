@@ -4,6 +4,23 @@ Only deterministic independent fixture data belongs in these public receipts.
 from installed_host import call,script,wait,OUT
 import base64,hashlib,json,time
 
+def keyboard(sid,label,receipt):
+ # Test actual browser Tab traversal. No keys activate provider actions.
+ saved=script(sid,"window.__captureFocus=document.activeElement;const nav=document.querySelector('nav');const s={x:scrollX,y:scrollY,nav:nav.scrollLeft};document.querySelector('a.brand').focus();return s;")
+ reached=[]
+ try:
+  for _ in range(24):
+   call('POST',f'/session/{sid}/actions',{'actions':[{'type':'key','id':'visual-keyboard','actions':[{'type':'keyDown','value':'\ue004'},{'type':'keyUp','value':'\ue004'}]}]})
+   state=script(sid,"const e=document.activeElement;if(!document.hasFocus()||!e||['BODY','HTML'].includes(e.tagName))return {outside:true};const r=e.getBoundingClientRect(),s=getComputedStyle(e);return {tag:e.tagName,id:e.id||null,name:(e.getAttribute('aria-label')||e.labels&&[...e.labels].map(l=>l.textContent).join(' ')||e.getAttribute('title')||e.textContent||'').trim().slice(0,180),hidden:!!e.closest('[hidden],[inert]')||s.display==='none'||s.visibility==='hidden'||r.width<=0||r.height<=0,disabled:!!e.disabled,focusVisible:e.matches(':focus-visible'),outline:s.outlineStyle,frame:e.tagName==='IFRAME'};")
+   if state.get('outside'):continue
+   assert not state['hidden'] and not state['disabled'] and state['name'],('KEYBOARD_CONTROL',label,state)
+   reached.append(state)
+  assert reached,('NO_KEYBOARD_CONTROLS',label)
+  receipt.setdefault('keyboard',[]).append({'label':label,'width':script(sid,'return innerWidth'),'scope':'24 real Tabs in top document; opaque-frame internals covered by installed module action journey','reached':reached})
+ finally:
+  call('DELETE',f'/session/{sid}/actions')
+  script(sid,"document.querySelector('nav').scrollLeft=arguments[0].nav;window.scrollTo(arguments[0].x,arguments[0].y);if(window.__captureFocus?.isConnected){if(['BODY','HTML'].includes(window.__captureFocus.tagName))document.activeElement?.blur();else window.__captureFocus.focus({preventScroll:true});}delete window.__captureFocus;",[saved])
+
 def viewport(sid,width):
  from installed_records import asyncjs
  result=asyncjs(sid,"const t=await browser.tabs.getCurrent();await browser.tabs.setZoom(t.id,1);return true;");assert result is True,result
@@ -29,6 +46,7 @@ def capture(sid,label,receipt):
  for mode,endpoint in [('viewport','screenshot'),('full','moz/screenshot/full')]:
   data=base64.b64decode(call('GET',f'/session/{sid}/'+endpoint));name=f'{label}-{state["width"]}-{mode}.png';(directory/name).write_bytes(data)
   receipt.setdefault('screenshots',[]).append({'path':str(directory.relative_to(OUT)/name),'sha256':hashlib.sha256(data).hexdigest(),'source':receipt['source'],'xpiSha256':receipt['xpiSha256'],'browserVersion':receipt.get('browserVersion'),'buildId':receipt.get('buildId'),'mode':mode,'state':state,'capturedAt':time.time()})
+ if state['width']>=1200 or state['width']<450:keyboard(sid,label,receipt)
  (directory/'manifest.json').write_text(json.dumps(receipt['screenshots'],indent=2)+'\n')
 
 def state_matrix(sid,label,receipt):
