@@ -17,7 +17,7 @@ def exact(sock,n):
 class Fixture:
  def __init__(self,root,extra_hosts=()):
   self.extra_hosts=set(extra_hosts)
-  assert all(host in ['user.uploads.dev'] for host in self.extra_hosts)
+  assert all(host in ['user.uploads.dev','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.perchance.org'] for host in self.extra_hosts)
   self.lock=threading.RLock();self.tokens={};self.exits={};self.calls=[];self.logins={};self.reads=[];self.probes=[];self.unexpected=[];self.delay_next=False;self.duplicate_exit=False;self.inventory={'remote-sentinel':{'isPrivate':True,'files':{'main.pjs':'protected remote source\n','index.html':'<p>Remote sentinel</p>','src/data.bin':'AAH/'}}}
   ca=root/'ca.pem';key=root/'server.key';csr=root/'server.csr';cert=root/'server.pem';ext=root/'extensions.cnf'
   ext.write_text('subjectAltName=DNS:perchance.org,DNS:api.mullvad.net,DNS:am.i.mullvad.net,DNS:*.am.i.mullvad.net,DNS:*.dnsleak.am.i.mullvad.net'+''.join(',DNS:'+host for host in sorted(self.extra_hosts))+'\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
