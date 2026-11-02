@@ -21,3 +21,10 @@ The P41 candidate was rejected. Its prior fixture receipts do not close the I-Aâ
 
 - Firefox connector get-info and list-pages both return internal server errors. Local Firefox/geckodriver absent at initial inspection. Check existing CI/local setup before declaring B blocked; never weaken sandbox.
 - Prior CI success: main code merge `71e672b9` run `41457499428`; historical evidence only.
+
+### R01 checkpoint
+
+- Implemented typed diagnostic projection, atomic transition context, original queue cause/no-replay, default hashed current checkpoint ZIP section, RPC search outcome fingerprints, safe Git HTTP/comparison witnesses, bounded event range seek and legacy verifier.
+- 66 focused T checks PASS. Actual fake-IndexedDB 100001-row suffix oracle traverses <=3 cursors for one row. This does not qualify installed performance.
+- Published source `c6b96096` / tree `dd678fdd1364b3b141c9d511b399d3801786f876`; remote tree matched exactly. Git CLI push lacks credentials; connector CAS publication works.
+- Local Firefox155.0b1 could not create a session: sandbox uid_map EPERM/content-process crashes. No sandbox workaround applied. Extended installed Journal/independent disk test and selected CI for this changed boundary. Required B/DSK pending; see [R01 report](docs/remediation/R01-report.md).
