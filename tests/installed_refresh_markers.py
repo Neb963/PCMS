@@ -92,7 +92,7 @@ def main():
    if receipt['readbackRecovery']=='CHECK_AVAILABLE':
     check_button=call('POST',f'/session/{sid}/element',{'using':'xpath','value':'//li[@data-refresher="'+SLUG+'"]//button[text()="Check Refresh result"]'})['element-6066-11e4-a52e-4f735466cecf']
     call('POST',f'/session/{sid}/element/{check_button}/click',{})
-;three=verified(sid,3);assert three['j']['effect']['operationId']==op and len(provider.save_requests)==3;assert_bytes(provider,expected,marker,3)
+   three=verified(sid,3);assert three['j']['effect']['operationId']==op and len(provider.save_requests)==3;assert_bytes(provider,expected,marker,3)
    receipt['checks'].append('server-applied-third-save/actual-process-crash/lost-ACK/readback-outage/original-POSSIBLE-and-counter2-retained/normal-route-reverify/real-Check-control/full-readback-resolves-same-operation/counter3/no-resend')
    # Open is a real scoped handler, needed after a browser that restores no live tabs.
    click(sid,'button[data-refresh-open="'+SLUG+'"]');editor_handle=editor(sid);dashboard(sid);page(sid);check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');provider.race=True;refresh(sid);held=wait(lambda:refresh_cut(sid) if refresh_cut(sid)['g'].get('sourceSaveCode')=='SOURCE_STALE' else None,100);assert held['j']['effect']['disposition']=='REJECTED' and held['g']['refreshMarker']['counter']==3;assert len(provider.save_requests)==4;assert provider.generator['modelText']=='Independent external editor changed source\n';assert held['g']['previousGood'] is not None
