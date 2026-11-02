@@ -29,6 +29,7 @@ export function stageRecords(data,{dataset,profileId,mappings,routeMap={}}){
   }
   if(table==='modules'){out.generation=(out.generation??0)+1;out.restoredLifecycle=out.lifecycle??null;out.lifecycle=null;out.restoredInstances=out.instances??[];out.instances=[];}
   if(table==='files'){delete out.downloadId;delete out.sourceUrl;delete out.absolutePath;out.sourceProfileId=out.profileId??null;out.profileId=null;out.automatic=false;out.restoredReceipt=true;out.cleanup=null;delete out.payloadId;out.payloadAvailable=false;out.refs=[];}
+  if(out.key?.[1]==='refresher-clock'&&out.value?.schema===1){out.value.boot=null;out.value.session=null;out.value.nextHeartbeat=0;for(const c of Object.values(out.value.cycles??{})){c.lastAccountingReceipt=null;c.knownKey=null;}}
   if(table==='pins')out.refs=(out.refs??[]).filter(hashId);
   return out;
  };

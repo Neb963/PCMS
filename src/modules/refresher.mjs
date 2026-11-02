@@ -1,0 +1,41 @@
+import {requireCore as check,publicError} from '../core/records.mjs';
+import {eligibleAccount} from './creator-allocation.mjs';
+import {accountCycle,HEARTBEAT} from './refresh-clock.mjs';
+const ID='pcms-refresher',KEY='refresher-clock',HOUR=3600000;
+export function cycleEligibility(g,a,m,r,observed,now){
+ if(!m?.enabled||m.lifecycle)return 'MODULE_DISABLED';if(m.refresher?.paused)return 'REFRESHER_PAUSED';if(r.paused)return 'PCMS_PAUSED';if(r.restoreHold)return 'RESTORE_MAINTENANCE';
+ if(!eligibleAccount(a))return 'ACCOUNT_NOT_READY';if(!g.pool?.member||!g.poolMember||g.listing!=='PUBLIC')return 'NOT_PUBLIC';if(g.ownerMissing||!g.remoteId||g.ownerPrincipal!==a.expectedPrincipal)return 'OWNER_UNVERIFIED';
+ if(g.writerHold)return 'WRITER_HELD';if(g.sourceState!=='VERIFIED'||g.sourceHoldCode||!g.sourceManifest)return g.sourceHoldCode??'SOURCE_NOT_ADMITTED';
+ if(g.refreshBackoffUntil>now||m.refresher?.backoffUntil>now)return 'PROVIDER_BACKOFF';if(!observed?.ok)return observed?.code??'ELIGIBILITY_UNKNOWN';return null;
+}
+export function createRefresher({core,observe=async()=>({}),sessionNonce=async()=>null,clock=Date.now,monotonic=()=>performance.now()}){
+ let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
+ const module=()=>core.read('modules',ID),capable=m=>m?.manifest?.capabilities?.includes('records.refresher');
+ async function rows(table){const out=[];let cursor=null;do{const p=await core.list({table,cursor,limit:200});for(const r of p.rows)out.push(await core.read(table,r.id));cursor=p.cursor;}while(cursor);return out;}
+ async function initialize(){let m=await module();if(capable(m)&&!m.refresher){await core.mutate([{table:'modules',id:ID,expectedRev:m.rev,refs:m.refs,value:{...m,refresher:{schema:1,activeHours:24,sleepHours:72,paused:false}}}],{moduleId:ID,step:'REFRESHER_INITIALIZE',result:'COMPLETE'});m=await module();}return m;}
+ async function tick(force=false,invalidate=false){
+  let m=await initialize();if(!capable(m))return;const old=await core.view(KEY),now=clock(),boot=(await core.queue.status()).bootId;let nonce=null;try{nonce=await sessionNonce();}catch{}
+  if(!force&&old?.boot===boot&&old.session===nonce&&old.nextHeartbeat>now)return;
+  const r=await core.status(),gs=(await rows('generators')).filter(g=>g.poolMember&&g.pool?.member),as=new Map((await rows('accounts')).map(a=>[a.id,a])),facts={};
+  if(m.enabled&&!m.lifecycle&&!m.refresher.paused&&!r.paused&&!r.restoreHold&&nonce)try{Object.assign(facts,await observe(gs,as));}catch{}
+  const state={schema:1,dataset:r.dataset,boot,session:nonce,nextHeartbeat:now+HEARTBEAT,cycles:{...old?.cycles},observedAt:now},reasons={},settings={activeMs:m.refresher.activeHours*HOUR,sleepMs:m.refresher.sleepHours*HOUR};
+  for(const g of gs){const a=as.get(g.accountId);reasons[g.id]=!nonce?'CLOCK_SESSION_UNAVAILABLE':cycleEligibility(g,a,m,r,facts[g.id],now);state.cycles[g.id]??={...g.refreshCycle,schema:1,cycleId:g.refreshCycle?.cycleId??crypto.randomUUID(),phase:'PENDING',activeUsedMs:0,notBefore:null};if(state.cycles[g.id].phase==='PENDING'&&(old?.boot!==boot||reasons[g.id]))state.cycles[g.id].notBefore=null;}
+  const pending=gs.filter(g=>!reasons[g.id]&&state.cycles[g.id].phase==='PENDING'&&state.cycles[g.id].notBefore==null).sort((a,b)=>a.id.localeCompare(b.id)),spacing=Math.min(HEARTBEAT,settings.activeMs/Math.max(1,pending.length-1));
+  let base=Math.max(now,...gs.filter(g=>state.cycles[g.id].phase==='PENDING').map(g=>state.cycles[g.id].notBefore??now));
+  for(let i=0;i<pending.length;i++)state.cycles[pending[i].id].notBefore=Math.min(now+settings.activeMs,base+i*spacing);
+  for(const g of gs){const a=as.get(g.accountId),c=state.cycles[g.id],knownKey=JSON.stringify([r.admissionEpoch,m.generation,a?.rev,g.sourceManifest,g.sourceStamp,g.writerHold??null]),key=knownKey+JSON.stringify([reasons[g.id],facts[g.id]?.key??null]);if(invalidate)c.lastAccountingReceipt=null;state.cycles[g.id]={...accountCycle(c,{wall:now,mono:monotonic(),session:nonce,boot,eligible:!reasons[g.id],key,admit:now>=(c.notBefore??now),nextCycleId:crypto.randomUUID()},settings),holdCode:reasons[g.id],knownKey};}
+  // Any intervening mutation, including a Pause or lifecycle fence, rejects
+  // the whole sampled cut rather than charging a stale eligibility interval.
+  try{await core.saveView(KEY,state,crypto.randomUUID(),{dataset:r.dataset,revision:r.revision});}catch(error){if(publicError(error)!=='STALE_REVISION')throw error;}
+ }
+ async function status({search='',phase='',offset=0,limit=50}={}){
+  const m=await initialize(),r=await core.status(),saved=await core.view(KEY),now=clock(),gs=(await rows('generators')).filter(g=>g.poolMember&&g.pool?.member),as=new Map((await rows('accounts')).map(a=>[a.id,a]));
+  const all=gs.map(g=>{const c=saved?.cycles[g.id]??g.refreshCycle??{phase:'PENDING',activeUsedMs:0},a=as.get(g.accountId),fresh=saved&&now>=saved.observedAt&&now-saved.observedAt<=HEARTBEAT+1500,knownKey=JSON.stringify([r.admissionEpoch,m.generation,a?.rev,g.sourceManifest,g.sourceStamp,g.writerHold??null]),code=!fresh||c.knownKey!==knownKey?'ELIGIBILITY_STALE':cycleEligibility(g,a,m,r,c.holdCode?{ok:false,code:c.holdCode}:{ok:true},now);return {id:g.id,slug:g.slug,accountId:g.accountId,accountLabel:a?.label??g.accountId,cycle:c,holdCode:code,available:c.phase==='ACTIVE'&&!code,remainingMs:c.phase==='SLEEP'?Math.max(0,c.sleepUntil-now):c.phase==='ACTIVE'?Math.max(0,c.activeDurationMs-c.activeUsedMs):Math.max(0,(c.notBefore??now)-now),position:'Not measured'};}).sort((a,b)=>a.slug.localeCompare(b.slug));
+  check(typeof search==='string'&&['','PENDING','ACTIVE','SLEEP','AVAILABLE'].includes(phase)&&Number.isSafeInteger(offset)&&offset>=0&&Number.isSafeInteger(limit)&&limit>0&&limit<=200,'INVALID_QUERY');const found=all.filter(g=>(!phase||(phase==='AVAILABLE'?g.available:g.cycle.phase===phase))&&[g.slug,g.accountLabel,g.id].some(v=>String(v).toLowerCase().includes(search.toLowerCase())));
+  return {available:capable(m),enabled:!!m?.enabled&&!m.lifecycle,paused:m?.refresher?.paused??false,pcmsPaused:r.paused,settings:m?.refresher??null,observedAt:saved?.observedAt??null,attention:all.filter(g=>g.holdCode&&!['REFRESHER_PAUSED','PCMS_PAUSED','MODULE_DISABLED'].includes(g.holdCode)).length,counts:{pool:all.length,pending:all.filter(g=>g.cycle.phase==='PENDING').length,active:all.filter(g=>g.cycle.phase==='ACTIVE').length,sleep:all.filter(g=>g.cycle.phase==='SLEEP').length,available:all.filter(g=>g.available).length},rows:found.slice(offset,offset+limit),total:found.length,next:offset+limit<found.length?offset+limit:null};
+ }
+ return {initialize:()=>run(async()=>{await initialize();return tick(true,true);}),tick:()=>run(()=>tick()),changed:()=>run(()=>tick(true)),status,
+  deadline:async()=>{const m=await initialize(),s=await core.view(KEY);if(!capable(m)||!m.enabled||m.lifecycle)return null;const cs=Object.values(s?.cycles??{});if(!cs.length){if(m.refresher.paused||(await core.status()).paused)return null;return (await rows('generators')).some(g=>g.poolMember&&g.pool?.member)?s?.nextHeartbeat??clock():null;}if(!m.refresher.paused&&!(await core.status()).paused)return s.nextHeartbeat;const sleeps=cs.filter(c=>c.phase==='SLEEP'&&c.sleepUntil>clock()).map(c=>c.sleepUntil);return sleeps.length?Math.min(...sleeps):null;},
+  configure:args=>run(async()=>{const m=await initialize();check(capable(m),'REFRESHER_UPDATE_REQUIRED');check(m.enabled&&!m.lifecycle,'REFRESHER_DISABLED');const next={...m.refresher};if(args.paused!==undefined){check(typeof args.paused==='boolean','INVALID_REQUEST');next.paused=args.paused;}for(const field of ['activeHours','sleepHours'])if(args[field]!==undefined){check(Number.isFinite(args[field])&&args[field]>0&&Number.isSafeInteger(args[field]*HOUR)&&Number.isSafeInteger(clock()+args[field]*HOUR)&&Number.isFinite(new Date(clock()+args[field]*HOUR).getTime()),'REFRESHER_DURATION_INVALID');next[field]=args[field];}await core.mutate([{table:'modules',id:ID,expectedRev:m.rev,refs:m.refs,value:{...m,refresher:next}}],{moduleId:ID,step:'REFRESHER_SETTINGS',result:'COMPLETE'});await tick(true);return {settings:next,effective:'NEXT_CYCLE'};})
+ };
+}
