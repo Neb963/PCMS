@@ -15,3 +15,5 @@ Branch p40-representative-capacity from exact verified merge. Reuse production C
 - Publish meaningful checkpoints, merge only after required evidence, verify main, then plan P41. P42–P49 remain NOT TESTED pending named authorized external resources.
 
 Current: plan written before code; capacity implementation/evidence pending.
+
+First local S/DSK PASS:50 records/1000 generators/90000 events over90 days/32MiB unique binary shared between full current and previous snapshots.20 pages252ms/joined search625ms/capture4889ms/barrier4548ms/archive5500ms;35,452,877 archive bytes/74,937,420 uncompressed; Python independently verified ZIP64, CRC, every entry hash and full binary. Node process RSS1,066,270,720 bytes (not browser RSS);9 logical CPUs/10.45GB reported host memory. This is synthetic, not50 routes. Hosted loaded B/DSK and independent fair1000-item progress remain pending. Existing production backup-export journey is reused under load including actual staging crash/restart and Downloads cancellation. No production behavior changed yet.
