@@ -29,9 +29,11 @@ def setup(sid,ids):
  call('POST',f'/session/{sid}/timeouts',{'script':180000})
  model=original_setup(sid,ids)
  source=pathlib.Path(__file__).with_name('capacity-fixture.mjs').read_text().replace('export async function','async function')
- asyncjs(sid,"const n=arguments[0];globalThis.__capacitySeed={phase:'starting'};void(async()=>{const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{"+source+";return await seedCapacity(c,{existingAccounts:n,progress:p=>globalThis.__capacitySeed=p});}finally{c.close();}})().then(result=>globalThis.__capacitySeed={result},error=>globalThis.__capacitySeed={error:String(error)});return true;",[len(ids)])
+ started=asyncjs(sid,"const n=arguments[0];window.__capacitySeed={phase:'starting'};void(async()=>{const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{"+source+";return await seedCapacity(c,{existingAccounts:n,progress:p=>window.__capacitySeed=p});}finally{c.close();}})().then(result=>window.__capacitySeed={result},error=>window.__capacitySeed={error:String(error)});return true;",[len(ids)])
+ assert started is True,started
  def seeded():
-  state=script(sid,'return globalThis.__capacitySeed;')
+  state=script(sid,'return window.__capacitySeed;')
+  assert state is not None,'CAPACITY_SEED_OBSERVATION_LOST'
   if state.get('error'):raise AssertionError(state)
   return state.get('result')
  fixture=wait(seeded,180)
