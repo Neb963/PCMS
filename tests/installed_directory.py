@@ -21,18 +21,19 @@ class Provider(SourceProvider):
    return self.send(('<!doctype html><title>Native directory</title><a href="/owned-absent">Unrelated navigation</a><iframe title="Recently updated" src="https://'+FRAME+'/generators"></iframe>').encode(),'text/html')
   if host==FRAME and self.path=='/generators':
    js=r"""
-let visible=40,last='',mode='',revision='fixture-filtered-1';const items=ORDER;
+let visible=40,last='',mode='',revision='fixture-filtered-1';const inventory=['owned-absent','filter-excluded',...ORDER];let items=inventory.filter(s=>!['owned-absent','filter-excluded'].includes(s));
 const root=document.getElementById('generatorList'),more=document.getElementById('more');
 function draw(){
  root.setAttribute('aria-busy',mode==='complete'?'false':'true');root.setAttribute('data-revision',revision);root.setAttribute('data-total-displayed',String(items.length));root.replaceChildren();
  for(let i=0;i<Math.min(visible,items.length);i++){const li=document.createElement('li');li.setAttribute('aria-posinset',String(i+1));li.setAttribute('aria-setsize',String(items.length));li.setAttribute('data-generator-name',items[i]);if(i<2)li.setAttribute('data-pinned','true');const h=document.createElement('h2'),link=document.createElement('a'),again=document.createElement('a');link.href='https://perchance.org/'+items[i];link.textContent=items[i];again.href=link.href;again.textContent='thumbnail';h.append(link,again);li.append(h);root.append(li);}
  more.hidden=visible>=items.length;
 }
+document.getElementById('native-filter').addEventListener('change',e=>{items=e.target.value==='all'?inventory:inventory.filter(s=>!['owned-absent','filter-excluded'].includes(s));visible=40;draw();});
 more.addEventListener('click',()=>{visible+=40;fetch('/fixture/directory-advance',{method:'POST',body:JSON.stringify({visible})});draw();});
 async function update(){try{const data=await (await fetch('/fixture/directory-state')).json();if(data.mode!==mode){mode=data.mode;draw();}}finally{setTimeout(update,500);}}
 draw();update();
 """.replace('ORDER',json.dumps(ORDER))
-   return self.send(('<!doctype html><title>Rendered directory fixture</title><nav><a href="https://perchance.org/owned-absent">Navigation decoy</a></nav><label>Native filter<select data-directory-filter name="listing"><option>public</option></select></label><ul id="generatorList" aria-busy="true"></ul><button id="more" aria-label="Load more generators" aria-controls="generatorList">Load more</button><script>'+js+'</script>').encode(),'text/html')
+   return self.send(('<!doctype html><title>Rendered directory fixture</title><nav><a href="https://perchance.org/owned-absent">Navigation decoy</a></nav><label>Native filter<select id="native-filter" data-directory-filter name="listing"><option value="public">public</option><option value="all">all</option></select></label><ul id="generatorList" aria-busy="true"></ul><button id="more" aria-label="Load more generators" aria-controls="generatorList">Load more</button><script>'+js+'</script>').encode(),'text/html')
   if host==FRAME and self.path=='/fixture/directory-state':
    with f.lock:f.directory_reads.append({'route':self.route,'mode':f.directory_mode});return self.send({'mode':f.directory_mode})
   return super().do_GET()
@@ -52,6 +53,18 @@ def check(sid):
 def observer_tabs(sid):
  return asyncjs(sid,"const out=[];for(const t of await browser.tabs.query({})){const tag=await browser.sessions.getTabValue(t.id,'pcmsDirectory');if(tag)out.push({id:t.id,tag,url:t.url,container:t.cookieStoreId});}return out;")
 
+
+def native_filter(sid,value):
+ page(sid);click(sid,'#directory-open')
+ selected=None
+ for handle in call('GET',f'/session/{sid}/window/handles'):
+  call('POST',f'/session/{sid}/window',{'handle':handle})
+  if script(sid,"return location.href")=='https://perchance.org/generators':selected=handle;break
+ assert selected,'DIRECTORY_VISIBLE_CONTROL_DID_NOT_FOCUS_OBSERVER'
+ frame=call('POST',f'/session/{sid}/element',{'using':'css selector','value':'iframe'})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/frame',{'id':{'element-6066-11e4-a52e-4f735466cecf':frame}})
+ click(sid,'#native-filter option[value="'+value+'"]');assert script(sid,"return document.getElementById('native-filter').value")==value
+ call('POST',f'/session/{sid}/frame',{'id':None});dashboard(sid);page(sid);check(sid)
+
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k);receipt={'tier':'B/P36/rendered-directory','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]};assert receipt['xpiSha256']==identity['xpiSha256']
  with tempfile.TemporaryDirectory(prefix='pcms-p36-') as tmp:
@@ -69,9 +82,12 @@ def main():
    assert state(sid)['counts']['pool']==1 and provider.save_requests==[] and provider.uploads==[] and provider.generator==original
    receipt['checks'].append('actual-protected-required-iframe/one-owned-observer/native-lazy-More-clicks-once/independent-125-order/pins-first-duplicate/navigation-exclusion/all-owned-three-band-counts-distinct-from-one-pool/Home-UI')
    page(sid);cut=directory_cut(sid);assert cut['lastGood']['displayedSlugs']==ORDER[:-1] and cut['lastGood']['renderedRows']==126
+   native_filter(sid,'all');all_v=wait(lambda:visibility(sid) if visibility(sid)['fresh'] and visibility(sid)['size']==127 else None,100);assert all_v['counts']=={'top50':2,'top100':3,'full':4} and all_v['positions']['owned-absent']['position']==1 and all_v['positions'][SLUG]['position']==4,all_v
+   native_filter(sid,'public');wait(lambda:measured(sid),100);assert len(observer_tabs(sid))==1;assert provider.directory_advances==[{'visible':80},{'visible':120},{'visible':160}]*3,provider.directory_advances
+   receipt['checks'].append('actual-Open-protected-directory-handler/native-select-filter-changes-complete-order/127-versus125/independent-three-band-counts2-3-4-versus1-2-3/filtered-owned-absence/one-observer-retained')
    # Real native loading failure cannot turn any row into confirmed absence.
    provider.directory_mode='incomplete';time.sleep(1);check(sid);unknown=wait(lambda:visibility(sid) if visibility(sid)['state']=='UNKNOWN' else None,45);assert unknown['lastGoodSize']==125 and unknown['counts'] is None and unknown['positions']['owned-absent']['state']=='UNKNOWN' and unknown['positions'][SLUG]['lastGoodPosition']==2,unknown
-   wait(lambda:'Directory Unknown' in script(sid,"return document.getElementById('directory-summary').textContent"));assert directory_cut(sid)['lastGood']==cut['lastGood']
+   wait(lambda:'Directory Unknown' in script(sid,"return document.getElementById('directory-summary').textContent"));assert directory_cut(sid)['lastGood']['displayedSlugs']==cut['lastGood']['displayedSlugs'] and directory_cut(sid)['lastGood']['size']==125
    wait(lambda:not state(sid)['counts']['available'],45);before=clock_cut(sid);assert before['cycles'][SLUG]['activeUsedMs']>=0
    receipt['checks'].append('native-incomplete-keeps-full-last-good/Unknown-never-false-absence/last-good-age-and-counts/clock-eligibility-withheld/source-unchanged')
    # Reconstruct the observer with the dashboard closed; no duplicate tab.
