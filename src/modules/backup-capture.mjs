@@ -60,7 +60,7 @@ export function createBackupCapture({core,donor,clock=Date.now}){
     if(current.effect?.boundary==='POSSIBLE'){check(current.effect.operationId===op&&current.effect.kind==='BACKUP_CAPTURE_CUT','BACKUP_OPERATION_SCOPE');if(!receipt)await actualCall();current=await core.read('jobs',j.id);await core.queue.reconcile(j.id,current.rev,op,{matched:true,operationId:op});}
     else if(!receipt){if(reconcile)return output(j);await core.queue.dispatch(j.id,current.rev,{operationId:op,kind:'BACKUP_CAPTURE_CUT',write:false,preflight:async()=>({ok:enabled(await module())}),call:actualCall,observe:async()=>({matched:!!await core.view(key),operationId:op})});}
     receipt=await core.view(key);j=await core.read('jobs',j.id);if(!receipt)return output(j,'HELD','CAPTURE_CUT_UNKNOWN');
-    if(!receipt.ok){if(receipt.discard)await core.releaseCaptureCut(captureId);return finish(j,receipt.code??'CAPTURE_CUT_UNVERIFIED');}
+    if(!receipt.ok){if(receipt.discard)await core.releaseCaptureCut(captureId);if(['CAPTURE_DONOR_CHANGED','AUTH_SESSION_CHANGED','CAPTURE_WITNESS_LOST'].includes(receipt.code))return retry(j,receipt.code);return finish(j,receipt.code??'CAPTURE_CUT_UNVERIFIED');}
     const raw=await core.credentials.get(receipt.result.credentialId);check(raw,'CAPTURE_DATA_REMOVED');const data=JSON.parse(raw);check(data.external.donor.revision===receipt.donorReceipt.revision&&data.external.donor.bootId===receipt.donorReceipt.bootId&&data.external.donor.storageVersion===receipt.donorReceipt.storageVersion,'CAPTURE_DONOR_CHANGED');
     await save(j,{...c,phase:'BLOBS',cursor:0,verifiedBytes:0,receipt:{...receipt.result,donor:receipt.donorReceipt}},data.core.blobs.map(b=>b.blobId));await stop(j);return output(j);
    }

@@ -75,7 +75,13 @@ def main():
    # Persist a local staging checkpoint and stop the actual browser while the
    # next bounded Blob read is pending. No Downloads call has occurred.
    asyncjs(sid,"""const bg=await browser.runtime.getBackgroundPage(),put=bg.IDBObjectStore.prototype.put,slice=bg.Blob.prototype.slice;bg.__P31_STAGE=false;bg.__P31_BLOCKED=false;bg.IDBObjectStore.prototype.put=function(row){if(this.name==='files'&&row.type==='backup'&&row.state==='STAGING')bg.__P31_STAGE=true;return put.call(this,row);};bg.Blob.prototype.slice=function(...args){const b=slice.apply(this,args);if(bg.__P31_STAGE&&!bg.__P31_BLOCKED){bg.__P31_BLOCKED=true;Object.defineProperty(b,'arrayBuffer',{value:()=>new Promise(()=>{})});}return b;};return true;""")
-   interrupted=request_export(sid);wait(lambda:asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__P31_BLOCKED;"),180);partial=file_receipt(sid,interrupted['jobId']);assert partial['state']=='STAGING' and partial['downloadId'] is None
+   interrupted=request_export(sid)
+   def staging_reached():
+    if asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__P31_BLOCKED;"):return True
+    current=state(sid)['current']
+    if current and current['jobId']==interrupted['jobId'] and current['state']=='FAILED':raise AssertionError(('STAGING_CAPTURE_FAILED',current['code']))
+    return False
+   wait(staging_reached,180);partial=file_receipt(sid,interrupted['jobId']);assert partial['state']=='STAGING' and partial['downloadId'] is None
    prior=stop(sid,profile);sid=None;sid,_=account_session(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);backup_page(sid);wait(lambda:(state(sid)['current'] or {}).get('jobId')==interrupted['jobId']);assert state(sid)['current']['state']=='STAGING';click(sid,'#backup-export-check');resumed=completed(sid,interrupted['jobId']);assert resumed['state']=='COMPLETE',json.dumps(resumed);resumed_file=file_receipt(sid,interrupted['jobId']);read_archive(disk/resumed_file['filename']);assert (disk/resumed_file['filename']).stat().st_size==resumed_file['bytes'];assert inspect_paused(sid)
    receipt['checks'].append('actual-process-stop-mid-Blob-staging/durable-cut-pin-receipt/restart/actual-Check-export/same-job-and-filename/no-pre-restart-download/independent-production-disk-reopen')
    # Current account contexts require ordinary explicit recovery after restart

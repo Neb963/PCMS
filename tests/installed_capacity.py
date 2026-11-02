@@ -64,7 +64,7 @@ def completed(sid,id):
  if result['state']=='COMPLETE':
   capture=base.coverage(sid)['capture']['current'];assert capture['receipt']['barrierMs']<=5000,capture
   f=base.file_receipt(sid,id);native=asyncjs(sid,"const d=(await browser.downloads.search({id:arguments[0]}))[0];return {state:d.state,exists:d.exists,fileSize:d.fileSize,bytesReceived:d.bytesReceived,totalBytes:d.totalBytes,byExtensionId:d.byExtensionId};",[f['downloadId']]);assert native['state']=='complete' and native['exists'] and native['fileSize']==f['bytes'] and native['byExtensionId']==ID,native
-  metrics['exports'].append({'jobId':id,'waitMs':(time.monotonic()-start)*1000,'barrierMs':capture['receipt']['barrierMs'],'verifiedBytes':capture.get('verifiedBytes'),'native':native,'expectedBytes':f['bytes'],'expectedSha256':f['sha256']})
+  metrics['exports'].append({'jobId':id,'waitMs':(time.monotonic()-start)*1000,'barrierMs':capture['receipt']['barrierMs'],'captureMs':capture['finishedAt']-capture['startedAt'],'verifiedBytes':capture.get('verifiedBytes'),'native':native,'expectedBytes':f['bytes'],'expectedSha256':f['sha256']})
  return result
 
 def main():
