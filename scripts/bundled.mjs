@@ -66,8 +66,8 @@ const backup=`PCMS.defineModule({
 });\n`;
 const directory=`PCMS.defineModule({
  start(){},
- async runStep(job,api){return this.outcome(await api.action({name:'directory.step'}));},
- async reconcile(job,api){return this.outcome(await api.query({name:'directory.status'}));},
+ async runStep(job,api){return this.outcome(await api.action({name:job.kind==='REFRESH'?'source.step':'directory.step'}));},
+ async reconcile(job,api){return this.outcome(await api.query({name:job.kind==='REFRESH'?'source.status':'directory.status'}));},
  outcome(r){if(r.state==='COMPLETE')return {kind:'complete'};if(r.state==='CONTINUE')return {kind:'checkpoint'};if(r.state==='WAITING')return {kind:'wait',dueAt:r.dueAt||Date.now()+1000};return {kind:'hold',reason:r.code||'DIRECTORY_UNKNOWN',recovery:{action:'OPEN_REFRESHER'}};},
  stop(){}
 });\n`;

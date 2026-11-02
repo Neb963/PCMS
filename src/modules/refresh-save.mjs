@@ -1,0 +1,36 @@
+import {requireCore as check,publicError} from '../core/records.mjs';
+import {eligibleAccount} from './creator-allocation.mjs';
+import {planRefreshMarkers,MARKER_RECIPE} from './refresh-markers.mjs';
+const ID='pcms-refresher';
+export function createRefreshSave({core,writer,refresher,directory,clock=Date.now}){
+ let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
+ async function records(){let cursor=null,rows=[];do{const p=await core.list({table:'generators',cursor,limit:200});for(const row of p.rows)rows.push(await core.read('generators',row.id));cursor=p.cursor;}while(cursor);return rows;}
+ async function validate(j){
+  const [g,a,m,r,clockState,d]=await Promise.all([core.read('generators',j.targetId),core.read('accounts',j.accountId),core.read('modules',ID),core.status(),core.view('refresher-clock'),directory.projection()]);
+  check(j.moduleId===ID&&j.kind==='REFRESH'&&j.refresh?.recipe===MARKER_RECIPE&&j.refresh.candidateManifest===j.save?.candidateManifest,'REFRESH_SOURCE_SCOPE');
+  check(m?.enabled&&!m.lifecycle&&!m.refresher?.paused&&m.generation===j.generation,'REFRESHER_PAUSED');check(!r.paused&&!r.restoreHold,'PAUSED');check(d.fresh,d.code??'DIRECTORY_STALE');
+  const c=clockState?.cycles?.[g?.id];check(c?.phase==='ACTIVE'&&c.cycleId===j.refresh.cycleId&&c.activeUsedMs<c.activeDurationMs,'REFRESH_CYCLE_CHANGED');
+  check(eligibleAccount(a)&&g?.ownerPrincipal===a.expectedPrincipal&&g.accountId===a.id&&g.poolMember&&g.pool?.member&&g.listing==='PUBLIC'&&g.sourceListing==='PUBLIC'&&!g.ownerMissing,'REFRESH_PUBLIC_OWNER_REQUIRED');
+  check(g.sourceState==='VERIFIED'&&!g.sourceHoldCode&&g.sourceManifest===j.save.baselineManifest&&g.sourceStamp===j.save.baselineStamp,'REFRESH_SOURCE_CHANGED');check(!g.writerHold||g.writerHold.jobId===j.id,'SOURCE_WRITER_BUSY');
+  check(g.refreshMarker?.id===j.refresh.markerId&&g.refreshMarker.counter===j.refresh.counter-1,'REFRESH_MARKER_CHANGED');check(!(g.refreshBackoffUntil>clock())&&!(m.refresher?.backoffUntil>clock()),'PROVIDER_BACKOFF');return {g,a,m};
+ }
+ async function get(id){const g=await core.read('generators',id);check(g,'TARGET_MISSING');const j=g.sourceSaveJobId?await core.read('jobs',g.sourceSaveJobId):null,s=j?.refresh?await writer.get(id):null;return {id,marker:g.refreshMarker??null,last:g.refreshLast??null,code:g.refreshHoldCode??s?.code??null,jobId:s?.jobId??null,state:s?.state??(g.refreshHoldCode?'HELD':'NOT_SAVED'),possible:s?.possible??false,canCheck:!!s&&!['VERIFIED','REVIEWED'].includes(s.state),active:s?.active??false};}
+ async function prepare({id,requestId,decisionId=requestId}){
+  check(typeof requestId==='string'&&/^[a-f0-9-]{36}$/i.test(requestId)&&typeof decisionId==='string'&&/^[a-f0-9-]{36}$/i.test(decisionId),'INVALID_REQUEST');let g=await core.read('generators',id);check(g,'TARGET_MISSING');
+  const prior=g.sourceSaveJobId?await core.read('jobs',g.sourceSaveJobId):null;if(prior&&!['COMPLETE','FAILED'].includes(prior.state))return get(id);
+  await refresher.changed();const status=await refresher.status({search:id}),row=status.rows.find(r=>r.id===id),m=await core.read('modules',ID);check(m?.manifest?.capabilities?.includes('perchance.source'),'REFRESHER_UPDATE_REQUIRED');check(row?.available,row?.holdCode??'REFRESH_NOT_AVAILABLE');
+  g=await core.read('generators',id);let pin=null;
+  try{
+   if(!g.refreshMarker){const marker={schema:1,id:/^[a-f0-9-]{36}$/i.test(g.id)?g.id:crypto.randomUUID(),counter:0,recipe:MARKER_RECIPE};await core.mutate([{table:'generators',id,expectedRev:g.rev,refs:g.refs,value:{...g,refreshMarker:marker}}],{moduleId:ID,targetId:id,step:'REFRESH_MARKER_IDENTITY',result:'COMPLETE'});g=await core.read('generators',id);}
+   const files=await Promise.all((await core.verifySource(g.sourceManifest)).map(async f=>({path:f.path,bytes:await core.bytes(f.blobId)}))),plan=planRefreshMarkers(files,{markerId:g.refreshMarker.id,counter:g.refreshMarker.counter+1}),candidate=await core.source(plan.files);pin=candidate.pinId;
+   await writer.enqueue({id,moduleId:ID,candidateManifest:candidate.manifestId,requestId,refresh:{schema:1,recipe:plan.recipe,markerId:plan.markerId,counter:plan.counter,cycleId:row.cycle.cycleId,decisionId,candidateManifest:candidate.manifestId,plannedAt:clock()}});
+   const current=await core.read('generators',id);if(current.refreshHoldCode)await core.mutate([{table:'generators',id,expectedRev:current.rev,refs:current.refs,value:{...current,refreshHoldCode:null}}],{moduleId:ID,targetId:id,step:'REFRESH_PLANNED',result:'COMPLETE'});return get(id);
+  }catch(error){const code=error.code??publicError(error),current=await core.read('generators',id);if(current&&!current.writerHold)await core.mutate([{table:'generators',id,expectedRev:current.rev,refs:current.refs,value:{...current,refreshHoldCode:code}}],{moduleId:ID,targetId:id,step:'REFRESH_HELD',result:'HELD',code});throw error;}
+  finally{if(pin)await core.releasePin(pin);}
+ }
+ async function observed(id){const g=await core.read('generators',id);if(g?.refreshLast?.state==='VERIFIED')await directory.afterSave(g.refreshLast.verifiedAt);}
+ return {validate,get,prepare:args=>run(()=>prepare(args)),effect:(job,reconcile=false)=>run(async()=>{const r=await writer.effect(job,reconcile);if(r.value.state==='COMPLETE'){await observed(job.targetId);await refresher.changed();}return r;}),
+  check:({id})=>run(async()=>{const g=await core.read('generators',id),j=g?.sourceSaveJobId?await core.read('jobs',g.sourceSaveJobId):null;check(j?.refresh,'REFRESH_JOB_MISSING');if(!['COMPLETE','FAILED'].includes(j.state)){await writer.check({id});await observed(id);await refresher.changed();}return get(id);}),
+  recover:()=>run(async()=>{for(const g of await records()){const j=g.sourceSaveJobId?await core.read('jobs',g.sourceSaveJobId):null;if(j?.refresh&&(j.effect?.boundary==='POSSIBLE'||j.effect?.disposition==='APPLIED'&&j.save?.phase!=='COMPLETE')){const r=await writer.effect(j,true);if(r.value.state==='COMPLETE')await observed(g.id);}}const d=await directory.projection(),pending=(await records()).filter(g=>g.refreshLast?.state==='VERIFIED'&&(!d.observedAt||d.observedAt<g.refreshLast.verifiedAt+5000));if(pending.length)await directory.afterSave(Math.max(...pending.map(g=>g.refreshLast.verifiedAt)));})
+ };
+}

@@ -56,7 +56,7 @@ export function createDirectory({core,donor,clock=Date.now}){
  return {initialize:()=>run(()=>start()),tick:()=>run(()=>start()),projection,effect:(job,reconcile=false)=>run(()=>step(job,reconcile)),
   deadline:async()=>{const e=await enabled();if(!e.ok)return null;const s=await state(),j=s.jobId?await core.read('jobs',s.jobId):null;if(j&&!['COMPLETE','FAILED'].includes(j.state))return null;return s.nextDue??clock();},
   check:()=>run(async()=>{let s=await state(),job=s.jobId?await core.read('jobs',s.jobId):null;if(job&&!['COMPLETE','FAILED'].includes(job.state)){if(job.effect?.boundary==='POSSIBLE')await step(job,true);job=await core.read('jobs',job.id);if(job.state==='HELD'&&job.effect?.boundary!=='POSSIBLE')await core.queue.transition(job.id,job.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {state:'WAITING',jobId:job.id};}return start(true);}),
-  afterSave:()=>run(async()=>{const s=await state();await persist({...s,nextDue:Math.min(s.nextDue??Infinity,clock()+DIRECTORY_AFTER_SAVE)});}),
+  afterSave:(savedAt=clock())=>run(async()=>{check(Number.isFinite(savedAt),'INVALID_DEADLINE');const s=await state();await persist({...s,nextDue:Math.min(s.nextDue??Infinity,savedAt+DIRECTORY_AFTER_SAVE)});}),
   open:()=>run(async()=>{const s=await state(),a=await core.read('accounts',s.accountId??'missing');check(eligibleAccount(a),'DIRECTORY_ACCOUNT_REQUIRED');const p=await donor.directory(scope(a),{action:'FOCUS'});check(p.ok,p.code??'DIRECTORY_OPEN_HELD');return {state:'OPENED'};})
  };
 }
