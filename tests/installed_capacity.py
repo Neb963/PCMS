@@ -29,7 +29,12 @@ def setup(sid,ids):
  call('POST',f'/session/{sid}/timeouts',{'script':180000})
  model=original_setup(sid,ids)
  source=pathlib.Path(__file__).with_name('capacity-fixture.mjs').read_text().replace('export async function','async function')
- fixture=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{"+source+";return await seedCapacity(c,{existingAccounts:arguments[0]});}finally{c.close();}",[len(ids)])
+ asyncjs(sid,"const n=arguments[0];globalThis.__capacitySeed={phase:'starting'};void(async()=>{const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();try{"+source+";return await seedCapacity(c,{existingAccounts:n,progress:p=>globalThis.__capacitySeed=p});}finally{c.close();}})().then(result=>globalThis.__capacitySeed={result},error=>globalThis.__capacitySeed={error:String(error)});return true;",[len(ids)])
+ def seeded():
+  state=script(sid,'return globalThis.__capacitySeed;')
+  if state.get('error'):raise AssertionError(state)
+  return state.get('result')
+ fixture=wait(seeded,180)
  assert fixture.get('accounts')==50,fixture
  metrics['fixture']=fixture
  # Read through the installed global query UI, beyond the first page. The

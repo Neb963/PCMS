@@ -99,7 +99,9 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     const closure=new Set(),pending=[...refs];
     while(pending.length){const blobId=pending.pop();if(closure.has(blobId))continue;requireCore(hash(blobId),'INVALID_REFERENCE');closure.add(blobId);
       const blob=await req(s('blobs').get([r.dataset,blobId]));requireCore(blob,'MISSING_BLOB');requireCore(!blob.staging,'BLOB_STAGE_INCOMPLETE');
-      for(let i=0;i<blob.chunks;i++)requireCore(await req(s('chunks').get([r.dataset,blobId,i])),'MISSING_CHUNK');
+      // Closure checks need existence, not another copy of every binary chunk
+      // for each record sharing the same source/history reference.
+      for(let i=0;i<blob.chunks;i++)requireCore(await req(s('chunks').getKey([r.dataset,blobId,i])),'MISSING_CHUNK');
       pending.push(...(blob.refs??[]));
     }
     return [...closure];
