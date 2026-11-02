@@ -229,9 +229,10 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       return {rows,cursor:more?{dataset:r.dataset,table,cut,after:last,search,filters}:null,cut};
     }),
     counts:()=>transact(['accounts','generators','jobs'],'readonly',async s=>{const r=await root(s),range=IDBKeyRange.only(r.dataset);return {accounts:await req(s('accounts').index('dataset').count(range)),generators:await req(s('generators').index('dataset').count(range)),jobs:await req(s('jobs').index('dataset').count(range)),visibility:null};}),
-    saveView:(name,value,requestId)=>transact(['views','commands','events'],'readwrite',async s=>{
+    saveView:(name,value,requestId,expected=null)=>transact(['views','commands','events'],'readwrite',async s=>{
       requireCore(id(name)&&id(requestId),'INVALID_VIEW');const r=await root(s);
       const previous=await req(s('commands').get([r.dataset,requestId]));if(previous)return previous.result;
+      if(expected)requireCore(r.dataset===expected.dataset&&r.revision===expected.revision,'STALE_REVISION');
       // Views/drafts are never placed in events or generic public record queries.
       const old=await req(s('views').get([r.dataset,name]));
       const sequence=await append(s,r,{step:'SAVE_VIEW',result:'COMPLETE',targetId:name});
