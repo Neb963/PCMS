@@ -7,6 +7,11 @@ export function matchesDownload(receipt,item,extensionId){
  const path=String(item.filename??'').replaceAll('\\','/'),started=Date.parse(item.startTime);
  return item.byExtensionId===extensionId&&path.endsWith('/'+receipt.filename)&&Number.isFinite(started)&&started>=receipt.preparedAt-1000&&(receipt.startedAt==null||started===receipt.startedAt)&&(receipt.downloadId==null||item.id===receipt.downloadId)&&(!receipt.absolutePath||path===receipt.absolutePath)&&(!receipt.sourceUrl||item.url===receipt.sourceUrl);
 }
+export function completedDownloadBytes(receipt,item){
+ // Firefox's bytesReceived is Download.currentBytes: its progress counter may
+ // stop before the last data arrives. fileSize is the succeeded target's size.
+ return item.state==='complete'&&Number.isSafeInteger(item.fileSize)&&item.fileSize===receipt.bytes;
+}
 // This service belongs to Core. It has no dependency on Journal being enabled.
 // Every caller supplies its already-admitted queue operation; no raw RPC opens it.
 export function createDownloads({core,api,profileId,clock=Date.now,urls=URL}){
@@ -59,7 +64,7 @@ export function createDownloads({core,api,profileId,clock=Date.now,urls=URL}){
    const item=matches[0],identity={downloadId:item.id,absolutePath:item.filename.replaceAll('\\','/'),startedAt:Date.parse(item.startTime)};
    if(item.state==='interrupted'){r=await save(r,{...identity,state:'FAILED',code:item.error==='FILE_NO_SPACE'?'DOWNLOAD_NO_SPACE':'DOWNLOAD_INTERRUPTED'},'FAILED');}
    else if(item.state==='complete'){
-    if(item.fileSize!==r.bytes||item.bytesReceived!==r.bytes||item.exists!==true)return save(r,{...identity,state:'UNKNOWN',code:'DOWNLOAD_BYTES_UNVERIFIED'},'UNKNOWN');
+    if(!completedDownloadBytes(r,item)||item.exists!==true)return save(r,{...identity,state:'UNKNOWN',code:'DOWNLOAD_BYTES_UNVERIFIED'},'UNKNOWN');
     r=await save(r,{...identity,state:'COMPLETE',completedAt:clock(),code:null},'COMPLETE');
    }else if(item.state==='in_progress')return r.downloadId===item.id&&r.state==='IN_PROGRESS'?r:save(r,{...identity,state:'IN_PROGRESS',code:null},'IN_PROGRESS');
    else return save(r,{...identity,state:'UNKNOWN',code:'DOWNLOAD_STATE_UNKNOWN'},'UNKNOWN');

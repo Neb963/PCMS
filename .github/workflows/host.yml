@@ -23,7 +23,7 @@ jobs:
           node-version: '22'
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: node --test tests/capacity.test.mjs tests/records.test.mjs tests/blob-stream.test.mjs tests/capture-cut.test.mjs tests/backup-capture.test.mjs tests/git-catalog.test.mjs tests/queue.test.mjs tests/ui-queries.test.mjs tests/deployer.test.mjs
+      - run: node --test tests/capacity.test.mjs tests/downloads.test.mjs tests/retention.test.mjs tests/records.test.mjs tests/blob-stream.test.mjs tests/capture-cut.test.mjs tests/backup-capture.test.mjs tests/git-catalog.test.mjs tests/queue.test.mjs tests/ui-queries.test.mjs tests/deployer.test.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: pcms-dev-${{ github.event.pull_request.head.sha || github.sha }}
@@ -54,7 +54,9 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - name: Verify loaded capacity and production disk recovery (normal sandbox)
-        run: python3 tests/installed_capacity.py build/pcms-dev.xpi
+        run: |
+          python3 tests/installed_retention.py build/pcms-dev.xpi
+          python3 tests/installed_capacity.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

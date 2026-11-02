@@ -1,5 +1,5 @@
 import {requireCore as check} from './records.mjs';
-import {matchesDownload} from './downloads.mjs';
+import {matchesDownload,completedDownloadBytes} from './downloads.mjs';
 const DAY=86400000;
 // Shared receipt-owned deletion. Module policy supplies the current retention
 // and last complete receipt; this service cannot discover arbitrary disk files.
@@ -10,7 +10,7 @@ export function createRetention({core,api,profileId,clock=Date.now}){
  const allowed=async type=>{const m=await core.read('modules','pcms-'+type);return m?.enabled&&!m.lifecycle&&m.hostClass===type;};
  async function item(r,removed=false){let items;try{items=await api.downloads.search({id:r.downloadId});}catch{return {code:'CLEANUP_STATUS_UNAVAILABLE'};}
   if(items.length!==1)return {code:items.length?'CLEANUP_ID_AMBIGUOUS':'CLEANUP_HISTORY_MISSING'};
-  if(!matchesDownload(r,items[0],api.runtime.id)||items[0].state!=='complete'||(!(removed&&items[0].exists===false)&&(items[0].fileSize!==r.bytes||items[0].bytesReceived!==r.bytes)))return {code:'CLEANUP_IDENTITY_CHANGED'};
+  if(!matchesDownload(r,items[0],api.runtime.id)||items[0].state!=='complete'||(!(removed&&items[0].exists===false)&&!completedDownloadBytes(r,items[0])))return {code:'CLEANUP_IDENTITY_CHANGED'};
   return {value:items[0]};
  }
  const result=async(job,r,state,code=null,dueAt=null)=>({value:{state,code,fileId:r.id,...dueAt?{dueAt}:{}},jobRevision:(await core.read('jobs',job.id)).rev});
