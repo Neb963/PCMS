@@ -29,3 +29,15 @@ test('Work uses joined labels/module filters and stable later pages while showin
  await f.put('j-020',{state:'COMPLETE'});const updated=await f.ui.work({search:'Visible account',moduleId:'pcms-deployer',limit:20,cursor:first.cursor});assert.equal(updated.rows[0].id,'j-020');assert.equal(updated.rows[0].state,'COMPLETE');assert.equal(JSON.stringify(updated).includes('DO_NOT_PROJECT'),false);
  await assert.rejects(f.ui.work({search:'Visible account',moduleId:'pcms-backup',cursor:first.cursor}),e=>e.code==='STALE_CURSOR');
 });
+
+test('R05: generator owner label/Unicode/folder, all filters, selection and cursor identity use the same cut',async t=>{
+ const f=await fixture(t);await f.c.mutate([{table:'accounts',id:'snow',value:{label:'Żółw 雪',state:'READY'}},...Array.from({length:1005},(_,i)=>({table:'generators',id:'large-'+String(i).padStart(4,'0'),value:{slug:'snow-'+i,accountId:'snow',folder:'generators/snow-'+i,listing:i%2?'PUBLIC':'UNLISTED',creatorState:'CREATED',gitState:'READY'}}))],event);
+ let cursor=null,ids=[];do{const p=await f.ui.generators({search:'żółw 雪',listing:'PUBLIC',accountId:'snow',workState:'CREATED',state:'READY',cursor,limit:37});ids.push(...p.rows.map(g=>g.id));cursor=p.cursor;}while(cursor);assert.equal(ids.length,502);assert.ok(ids.includes('large-1003'));
+ const selected=await f.ui.generators({selectedOnly:true,selectedIds:['large-1003','large-0001']});assert.deepEqual(selected.rows.map(g=>g.id),['large-0001','large-1003']);
+ const first=await f.ui.generators({search:'snow',limit:1});await assert.rejects(f.ui.generators({search:'snow',accountId:'other',cursor:first.cursor}),e=>e.code==='STALE_CURSOR');
+ assert.equal((await f.ui.generators({search:'generators/snow-1004'})).rows[0].id,'large-1004');
+});
+test('R05: default diagnostic records and unchanged views do not trigger full table reads; real mutations invalidate cache',async t=>{
+ const f=await fixture(t),original=f.c.list;let reads=0;f.c.list=async a=>{reads++;return original(a);};await f.ui.search({query:'visible'});const baseline=reads;await f.c.record({step:'UI_QUERY',result:'OBSERVED'});await f.c.saveView('shell-view',{query:'private'},crypto.randomUUID());await f.ui.search({query:'visible'});assert.equal(reads,baseline);
+ await f.c.mutate([{table:'generators',id:'new-cache',value:{slug:'visible-new'}}],event);assert.ok((await f.ui.search({query:'visible-new'})).rows.some(r=>r.id==='new-cache'));assert.ok(reads>baseline);
+});

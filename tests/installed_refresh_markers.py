@@ -37,14 +37,14 @@ def reopen_account(sid,owner,previous_job):
  def fresh_ready(a):
   f=a.get('flow') or {};w=a.get('work') or {}
   started=f.get('startedAt') or 0
-  return (a.get('state')=='READY' and f.get('purpose')=='OPEN'
+  return (a.get('state')=='READY' and f.get('purpose') in ['OPEN','RENEW']
    and f.get('jobId')!=previous_job and w.get('id')==f.get('jobId')
    and w.get('state')=='COMPLETE' and w.get('effect',{}).get('boundary')=='OBSERVED'
    and started>0 and (a.get('routeObservedAt') or 0)>=started
-   and (a.get('identityObservedAt') or 0)>=(a.get('routeObservedAt') or 0))
+   and ((f.get('purpose')=='RENEW' and a.get('protection',{}).get('state')=='VERIFIED' and (a.get('identityObservedAt') or 0)>0) or (a.get('identityObservedAt') or 0)>=(a.get('routeObservedAt') or 0)))
  def admission():
   a=account(sid,owner)
-  if fresh_ready(a):return 'AUTO_OPEN_VERIFIED'
+  if fresh_ready(a):return 'AUTO_RENEW_VERIFIED' if a.get('flow',{}).get('purpose')=='RENEW' else 'AUTO_OPEN_VERIFIED'
   b=script(sid,"const b=document.getElementById('account-open');return !!b&&!b.hidden&&!b.disabled")
   return 'MANUAL_OPEN_AVAILABLE' if b else None
  try:choice=wait(admission,60)

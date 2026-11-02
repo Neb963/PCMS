@@ -1,0 +1,25 @@
+# R05 — joined search, filters and retained selection
+
+Date: 2026-11-02. Base R04 `fed3b34845fd194cd329acfc0e2dfadcdf9254f1` / tree `d992a74898785992bfea61bc074041cf947d6fd6`. Plan committed before code. Authority unchanged.
+
+**Status: PARTIAL / installed diagnosis pending. IB-09 historical root remains UNKNOWN.**
+
+## Root causes and changes
+
+IB-06/07 are confirmed contract gaps: the Generator list searched only projected generator strings, missing owner display labels; account/listing/work filters and multi-selection were absent. A joined read-only projection now supplies these fields/filters, immutable cursor identity and selected-only paging. The same actual Core dataset remains authoritative. Selection is retained in existing view state and grants no new operation. All managed generator records can be found even before Git configuration; old catalog-only listing hid owned records in that state.
+
+IB-10/IF-03 source amplification: every shared query reread all three projected tables. A bounded cache reuses immutable dataset/data-revision cuts. Diagnostic-only events and view persistence do not invalidate data snapshots. Real account/generator/job mutations increment dataRevision transactionally. Historical cursors retain exact membership; Work still reads current status where its historical page requires it. No source/credentials/private checkpoints enter the cache.
+
+Global search now fences an earlier response immediately on input, before debounce. RPCs have a bounded timeout with a visible error instead of an indefinitely pending field. Default diagnostic traces record query length/digest, request identity, result count and elapsed time; no raw search text. Generator errors stay with the list and stale cursors reset safely.
+
+**IB-09:** The old operator's actual query/profile response is unavailable. Existing source/fixture matches cannot establish its historical cause. The known friendly-owner omission is repaired, but no claim that it explains universal/global failure is made.
+
+## Verification
+
+15 focused production query/record/continuity tests PASS. New actual fake-IndexedDB tests: 1,005 joined Unicode-owner generators, account/listing/work/folder filters, all later pages (502 Public matches, including row1003), selected-only IDs, cursor-filter identity, and cache invalidation. Instrumented Core list calls do not increase across diagnostic-only event/view writes and do increase after a real generator mutation. Existing stable snapshot, joined cross-item search, Work current status and record privacy tests pass.
+
+Extended installed UI test uses actual owner search, listing filter, row multi-selection/selected-only/navigation, and independently reads the default query diagnostic from IndexedDB. Cold route recovery must now prove AUTO_RENEW_VERIFIED; it may not pass by a routine manual Open. This matching installed test is **NOT TESTED** until CI executes it. Universal historical search closure, out-of-order installed/empty/error matrix and full loaded list/visual acceptance remain open.
+
+## Safety / remaining work
+
+No second store/query authority/queue; cache keys are immutable cuts/data revisions and retain at most8 entries. No search cap or selection-granted source action. View drafts, module fences, account/source scope and uncertain operation identities remain. R06 must inspect actual pixels and conditional controls; R07 measures long-running cache/read/write costs; R08 reruns exact final XPI integration. Required missing evidence prevents R05 PASS and final readiness. Real P42–P49 remains NOT TESTED.

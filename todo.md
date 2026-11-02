@@ -76,3 +76,17 @@ R02 source/T checkpoint: cd6ed32c / tree16e5032cc274c81e21db5b0045cb7fb95f992726
 - Exact YES catalog guard; Accounts protection prerequisite and same-job safe Creator wake; current Creator dependency/account/cause in Deployer/Work; unchanged dependency records coalesced; truthful still-waiting check feedback.
 - 84 Creator/allocation/creation/Deployer T tests PASS (~76s), with same-job/no-owner-rescan/no-write-before-proof and exact YES negatives. Narrowed refinement is checked separately. Matching B/visual remains pending; [R04 report](docs/remediation/R04-report.md).
 - R01 downloaded receipt independently identifies Firefox155.0/build20260817142839, sandbox6, XPI40111aec89f9227f96afed31f825fc8aa027a46132bef7952aef9ae7911470d1:100001 events/90days,1 tail row,5 tail cursor reads,107ms actual UI→Downloads→disk. No provider acceptance inferred.
+
+## R05 plan (before R05 code)
+
+1. Use the existing Core projections to join generator owner display names, listing and work state. Add account/listing/work filters and multi-selection retained across page/navigation/restart; selection grants no mutation authority.
+2. Cache immutable projection snapshots by dataset/data revision (bounded entries); diagnostic-only events and UI view saves must not force whole account/generator/job rereads. Keep historical cursor cuts stable and current Work state truthful.
+3. Preserve real UI→RPC→Core queries and privacy-safe diagnostics. Fence stale responses immediately when typing, retain query/filter/paging state, and show actual query failures near controls.
+4. Extend source tests for joined owner search/filtering, late pages, changed data versus diagnostic-only changes and cursor identity; extend actual installed UI fixture for owner/Unicode/filter/selection/restart and default diagnostic trace.
+5. Keep historical operator universal search root UNKNOWN unless actual installed evidence establishes it. Publish R05 report with that limit; a synthetic match is not historical incident closure.
+
+### R05 checkpoint
+
+- Joined generator search by human owner/slug/folder; owner/listing/work filters, retained multi-select and selected-only paging; stale response fencing and bounded RPC errors.
+- Bounded immutable data-revision projection cache; UI diagnostic/view writes do not force full data scans; real mutations invalidate it. 15 query/record/continuity T tests PASS, including1005 Unicode-owner generators/later pages and instrumented cache oracle.
+- Actual installed owner/filter/selection/query-diagnostic and cold AUTO_RENEW checks added; not yet executed. IB-09 historical universal search cause remains UNKNOWN; [R05 report](docs/remediation/R05-report.md). R06 can safely refine actual UI while this acceptance gate stays open.

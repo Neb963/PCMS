@@ -126,6 +126,7 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
       if(value===null)await req(s(table).delete(row.key));else await req(s(table).put(row));
       await req(s('versions').add({...row,key:[r.dataset,table,recordId,sequence],table}));
     }
+    if(changes.some(c=>['accounts','generators','jobs'].includes(c.table)))r.dataRevision=(r.dataRevision??0)+1;
     r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));return {revision:r.revision,sequence};
   };
   await transact(['events'],'readwrite',async s=>{const r=await root(s);if(!r.profileId){r.profileId=crypto.randomUUID();await append(s,r,{step:'PROFILE_IDENTITY',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}});
