@@ -14,7 +14,7 @@ The accepted specification controls product behavior; the design supplies implem
 
 ## Implementation and acceptance
 
-PCMS includes all seven modules: Accounts, Discover, Creator, Deployer, Refresher, Journal and Backup, sharing one Core dataset, queue and dashboard. Fresh installs enable all seven; existing user packages, settings and disabled state are preserved. P01–P40 implementation and fixture evidence are complete. P41 qualifies the full acceptance candidate; its exact source, tested XPI hash, artifacts and current result are recorded in [current work](todo.md).
+PCMS includes all seven modules: Accounts, Discover, Creator, Deployer, Refresher, Journal and Backup, sharing one Core dataset, queue and dashboard. Fresh installs enable all seven; existing user packages, settings and disabled state are preserved. P01–P41 implementation and required fixture qualification are complete. The full acceptance candidate’s exact source, tested XPI hash, artifacts and current result are recorded in [current work](todo.md).
 
 Authorized live acceptance P42–P49 remains **NOT TESTED**. Fixture records do not establish real routes, current provider compatibility, working restored logins or fleet readiness. The candidate is an unsigned development build; signed/general distribution is unestablished.
 
