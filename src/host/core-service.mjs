@@ -1,3 +1,4 @@
+import {createUiQueries} from './ui-queries.mjs';
 import {createRefreshController} from '../modules/refresh-controller.mjs';
 import {createRefreshSave} from '../modules/refresh-save.mjs';
 import {createDirectory} from '../modules/directory.mjs';
@@ -28,7 +29,7 @@ import {openCore,publicError,project} from '../core/records.mjs';
 // Only the packaged dashboard can use these secret-safe operations. The
 // module host will grant narrower bound scopes; it receives no storage object.
 export function createCoreService({open=openCore,alarms=null,wake=async()=>{},api=globalThis.browser,notify=()=>{}}={}) {
-  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,sourceWriter,deployer,backup,retention,refresher,directory,refreshSave,refreshController,seedFailure=null;
+  let pending,modules,lifecycle,scripts,downloads,journal,accounts,git,gitWriter,discover,creator,source,sourceWriter,deployer,backup,retention,refresher,directory,refreshSave,refreshController,ui,seedFailure=null;
   const seedCode=error=>/^(BUNDLED_[A-Z_]+|INVALID_BUNDLED_SEED|STORAGE_FULL)$/.test(error?.message)?error.message:publicError(error);
   async function seed(value){
     try{const result=await seedBundled(value);seedFailure=null;return result;}
@@ -36,7 +37,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
   }
   const core=()=>pending??=(async()=>{
     const value=await open();
-    await value.queue.boot();
+    await value.queue.boot();ui=createUiQueries({core:value});
     await value.record({step:'CORE_START',result:'COMPLETE'});
     await seed(value);
     git=createGitCatalog({core:value});await git.initialize();gitWriter=createGitWriter({core:value,validateJob:j=>j.deployment?deployer.validate(j):undefined});
@@ -162,12 +163,17 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
         case 'queue.list':{const page=await value.queue.list({cursor:message.cursor,search:message.search??'',state:message.state??''});result={...page,rows:page.rows.map(j=>project('jobs',j))};break;}
         case 'queue.get':{const job=await value.read('jobs',message.id),m=job?.moduleId==='pcms-backup'?await value.read('modules','pcms-backup'):null,exportFile=job?.moduleId==='pcms-backup'&&job.kind==='EXPORT'?await value.read('files',job.id):null,restore=job?.moduleId==='pcms-backup'&&job.kind==='RESTORE'?await value.restore.read():null;result=job?{...project('jobs',job),git:gitWriter.status(job),target:await value.get('generators',job.targetId),...m?{backup:job.kind==='RESTORE'?{restore:true,restoreId:job.input.restoreId,state:restore?.jobId===job.id?restore.state:job.state,code:restore?.jobId===job.id?restore.code:null,canCheck:restore?.jobId===job.id&&m.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('backup.restore')}:job.kind==='EXPORT'?{export:true,state:exportFile?.state??job.backupExport?.phase??job.state,code:exportFile?.code??job.backupExport?.code??job.recovery?.code??null,canCheck:m.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('backup.export')}:{coverageOnly:job.input?.coverageOnly===true,state:job.input?.coverageOnly===true?job.capture?.state??'COLLECTING':job.fullCapture?.phase??'STAGE',code:job.input?.coverageOnly===true?null:job.fullCapture?.code??null,complete:job.input?.coverageOnly===true?job.capture?.state==='COMPLETE':job.fullCapture?.phase==='COMPLETE',canCheck:job.input?.coverageOnly===false&&m.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('backup.captureCut')}}:{}}:null;break;}
         case 'queue.batch':result=await value.queue.batch(message.id);break;
+        case 'ui.work':result=await ui.work(message);break;
+        case 'ui.search':result=await ui.search(message);break;
+        case 'ui.home':result=await ui.home();break;
+        case 'ui.review':result=await ui.review(message);break;
+        case 'ui.diagnostics':result=await ui.diagnostics();break;
         case 'counts':result=await value.counts();break;
         case 'events':result=await journal.events(message);break;
         case 'view.get':result=await value.view('shell-view');break;
         case 'view.save': {
           const v=message.value;
-          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount','sourceSelection','sourceSearch','sourceVersions','backupSearch','backupPage','backupDraftFolder','backupDraftInterval','backupDraftRetention','refresherSearch','refresherPhase','refresherOffset','refresherActiveDraft','refresherSleepDraft'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
+          if(!v||typeof v!=='object'||Object.keys(v).some(k=>!['pages','globalSearch','globalCursor','settingsSearch','otherSearch','workCursor','workModule','journalFilter','route','scroll','workSearch','workState','journalModule','journalTarget','journalSeverity','journalCursor','journalFirst','journalLast','journalDraftInterval','journalDraftFolder','journalDraftRetention','accountSearch','accountState','accountDraftLabel','accountSelection','accountCursor','accountAddRequestId','accountAddLabel','accountRequests','accountRemoveConfirmed','connectionRepository','catalogSearch','catalogState','catalogCursor','catalogSelection','discoverDraft','discoverAccount','discoverSelection','discoverRow','discoverBatchCursor','creatorAccountDrafts','catalogAccount','sourceSelection','sourceSearch','sourceVersions','backupSearch','backupPage','backupDraftFolder','backupDraftInterval','backupDraftRetention','refresherSearch','refresherPhase','refresherOffset','refresherActiveDraft','refresherSleepDraft'].includes(k))||typeof v.journalFilter!=='string'||typeof v.route!=='string'||!Number.isFinite(v.scroll))return {ok:false,code:'INVALID_VIEW'};
           result=await value.saveView('shell-view',v,message.requestId);break;
         }
         default:return {ok:false,code:'OPERATION_DENIED'};

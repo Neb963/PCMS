@@ -1,3 +1,5 @@
+import {rememberPage,restorePage} from './continuity.mjs';
+import {sharedPages} from './shared-pages.mjs';
 import {openModulePage} from './module-page.mjs';
 const titles = {home:'Home',generators:'Generators',accounts:'Accounts',refresher:'Refresher',work:'Work',other:'Other',settings:'Settings'};
 const notes = {
@@ -25,21 +27,24 @@ function directorySummary(v){
  return (v.fresh?'Directory measured':'Directory Unknown · '+v.code)+' · Top 50: '+(v.fresh?counts.top50:'Unknown')+' · Top 100: '+(v.fresh?counts.top100:'Unknown')+' · Full list: '+(v.fresh?counts.full:'Unknown')+' · '+(v.fresh?v.size+' displayed':('last good '+Math.floor((v.ageMs??0)/1000)+' seconds ago · '+v.lastGoodSize+' displayed · counts '+counts.top50+' / '+counts.top100+' / '+counts.full));
 }
 
-function route() {
+let renderedRoute=null,routeOrder=0;
+async function route() {
+  const target=location.hash.slice(1)||'home',order=++routeOrder;view.pages??={};if(renderedRoute){const saved=rememberPage(document,window);if(document.activeElement?.closest('nav,.global-control,.global-search'))saved.focus=view.pages[renderedRoute]?.focus??null;view.pages[renderedRoute]=saved;}renderedRoute=target;void persist();
   const primary=location.hash.slice(1).split('/')[0];
   const key=primary==='module'?'module':primary in titles?primary:'home';
   document.getElementById('heading').textContent = titles[key]??'Module';
   document.getElementById('page-note').textContent = key==='settings'&&location.hash.includes('/')?'':notes[key]??'';
-  void renderRecords(key);
+  const ready=renderRecords(key);
   for (const link of document.querySelectorAll('nav a')) {
     const selected=key==='module'?(link.dataset.pinnedModule===location.hash.split('/')[1]||link.hash==='#other'&&![...document.querySelectorAll('[data-pinned-module]')].some(a=>a.dataset.pinnedModule===location.hash.split('/')[1])):link.hash==='#'+key;
     if (selected) link.setAttribute('aria-current','page');
     else link.removeAttribute('aria-current');
   }
+  await ready;if(order===routeOrder)restorePage(view.pages?.[target],document,window);
 }
 function show(status) {
   document.getElementById('status').textContent = messages[status.code] || messages.STATUS_UNAVAILABLE;
-  document.body.dataset.startup = status.code;
+  document.body.dataset.startup = status.code;document.getElementById('host-heading').textContent=status.code==='HOST_ONLY'?'Protected account checks available':status.donorReady?'Protected work needs attention':'Protected work blocked';
   const list = document.getElementById('details'); list.replaceChildren();
   for (const [label,value] of [['Admission',status.admission],['Startup code',status.code],['Donor ready',status.donorReady],['Privacy safe',status.privacySafe],['Bridge',status.bridge],['Userscript permission',status.userScriptsPermission],['Shell error',status.shellFailure || 'None']]) {
     const dt=document.createElement('dt'),dd=document.createElement('dd');
@@ -52,7 +57,7 @@ const timeout=setTimeout(()=>{if(!received)show({code:'STATUS_UNAVAILABLE',admis
 port.onMessage.addListener(status=>{received=true;clearTimeout(timeout);show(status);port.disconnect();});
 port.onDisconnect.addListener(()=>{clearTimeout(timeout);if(!received)show({code:'STATUS_UNAVAILABLE',admission:'BLOCKED'});});
 
-let disposeModule=null,refreshJournal=null,refreshAccounts=null,refreshCatalog=null,refreshWork=null,refreshBackup=null,refreshRefresher=null;
+let disposeModule=null,refreshJournal=null,refreshAccounts=null,refreshCatalog=null,refreshWork=null,refreshBackup=null,refreshRefresher=null,refreshHome=null;
 let view={journalFilter:'',route:'home',scroll:0,workSearch:'',workState:''},pageCursor=null,nextCursor=null;
 let corePort=null;const requests=new Map();
 function connection(){if(corePort)return corePort;const port=browser.runtime.connect({name:'pcms-core-rpc'});corePort=port;
@@ -69,15 +74,11 @@ async function persist(){
 }
 async function renderRecords(key){
  void queueStatus();
- refreshJournal=null;refreshAccounts=null;refreshCatalog=null;refreshWork=null;refreshBackup=null;refreshRefresher=null;const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
+ refreshJournal=null;refreshAccounts=null;refreshCatalog=null;refreshWork=null;refreshBackup=null;refreshRefresher=null;refreshHome=null;const mount=document.getElementById('records'),area=node('div');mount.replaceChildren(area);if(disposeModule){disposeModule();disposeModule=null;}area.replaceChildren();
  if(key==='module'){await renderModule(area);return;}
  if(key==='other'){await renderOther(area);return;}
  if(key==='home'){
-   const response=await core('counts');if(location.hash.slice(1)&&location.hash!=='#home')return;
-   if(!response.ok){area.append(failure(response.code));return;}
-   const counts=node('div');counts.className='counts';
-   for(const [label,field,route] of [['Accounts','accounts','accounts'],['Generators','generators','generators'],['Jobs','jobs','work']]){const a=node('a',response.result[field]+' '+label);a.href='#'+route;a.dataset.count=field;counts.append(a);}
-   const directory=await core('directory.status'),visibility=node('a',directory.ok?directorySummary(directory.result):'Directory visibility: Unknown');visibility.id='home-directory';visibility.href='#refresher';area.append(counts,visibility);
+   refreshHome=await shared.home(area);
  }else if(key==='accounts'){await renderAccounts(area);
  }else if(key==='generators'){if(location.hash.split('/')[1]==='account')await renderRelated(area,'generators');else await renderGenerators(area);
  }else if(key==='work'){if(location.hash.split('/')[1]==='account')await renderRelated(area,'jobs');else await renderWork(area);
@@ -88,13 +89,14 @@ async function renderRecords(key){
    if(location.hash.split('/')[1]==='refresher'){await renderRefresherSettings(area);return;}
    if(location.hash.split('/')[1]==='backup'){await renderBackup(area);return;}
    if(location.hash.split('/')[1]==='journal'){await renderJournal(area);return;}
-   for(const [name,path] of [['Connections','connections'],['Modules','modules'],['Refresher','refresher'],['Journal','journal'],['Backup','backup']]){const link=node('a',name);link.href='#settings/'+path;area.append(link,document.createTextNode(' '));}
+   if(location.hash.split('/')[1]==='advanced'){await shared.advanced(area);return;}
+   await shared.settings(area);
 
  }
 }
 const initial=await core('view.get');
 if(initial.ok&&initial.result){view=initial.result;if(!location.hash)history.replaceState(null,'','#'+view.route);}
-await updateModuleNavigation();window.addEventListener('hashchange',route);route();
+const shared=sharedPages({core,node,view,persist,document});await shared.search();await updateModuleNavigation();window.addEventListener('hashchange',route);void route();let viewTimer;window.addEventListener('scroll',()=>{clearTimeout(viewTimer);viewTimer=setTimeout(()=>{if(renderedRoute){view.pages??={};view.pages[renderedRoute]=rememberPage(document,window);void persist();}},250);},{passive:true});document.addEventListener('focusin',()=>{if(renderedRoute&&!document.activeElement?.closest('nav,.global-control,.global-search')){view.pages??={};view.pages[renderedRoute]=rememberPage(document,window);}});
 
 async function queueStatus(){
  const response=await core('queue.status'),status=document.getElementById('queue-status'),button=document.getElementById('pause-core');
@@ -111,13 +113,13 @@ async function renderRelated(area,table){
  const id=location.hash.split('/')[2];if(!id){area.append(node('p','Select an account to view its linked generators.'));return;}
  const back=node('a','Account details');back.href='#accounts/'+id;area.append(back,node('h2',table==='jobs'?'Account work':'Account generators'));
  const list=node('ul'),next=node('button','Next page');list.id='account-related-list';next.id='account-related-next';area.append(list,next);let cursor=null;
- const load=async()=>{next.disabled=true;const r=await core('accounts.related',{id,table,cursor});if(!r.ok){list.replaceChildren(failure(r.code));return;}list.replaceChildren();for(const row of r.result.rows){const li=node('li');if(table==='jobs'){const a=node('a',row.kind+' · '+row.state);a.href='#work/'+row.id;li.append(a);}else li.textContent=[row.slug,row.state,row.holdCode,row.accountId===id?'Original account retained':''].filter(Boolean).join(' · ');list.append(li);}if(!list.children.length)list.append(node('li','No linked records.'));cursor=r.result.cursor;next.hidden=!cursor;next.disabled=false;};next.addEventListener('click',()=>void load());await load();
+ const load=async()=>{next.disabled=true;const r=await core('accounts.related',{id,table,cursor});if(!r.ok){list.replaceChildren(failure(r.code));return;}list.replaceChildren();for(const row of r.result.rows){const li=node('li');if(table==='jobs'){const a=node('a',row.kind+' · '+row.state);a.href='#work/'+row.id;li.append(a);}else {const a=node('a',[row.slug,row.state,row.holdCode,row.accountId===id?'Original account retained':''].filter(Boolean).join(' · '));a.href='#generators/'+row.id;li.append(a);}list.append(li);}if(!list.children.length)list.append(node('li','No linked records.'));cursor=r.result.cursor;next.hidden=!cursor;next.disabled=false;};next.addEventListener('click',()=>void load());await load();
 }
 async function renderWork(area){
  const id=location.hash.slice(1).split('/')[1];
  if(id){
   let response=await core('queue.get',{id});if(!response.ok){area.append(failure(response.code));return;}let job=response.result;if(!job){area.append(node('p','This job is unavailable.'));return;}
-  const back=node('a','All work');back.href='#work';const heading=node('h2'),state=node('p'),details=node('dl'),uncertainty=node('p','The result needs readback. This operation will not run again while its result is unknown.');state.id='work-job-state';area.append(back,heading,state,details,uncertainty);
+  const journal=node('a','Journal for this job');journal.id='work-journal';journal.href='#settings/journal/job/'+id;area.append(journal);if(job.accountId){const a=node('a','Affected account');a.href='#accounts/'+job.accountId;area.append(a);}if(job.target){const a=node('a','Affected generator');a.href='#generators/'+job.target.id;area.append(a);}if(job.moduleId==='pcms-refresher'&&job.kind==='REFRESH'){const check=node('button','Check Refresh result'),outcome=node('p');check.id='work-refresh-check';check.addEventListener('click',async()=>{check.disabled=true;const r=await core('refresher.check',{id:job.targetId});outcome.textContent=r.ok?'Refresh '+r.result.state:'Refresh held: '+r.code;check.disabled=false;});area.append(check,outcome);}const back=node('a','All work');back.href='#work';const heading=node('h2'),state=node('p'),details=node('dl'),uncertainty=node('p','The result needs readback. This operation will not run again while its result is unknown.');state.id='work-job-state';area.append(back,heading,state,details,uncertainty);
   const gitSection=node('section'),summary=node('p'),result=node('p'),button=node('button','Check Git result'),connection=node('a','Connections'),folder=node('a','Open generator folder');summary.id='git-job-state';button.id='git-job-check';result.id='git-job-result';result.setAttribute('role','status');connection.href='#settings/connections';gitSection.append(summary,button,result,folder,document.createTextNode(' · '),connection);area.append(gitSection);if(job.moduleId==='pcms-backup')await renderBackupWork(area,job);if(job.moduleId==='pcms-creator'&&job.target){const generator=node('a','Open generator and ownership recovery');generator.id='creator-work-generator';generator.href='#generators/'+job.target.id;area.append(generator);}if(job.moduleId==='pcms-deployer'&&['SOURCE_INSPECT','SOURCE_SAVE','DEPLOY','DEVELOP'].includes(job.kind)&&job.target){const generator=node('a','Open generator and source inspection');generator.id='source-work-generator';generator.href='#generators/'+job.target.id;area.append(generator);}const deploymentRefresh=['DEPLOY','DEVELOP'].includes(job.kind)&&job.target?await renderDeployment(area,job.target.id):null;const sourceRefresh=job.moduleId==='pcms-deployer'&&job.kind==='SOURCE_SAVE'&&job.target?await renderSourceSave(area,job.target.id):null;let busy=false;
   const draw=()=>{heading.textContent=job.kind+' · '+job.targetId;state.textContent=(job.effect?.boundary==='POSSIBLE'?'Unknown':job.state)+' · '+job.step;details.replaceChildren();for(const [label,value]of [['Job',job.id],['Target',job.targetId],['Account',job.accountId||'None'],['Module',job.moduleId],['Recovery',job.recovery?.code||'None']])details.append(node('dt',label),node('dd',value));uncertainty.hidden=job.effect?.boundary!=='POSSIBLE';gitSection.hidden=!job.git;if(job.git){summary.textContent=[job.git.repository,job.git.folder,job.git.phase,job.git.code?gitError(job.git.code):null,job.git.candidate,job.git.receipt?'Verified commit '+job.git.receipt.commit+' at '+new Date(job.git.receipt.verifiedAt).toISOString():'No verified Git completion'].filter(Boolean).join(' · ');folder.href=job.target?'#generators/'+job.target.id:'#generators';button.disabled=busy;}};
   const refresh=async()=>{const r=await core('queue.get',{id});if(!area.isConnected||!r.ok||!r.result)return;job=r.result;draw();if(deploymentRefresh)await deploymentRefresh();if(sourceRefresh)await sourceRefresh();};folder.addEventListener('click',()=>{if(!job.target){view.catalogSearch=job.git?.folder?.split('/').at(-1)??'';view.catalogState='';view.catalogCursor=null;void persist();}});
@@ -127,12 +129,13 @@ async function renderWork(area){
  }
  const label=node('label','Find work'),input=node('input');input.id='work-search';input.value=view.workSearch??'';label.htmlFor=input.id;
  const select=node('select');select.id='work-state';select.setAttribute('aria-label','Work status');for(const [value,text] of [['','All work'],['HELD','Needs action'],['RUNNING','In progress'],['WAITING','Waiting'],['COMPLETE','Completed'],['FAILED','Failed']]){const option=node('option',text);option.value=value;select.append(option);}select.value=view.workState??'';
- const list=node('ul');list.id='work-list';const next=node('button','Next');next.type='button';let cursor=null,nextPage=null;
- const load=async()=>{const response=await core('queue.list',{cursor,search:view.workSearch??'',state:view.workState??''});list.replaceChildren();if(!response.ok){list.append(failure(response.code));return;}nextPage=response.result.cursor;next.hidden=!nextPage;
-  for(const job of response.result.rows){const li=node('li'),a=node('a',job.kind+' · '+job.targetId+' · '+(job.recovery?.code==='OUTCOME_UNKNOWN'?'Unknown':job.state));a.href='#work/'+job.id;li.append(a);list.append(li);}if(!response.result.rows.length)list.append(node('li','No matching work.'));
+ const module=node('select');module.id='work-module';module.setAttribute('aria-label','Work module');const all=node('option','All modules');all.value='';module.append(all);for(const m of await moduleRecords()){const o=node('option',m.name??m.id);o.value=m.id;module.append(o);}module.value=view.workModule??'';
+ const list=node('ul');list.id='work-list';const next=node('button','Next');next.type='button';let cursor=view.workCursor??null,nextPage=null;
+ const load=async()=>{const response=await core('ui.work',{cursor,search:view.workSearch??'',state:view.workState??'',moduleId:module.value});if(!area.isConnected)return;const saved=list.contains(document.activeElement)?rememberPage(document,window):null;list.replaceChildren();if(!response.ok){if(response.code==='STALE_CURSOR'&&cursor){cursor=null;view.workCursor=null;void persist();return load();}list.append(failure(response.code));return;}nextPage=response.result.cursor;next.hidden=!nextPage;
+  for(const job of response.result.rows){const li=node('li'),a=node('a',(job.label??job.kind+' · '+job.targetId)+' · '+(job.recovery?.code==='OUTCOME_UNKNOWN'?'Unknown':job.state));a.href='#work/'+job.id;li.append(a);list.append(li);}if(!response.result.rows.length)list.append(node('li','No matching work.'));if(saved)restorePage(saved,document,window);
  };
- input.addEventListener('input',()=>{view.workSearch=input.value;cursor=null;void persist();void load();});select.addEventListener('change',()=>{view.workState=select.value;cursor=null;void persist();void load();});
- next.addEventListener('click',()=>{cursor=nextPage;void load();});area.append(label,input,select,list,next);await load();
+ input.addEventListener('input',()=>{view.workSearch=input.value;cursor=null;view.workCursor=null;void persist();void load();});select.addEventListener('change',()=>{view.workState=select.value;cursor=null;view.workCursor=null;void persist();void load();});
+ module.addEventListener('change',()=>{view.workModule=module.value;cursor=null;view.workCursor=null;void persist();void load();});refreshWork=load;next.id='work-next';next.addEventListener('click',()=>{cursor=nextPage;view.workCursor=cursor;void persist();void load();});area.append(label,input,select,module,list,next);await load();
 }
 
 async function moduleRecords(){const response=await core('modules.list');return response.ok?response.result:[];}
@@ -142,8 +145,8 @@ async function updateModuleNavigation(){
  const settings=document.querySelector('nav a[href="#settings"]');for(const module of await moduleRecords())if(module.enabled&&module.pinned&&module.pages.length){const a=node('a',module.name??module.id);a.href=moduleURL(module);a.dataset.pinnedModule=module.id;settings.before(a);}
 }
 async function renderOther(area){
- const modules=(await moduleRecords()).filter(m=>m.enabled&&!m.pinned&&m.pages.length),label=node('label','Find a module'),input=node('input'),list=node('ul');label.htmlFor='module-search';input.id='module-search';
- const draw=()=>{list.replaceChildren();for(const m of modules.filter(m=>(m.name??m.id).toLowerCase().includes(input.value.toLowerCase()))){const li=node('li'),a=node('a',m.name??m.id);a.href=moduleURL(m);li.append(a);list.append(li);}if(!list.children.length)list.append(node('li','No matching modules.'));};input.addEventListener('input',draw);area.append(label,input,list);draw();
+ const modules=(await moduleRecords()).filter(m=>m.enabled&&!m.pinned&&m.pages.length),label=node('label','Find a module'),input=node('input'),list=node('ul');label.htmlFor='module-search';input.id='module-search';input.value=view.otherSearch??'';
+ const draw=()=>{list.replaceChildren();for(const m of modules.filter(m=>(m.name??m.id).toLowerCase().includes(input.value.toLowerCase()))){const li=node('li'),a=node('a',m.name??m.id);a.href=moduleURL(m);li.append(a);list.append(li);}if(!list.children.length)list.append(node('li','No matching modules.'));};input.addEventListener('input',()=>{view.otherSearch=input.value;void persist();draw();});area.append(label,input,list);draw();
 }
 async function renderModuleSettings(area){
  area.append(node('h2','Modules'));const rows=node('div');renderInstall(area,()=>renderModuleRows(rows));
@@ -191,7 +194,7 @@ async function renderModule(area){
 }
 
 // Refresh only the visible dashboard status; no background keepalive.
-setInterval(()=>{if(document.visibilityState==='visible'){void queueStatus();if(refreshJournal)void refreshJournal();if(refreshAccounts)void refreshAccounts();if(refreshCatalog)void refreshCatalog();if(refreshWork)void refreshWork();if(refreshBackup)void refreshBackup();if(refreshRefresher)void refreshRefresher();}},2000);
+setInterval(()=>{if(document.visibilityState==='visible'){void queueStatus();if(refreshJournal)void refreshJournal();if(refreshAccounts)void refreshAccounts();if(refreshCatalog)void refreshCatalog();if(refreshWork)void refreshWork();if(refreshBackup)void refreshBackup();if(refreshRefresher)void refreshRefresher();if(refreshHome)void refreshHome();}},2000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')void queueStatus();});
 
 const importMessages={IMPORT_BUDGET_EXCEEDED:'This ZIP needs more import space. Increase the import budget or select a smaller package.',INVALID_IMPORT_BUDGET:'Enter a positive import budget.',DUPLICATE_JSON_KEY:'module.json has a repeated field.',INVALID_JSON:'module.json is not valid JSON.',INVALID_MANIFEST_FIELDS:'The module manifest has missing or unknown fields.',INCOMPATIBLE_CORE_API:'This module needs a different Core API.',UNKNOWN_CAPABILITY:'This module requests an unsupported capability.',INVALID_RELEASE_VERSION:'Use a release version in major.minor.patch format.',INCOMPATIBLE_SCHEMA:'The module job or settings schema is incompatible.',INCOMPATIBLE_SETTINGS_SCHEMA:'This update cannot read the current settings.',INCOMPATIBLE_JOB_SCHEMA:'This update cannot read an unfinished job. Existing work is kept.',SAME_VERSION_CHANGED:'These bytes differ from the installed release. Use a higher version.',DOWNGRADE_REJECTED:'This is an older release. The active package is kept.',UNSAFE_PATH:'The ZIP contains an unsafe file path.',PATH_COLLISION:'The ZIP contains duplicate or conflicting paths.',ENCRYPTED_ZIP:'Encrypted module ZIPs are not supported.',NON_REGULAR_ZIP_ENTRY:'The ZIP contains a link or special file.',PAYLOAD_LIST_MISMATCH:'The ZIP files do not match the manifest.',PAYLOAD_HASH_MISMATCH:'A file does not match its manifest hash.',PAYLOAD_SIZE_MISMATCH:'A file does not match its declared size.',ZIP_CRC_MISMATCH:'A ZIP file failed its CRC check.',UNSUPPORTED_EXECUTABLE_DEPENDENCY:'Bundle module code locally without imports.',INVALID_EXECUTABLE:'A module script is invalid or uses an unsupported import.'};
@@ -235,8 +238,9 @@ async function renderJournal(area){
  check.addEventListener('click',async()=>{check.disabled=true;const r=await core('journal.check');check.disabled=false;if(!r.ok)progress.textContent=journalError(r.code);else await update();});
  area.append(node('h3','Recorded work'));const search=field('Search recorded work','journal-filter',view.journalFilter??''),moduleFilter=field('Module ID','journal-module',view.journalModule??''),targetFilter=field('Target ID','journal-target',view.journalTarget??'');
  const severity=node('select');severity.id='journal-severity';severity.setAttribute('aria-label','Severity');for(const value of ['','info','warning','error']){const option=node('option',value||'All severities');option.value=value;severity.append(option);}severity.value=view.journalSeverity??'';area.append(severity);
- const list=node('ol'),next=node('button','Next records');list.id='journal-events';next.id='next-events';let cursor=view.journalCursor??null,nextCursor=null,queryVersion=0;
- const load=async()=>{next.disabled=true;list.setAttribute('aria-busy','true');const version=++queryVersion,filters={};for(const [key,value] of [['moduleId',moduleFilter.value],['targetId',targetFilter.value],['severity',severity.value]])if(value)filters[key]=value;
+ const jobId=location.hash.split('/')[2]==='job'?location.hash.split('/')[3]:null;if(jobId)area.append(node('p','This job: '+jobId));
+ const list=node('ol'),next=node('button','Next records');list.id='journal-events';next.id='next-events';let cursor=jobId?null:view.journalCursor??null,nextCursor=null,queryVersion=0;
+ const load=async()=>{next.disabled=true;list.setAttribute('aria-busy','true');const version=++queryVersion,filters=jobId?{jobId}:{};for(const [key,value] of [['moduleId',moduleFilter.value],['targetId',targetFilter.value],['severity',severity.value]])if(value)filters[key]=value;
   const r=await core('journal.events',{search:search.value,filters,cursor});if(version!==queryVersion||!area.isConnected)return;list.setAttribute('aria-busy','false');list.replaceChildren();if(!r.ok){if(r.code==='STALE_CURSOR'&&cursor){cursor=null;view.journalCursor=null;void persist();return load();}list.append(node('li',journalError(r.code)));next.hidden=true;return;}nextCursor=r.result.cursor;next.hidden=!nextCursor;next.disabled=false;
   for(const event of r.result.rows){const li=node('li'),details=node('details'),summary=node('summary',[event.sequence,event.step,event.result,event.targetId].filter(Boolean).join(' · '));details.append(summary,node('pre',JSON.stringify(event,null,2)));li.append(details);list.append(li);}if(!r.result.rows.length)list.append(node('li','No matching records.'));
  };
