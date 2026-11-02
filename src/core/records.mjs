@@ -243,6 +243,8 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
     }),
     view:name=>transact(['views'],'readonly',async s=>{requireCore(id(name),'INVALID_VIEW');const r=await root(s);return (await req(s('views').get([r.dataset,name])))?.value??null;}),
     credentials:{
+      // Private presence checks must not clone a large capture payload.
+      has:name=>transact(['credentials'],'readonly',async s=>{const r=await root(s);return (await req(s('credentials').getKey([r.dataset,name])))!==undefined;}),
       set:(name,value,accountId=null,guard=null)=>transact(['credentials','events','modules','jobs','accounts'],'readwrite',async s=>{requireCore(id(name)&&typeof value==='string'&&(accountId===null||id(accountId)),'INVALID_CREDENTIAL');const r=await root(s);await assertGuard(s,r,guard);requireCore(!guard||guard.accountId===accountId,'INVALID_GUARD');await append(s,r,{step:'SET_CREDENTIAL',result:'COMPLETE'});const old=await req(s('credentials').get([r.dataset,name]));await req(s('credentials').put({key:[r.dataset,name],value,accountId,schema:1,rev:(old?.rev??0)+1,createdAt:old?.createdAt??clock(),updatedAt:clock()}));r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}),
       get:name=>transact(['credentials'],'readonly',async s=>{const r=await root(s);return (await req(s('credentials').get([r.dataset,name])))?.value??null;})
     }

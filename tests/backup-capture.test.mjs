@@ -46,3 +46,9 @@ test('a corrupt chunk during batched verification remains incomplete and preserv
  const root=await f.c.status(),db=await new Promise(resolve=>{const q=indexedDB.open(f.name);q.onsuccess=()=>resolve(q.result);}),tx=db.transaction('chunks','readwrite'),done=new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});const row=await req(tx.objectStore('chunks').get([root.dataset,source.files[0].blobId,0]));row.bytes[0]^=1;await req(tx.objectStore('chunks').put(row));await done;db.close();await f.drain();
  const s=await f.s.status();assert.equal(s.current.complete,false);assert.equal(s.current.code,'BLOB_HASH_MISMATCH');assert.equal(s.lastGood.jobId,first.jobId);assert.equal(s.lastGood.complete,true);
 });
+test('capture summaries check private presence without reading payloads and surface a removed cut',async t=>{
+ const f=await fixture(t);const first=await f.s.enqueue({requestId:'presence'});await f.drain();const j=await f.c.read('jobs',first.jobId),key=j.fullCapture.receipt.credentialId,get=f.c.credentials.get;let payloadReads=0;
+ f.c.credentials.get=async name=>{if(name===key)payloadReads++;return get(name);};
+ for(let i=0;i<5;i++)assert.equal((await f.s.status()).current.complete,true);assert.equal(payloadReads,0);assert.equal(await f.c.credentials.has(key),true);
+ await f.c.releaseCaptureCut(first.jobId+'-0');assert.equal(await f.c.credentials.has(key),false);const missing=await f.s.status();assert.equal(missing.current.complete,false);assert.equal(missing.current.code,'CAPTURE_DATA_REMOVED');assert.equal(payloadReads,0);
+});

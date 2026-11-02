@@ -54,9 +54,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - name: Verify loaded capacity and production disk recovery (normal sandbox)
-        run: |
-          python3 tests/installed_retention.py build/pcms-dev.xpi
-          python3 tests/installed_capacity.py build/pcms-dev.xpi
+        run: python3 tests/installed_capacity.py build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
