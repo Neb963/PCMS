@@ -46,7 +46,7 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
     deployer=createDeployer({core:value,donor:accountAdapter,inputs:createDeploymentInputs({core:value}),writer:sourceWriter,gitWriter});await deployer.initialize();
     directory=createDirectory({core:value,donor:accountAdapter});await directory.initialize();
     refresher=createRefresher({core:value,directory:directory.projection,sessionNonce:async()=>{if(!api?.storage?.session)return null;const key='pcms-refresher-session';let nonce=(await api.storage.session.get(key))[key];if(!nonce){nonce=crypto.randomUUID();await api.storage.session.set({[key]:nonce});}return nonce;},observe:async(gs,as)=>{const tabs=await api.tabs.query({}),targets=[];for(const g of gs){let files=[],sourceUnavailable=false;try{if(tabs.some(t=>t.url?.startsWith('https://perchance.org/'+g.slug+'#edit')))files=await value.verifySource(g.sourceManifest);}catch{sourceUnavailable=true;}targets.push({id:g.id,slug:g.slug,remoteId:g.remoteId,accountId:g.accountId,files,sourceUnavailable});}return accountAdapter.observeRefresher({accounts:[...as.values()].filter(a=>gs.some(g=>g.accountId===a.id)).map(a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal})),targets});}});await refresher.initialize();
-    refreshSave=createRefreshSave({core:value,writer:sourceWriter,refresher,directory});await refreshSave.recover();
+    refreshSave=createRefreshSave({core:value,writer:sourceWriter,refresher,directory,donor:accountAdapter});await refreshSave.recover();
     backup=createBackup({core:value,donor:accountAdapter,downloads,retention,pins:refreshAccountPins,quiesce:async()=>{if(!scripts)return;let cursor=null;do{const page=await value.list({table:'modules',cursor});for(const row of page.rows){const m=await value.read('modules',row.id),instances=scripts.instances(m);if(instances.length)await scripts.stop(m,{instances,oldGeneration:m.generation});await scripts.unregister(m);}cursor=page.cursor;}while(cursor);},verifyGit:()=>git.verifyRestored(),rebuild:async()=>{await scripts?.rebuild();await modules?.start();await accounts.initialize();await git.initialize();await journal.initialize();await directory.initialize();await refresher.initialize();await schedule(value);}});await backup.initialize();
     journal=createJournal({core:value,downloads,retention});await journal.initialize();if(downloads)await journal.changed();await discover.changed();await backup.changed();await journal.tick();
     if(globalThis.document&&api){
@@ -67,11 +67,12 @@ export function createCoreService({open=openCore,alarms=null,wake=async()=>{},ap
   async function handle(message,sender={}) {
     try {
       const value=await core();let result;
-      if((await value.status()).restoreHold&&['refresher.refresh','directory.check','directory.open','refresher.configure','backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
+      if((await value.status()).restoreHold&&['refresher.open','refresher.refresh','directory.check','directory.open','refresher.configure','backup.export','backup.exportSettings','backup.capture','backup.coverage','accounts.add','accounts.command','creator.override','source.inspect','source.open','source.savePrepare','source.saveRestore','source.saveAdopt','discover.import','discover.command','discover.export','git.configure','git.reconnect'].includes(message?.operation))return {ok:false,code:'RESTORE_MAINTENANCE'};
       switch(message?.operation) {
         case 'directory.status':result=await directory.projection();break;
         case 'directory.check':result=await directory.check();if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'directory.open':result=await directory.open();break;
+        case 'refresher.open':result=await refreshSave.open(message);break;
         case 'refresher.refresh':result=await refreshSave.prepare(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'refresher.check':result=await refreshSave.check(message);if(modules)void modules.turn().catch(()=>{});await schedule(value);break;
         case 'refresher.status':result=await refresher.status(message);break;
