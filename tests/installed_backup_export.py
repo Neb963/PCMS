@@ -49,7 +49,7 @@ def main():
    model=setup_model(sid,ids)
    with zipfile.ZipFile(xpi) as outer:
     with zipfile.ZipFile(io.BytesIO(outer.read('bundled/pcms-backup.zip'))) as package:payload={name:package.read(name) for name in package.namelist()}
-   manifest=json.loads(payload['module.json']);manifest['version']='0.5.0';payload['module.json']=json.dumps(manifest).encode();update=root/'backup-staged.zip'
+   manifest=json.loads(payload['module.json']);manifest['version']='.'.join([*manifest['version'].split('.')[:2],str(int(manifest['version'].split('.')[2])+1)]);payload['module.json']=json.dumps(manifest).encode();update=root/'backup-staged.zip'
    with zipfile.ZipFile(update,'w',compression=zipfile.ZIP_DEFLATED) as package:
     for name,value in payload.items():package.writestr(name,value)
    settings(sid);select(sid,update);click(sid,'#install-module');wait(lambda:'Update staged.' in script(sid,"return document.getElementById('import-result').textContent"))
@@ -75,7 +75,13 @@ def main():
    # Persist a local staging checkpoint and stop the actual browser while the
    # next bounded Blob read is pending. No Downloads call has occurred.
    asyncjs(sid,"""const bg=await browser.runtime.getBackgroundPage(),put=bg.IDBObjectStore.prototype.put,slice=bg.Blob.prototype.slice;bg.__P31_STAGE=false;bg.__P31_BLOCKED=false;bg.IDBObjectStore.prototype.put=function(row){if(this.name==='files'&&row.type==='backup'&&row.state==='STAGING')bg.__P31_STAGE=true;return put.call(this,row);};bg.Blob.prototype.slice=function(...args){const b=slice.apply(this,args);if(bg.__P31_STAGE&&!bg.__P31_BLOCKED){bg.__P31_BLOCKED=true;Object.defineProperty(b,'arrayBuffer',{value:()=>new Promise(()=>{})});}return b;};return true;""")
-   interrupted=request_export(sid);wait(lambda:asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__P31_BLOCKED;"),180);partial=file_receipt(sid,interrupted['jobId']);assert partial['state']=='STAGING' and partial['downloadId'] is None
+   interrupted=request_export(sid)
+   def staging_reached():
+    if asyncjs(sid,"return (await browser.runtime.getBackgroundPage()).__P31_BLOCKED;"):return True
+    current=state(sid)['current']
+    if current and current['jobId']==interrupted['jobId'] and current['state']=='FAILED':raise AssertionError(('STAGING_CAPTURE_FAILED',current['code']))
+    return False
+   wait(staging_reached,180);partial=file_receipt(sid,interrupted['jobId']);assert partial['state']=='STAGING' and partial['downloadId'] is None
    prior=stop(sid,profile);sid=None;sid,_=account_session(binary,profile);assert not prior.intersection(pids(profile));toolbar(sid);dashboard(sid);backup_page(sid);wait(lambda:(state(sid)['current'] or {}).get('jobId')==interrupted['jobId']);assert state(sid)['current']['state']=='STAGING';click(sid,'#backup-export-check');resumed=completed(sid,interrupted['jobId']);assert resumed['state']=='COMPLETE',json.dumps(resumed);resumed_file=file_receipt(sid,interrupted['jobId']);read_archive(disk/resumed_file['filename']);assert (disk/resumed_file['filename']).stat().st_size==resumed_file['bytes'];assert inspect_paused(sid)
    receipt['checks'].append('actual-process-stop-mid-Blob-staging/durable-cut-pin-receipt/restart/actual-Check-export/same-job-and-filename/no-pre-restart-download/independent-production-disk-reopen')
    # Current account contexts require ordinary explicit recovery after restart
@@ -100,6 +106,10 @@ def main():
    if sid:
     try:receipt['status']=coverage(sid)
     except Exception:pass
+    try:
+     receipt['downloadDiagnostics']=asyncjs(sid,"const rows=await browser.downloads.search({});return rows.map(d=>({id:d.id,state:d.state,filename:d.filename,fileSize:d.fileSize,totalBytes:d.totalBytes,bytesReceived:d.bytesReceived,exists:d.exists,byExtensionId:d.byExtensionId,error:d.error}));")
+     receipt['diskDiagnostics']=[{'filename':str(p.relative_to(disk)),'bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest()} for p in disk.rglob('*.pcms.zip')]
+    except Exception as diagnostic:receipt['downloadDiagnosticError']=str(diagnostic)
     try:(OUT/'backup-export-failure.png').write_bytes(base64.b64decode(call('GET',f'/session/{sid}/screenshot')))
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise

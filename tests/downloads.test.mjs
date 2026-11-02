@@ -36,3 +36,7 @@ test('a browser API rejection before start is a failed request, while lost durab
 test('metadata API outage is a typed Unknown and read-only recovery can still complete the same file',async t=>{
  const f=await setup(t),d=f.service();await d.start(f.prepared);const search=f.api.downloads.search;f.api.downloads.search=async()=>{throw Error('private failure');};assert.equal((await d.reconcile(f.prepared.receipt.id)).code,'DOWNLOAD_LOOKUP_FAILED');f.api.downloads.search=search;f.complete();assert.equal((await d.reconcile(f.prepared.receipt.id)).state,'COMPLETE');assert.equal(f.calls(),1);
 });
+test('completed native target size is authoritative when Firefox transfer progress stops early; unknown/wrong/missing targets stay held',async t=>{
+ const f=await setup(t),d=f.service();await d.start(f.prepared);f.complete();f.items[0].bytesReceived=1;assert.equal((await d.reconcile(f.prepared.receipt.id)).state,'COMPLETE');assert.equal(f.calls(),1);
+ for(const patch of [{fileSize:-1},{fileSize:0},{fileSize:f.bytes.length+1},{exists:false},{state:'in_progress'}]){const g=await setup(t),service=g.service();await service.start(g.prepared);g.complete();Object.assign(g.items[0],patch);assert.notEqual((await service.reconcile(g.prepared.receipt.id)).state,'COMPLETE');assert.equal(g.calls(),1);}
+});
