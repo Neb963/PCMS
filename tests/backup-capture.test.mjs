@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cpus,totalmem} from 'node:os';
-import {sha256} from '../src/core/records.mjs';
+import {sha256,req} from '../src/core/records.mjs';
 import {createBackup} from '../src/modules/backup.mjs';
 import {createBackupCapture} from '../src/modules/backup-capture.mjs';
 import {seeded} from './capture-fixture.mjs';
 const event={step:'FIXTURE_FULL_CAPTURE',result:'COMPLETE'};
 async function fixture(t,count=2){
- const {c}=await seeded(t);let calls=0,mode='good',hook=null,bootId='donor-fixture-boot';const watches=new Map();
+ const {c,name}=await seeded(t);let calls=0,mode='good',hook=null,bootId='donor-fixture-boot';const watches=new Map();
  const accounts=[];for(let i=0;i<count;i++)accounts.push({table:'accounts',id:'account-'+String(i).padStart(3,'0'),value:{label:'Account '+i,state:'READY',personaUid:crypto.randomUUID(),containerId:'firefox-container-'+(i+1),routeId:'route-'+i,expectedPrincipal:await sha256(new TextEncoder().encode('owner'+i+'@fixture.test'))}});await c.mutate(accounts,event);
  const donor={
   beginSessionCapture:async(scope,{captureId})=>{calls++;if(hook)await hook();if(mode==='unavailable')return {ok:false,code:'AUTH_CONTEXT_UNAVAILABLE'};const number=Number(scope.accountId.split('-').at(-1)),auth={adapter:'perchance-auth-1',schema:1,origin:'https://perchance.org',userPresent:true,user:{loggedIn:true,email:'owner'+number+'@fixture.test',sessionToken:'secret-'+number+'-雪'},guardPresent:true,sessionTokenLastChangeTime:'100'};const id=crypto.randomUUID(),fingerprint=await sha256(new TextEncoder().encode(JSON.stringify(auth)));watches.set(id,{scope,captureId,bootId,fingerprint});return {ok:true,source:'PCMS_MANAGED_SESSION_1',accountId:scope.accountId,personaUid:scope.personaUid,containerId:scope.containerId,startedAt:Date.now(),observedAt:Date.now(),auth,fingerprint:await sha256(new TextEncoder().encode(JSON.stringify(auth))),cookies:[],watch:{id,bootId,startedAt:Date.now()}};},
@@ -18,7 +18,7 @@ async function fixture(t,count=2){
  await createBackup({core:c,donor}).initialize();const service=createBackupCapture({core:c,donor});
  async function turn(){const j=await c.queue.next();if(!j)return null;const r=await service.effect(j),latest=await c.read('jobs',j.id);if(latest.effect?.boundary!=='POSSIBLE')await c.queue.transition(j.id,r.jobRevision,{state:r.value.state==='COMPLETE'?'COMPLETE':'WAITING',dueAt:Date.now()});return r;}
  async function drain(){for(let i=0;i<count*6+120;i++)if(!await turn())return;throw Error('FINITE_CAPTURE_LIMIT');}
- return {c,s:service,turn,drain,get calls(){return calls;},mode:x=>mode=x,hook:x=>hook=x,lose:()=>{bootId='new-boot';watches.clear();}};
+ return {c,name,s:service,turn,drain,get calls(){return calls;},mode:x=>mode=x,hook:x=>hook=x,lose:()=>{bootId='new-boot';watches.clear();}};
 }
 test('full capture joins private donor/auth sections, immutable Core bytes and previous-complete recovery without leaking secrets',async t=>{
  const f=await fixture(t);await f.c.queue.pause();const first=await f.s.enqueue({requestId:'first'});assert.equal((await f.s.enqueue({requestId:'duplicate'})).jobId,first.jobId);await f.drain();let state=await f.s.status();assert.equal(state.current.complete,true);const job=await f.c.read('jobs',first.jobId),raw=await f.c.credentials.get(job.fullCapture.receipt.credentialId),data=JSON.parse(raw);assert.equal(data.external.sessions.length,2);assert.equal(data.external.donor.storage.local.gmValues.exact,'GM-sentinel');assert.equal(data.external.donor.storage.sync.recovery,'sync-sentinel');assert.equal(data.core.root.paused,true);assert.equal(JSON.stringify(state).includes('private-route-secret'),false);assert.equal(JSON.stringify(state).includes('sessionToken'),false);
@@ -33,4 +33,16 @@ test('donor revision change after Core cut discards only this candidate and leav
 test('S: fifty staged participants permit independent Core progress and measure the short production barrier',async t=>{
  const f=await fixture(t,50);let otherProgress=0;f.hook(async()=>{otherProgress++;await f.c.saveView('independent-work',{count:otherProgress},crypto.randomUUID());});const started=performance.now();await f.s.enqueue({requestId:'scale-fifty'});await f.drain();const s=await f.s.status();assert.equal(s.current.complete,true);assert.equal(f.calls,50);assert.equal(otherProgress,50);assert.equal(s.current.rows.length,50);assert.ok(s.current.receipt.barrierMs<=5000);
  console.log(JSON.stringify({tier:'S/P29/synthetic-participants',participants:50,stagingCalls:f.calls,otherProgress,totalMs:performance.now()-started,barrierMs:s.current.receipt.barrierMs,verifiedBytes:s.current.verifiedBytes,blobs:s.current.receipt.blobs,hardware:{platform:process.platform,arch:process.arch,cpus:cpus().length,memoryBytes:totalmem()}}));
+});
+test('unmanaged rows share bounded local turns while managed reads remain separate and an oversized blob is fully verified',async t=>{
+ const f=await fixture(t);await f.c.mutate(Array.from({length:48},(_,i)=>({table:'accounts',id:'unmanaged-'+String(i).padStart(2,'0'),value:{label:'Not enrolled '+i,state:'LOGIN_REQUIRED'}})),event);
+ const source=await f.c.source([{path:'main.pjs',bytes:new TextEncoder().encode('exact')},{path:'index.html',bytes:new TextEncoder().encode('<p>exact</p>')},{path:'src/oversized.bin',bytes:new Uint8Array(5*1024*1024+7)}]);await f.c.mutate([{table:'generators',id:'retained',value:{sourceManifest:source.manifestId},refs:source.refs}],event);await f.c.releasePin(source.pinId);await f.c.queue.pause();await f.s.enqueue({requestId:'bounded-local'});
+ let turns=0;while(await f.turn()){turns++;assert.ok(turns<25,'local bookkeeping must not consume a turn per unmanaged row or tiny blob');}
+ const s=await f.s.status();assert.ok(s.current.complete);assert.equal(f.calls,2);assert.equal(s.current.rows.filter(r=>r.state==='NOT_REQUIRED').length,48);assert.equal(s.current.rows.filter(r=>r.state==='CAPTURED').length,2);assert.ok(s.current.verifiedBytes>=5*1024*1024+7);assert.ok((await f.c.queue.status()).paused);
+});
+test('a corrupt chunk during batched verification remains incomplete and preserves the preceding complete cut',async t=>{
+ const f=await fixture(t);const first=await f.s.enqueue({requestId:'preceding'});await f.drain();const source=await f.c.source([{path:'src/new.bin',bytes:new Uint8Array([0,255,4])}]);await f.c.mutate([{table:'generators',id:'new-source',value:{sourceManifest:source.manifestId},refs:source.refs}],event);await f.c.releasePin(source.pinId);const next=await f.s.enqueue({requestId:'missing-during-verify'});
+ while((await f.c.read('jobs',next.jobId)).fullCapture?.phase!=='BLOBS')await f.turn();
+ const root=await f.c.status(),db=await new Promise(resolve=>{const q=indexedDB.open(f.name);q.onsuccess=()=>resolve(q.result);}),tx=db.transaction('chunks','readwrite'),done=new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});const row=await req(tx.objectStore('chunks').get([root.dataset,source.files[0].blobId,0]));row.bytes[0]^=1;await req(tx.objectStore('chunks').put(row));await done;db.close();await f.drain();
+ const s=await f.s.status();assert.equal(s.current.complete,false);assert.equal(s.current.code,'BLOB_HASH_MISMATCH');assert.equal(s.lastGood.jobId,first.jobId);assert.equal(s.lastGood.complete,true);
 });

@@ -42,7 +42,11 @@ export function createBackupCapture({core,donor,clock=Date.now}){
    if(c.phase==='BLOBS'){
     const raw=await core.credentials.get(c.receipt.credentialId);check(raw,'CAPTURE_DATA_REMOVED');const data=JSON.parse(raw),blobs=data.core.blobs;
     if(c.cursor===blobs.length){await core.releasePin(c.receipt.pinId);return finish(j);}
-    const b=blobs[c.cursor],bytes=await core.bytes(b.blobId);check(bytes.length===b.bytes,'CAPTURE_BLOB_LENGTH_MISMATCH');await save(j,{...c,cursor:c.cursor+1,verifiedBytes:(c.verifiedBytes??0)+bytes.length});return output(j);
+    let cursor=c.cursor,verifiedBytes=c.verifiedBytes??0,turnBytes=0;
+    // Local verification shares one finite turn for small entries. An entry
+    // larger than the turn budget still gets its own complete byte check.
+    while(cursor<blobs.length&&cursor-c.cursor<200){const b=blobs[cursor];if(cursor>c.cursor&&turnBytes+b.bytes>4*1024*1024)break;const bytes=await core.bytes(b.blobId);check(bytes.length===b.bytes,'CAPTURE_BLOB_LENGTH_MISMATCH');turnBytes+=bytes.length;verifiedBytes+=bytes.length;cursor++;}
+    await save(j,{...c,cursor,verifiedBytes});return output(j);
    }
    if(c.phase==='CUT'){
     const stage=c.results.filter(r=>r.state==='CAPTURED'),accounts=stage.map(r=>({id:r.accountId,revision:r.revision,principalFingerprint:r.principalFingerprint,personaUid:r.personaUid,containerId:r.containerId})),sessions=[];
@@ -66,8 +70,8 @@ export function createBackupCapture({core,donor,clock=Date.now}){
     await save(j,{...c,phase:c.phase==='STAGE'?'CHECK':'CUT',cursor:0});return output(j);
    }
    const p=participants[c.cursor],a=await core.read('accounts',p.id??p.accountId);
-   if(c.phase==='STAGE'&&!p.personaUid){await save(j,{...c,cursor:c.cursor+1,results:[...c.results,{accountId:p.id,label:p.label,state:'NOT_REQUIRED',code:'NO_MANAGED_PERSONA'}]});return output(j);}
-   if(c.phase==='CHECK'&&p.state==='NOT_REQUIRED'){await save(j,{...c,cursor:c.cursor+1});return output(j);}
+   if(c.phase==='STAGE'&&!p.personaUid){let cursor=c.cursor;const results=[...c.results];while(cursor<participants.length&&cursor-c.cursor<200&&!participants[cursor].personaUid){const row=participants[cursor++];results.push({accountId:row.id,label:row.label,state:'NOT_REQUIRED',code:'NO_MANAGED_PERSONA'});}await save(j,{...c,cursor,results});return output(j);}
+   if(c.phase==='CHECK'&&p.state==='NOT_REQUIRED'){let cursor=c.cursor;while(cursor<participants.length&&cursor-c.cursor<200&&participants[cursor].state==='NOT_REQUIRED')cursor++;await save(j,{...c,cursor});return output(j);}
    if(!a||a.state!=='READY'||a.admission||a.personaUid!==p.personaUid||a.containerId!==p.containerId||a.expectedPrincipal!==p.principalFingerprint){if(c.phase==='STAGE'){await save(j,{...c,cursor:c.cursor+1,results:[...c.results,{accountId:p.id,label:p.label,state:'INCOMPLETE',code:'CAPTURE_ACCOUNT_CHANGED'}]});return output(j);}return retry(j,'CAPTURE_ACCOUNT_CHANGED',p);}
    if(c.phase==='CHECK'&&a.rev!==p.revision)return retry(j,'CAPTURE_ACCOUNT_CHANGED',p);
    const report=await read(j,a,reconcile);j=await core.read('jobs',j.id);if(!report)return output(j);if(j.effect?.boundary==='POSSIBLE')return output(j,'HELD','CAPTURE_READ_UNKNOWN');
