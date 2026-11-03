@@ -72,45 +72,68 @@ def complete_restore(sid):
   return None
  return wait(get,240)
 
+def held_context_groups(tabs,held,containers):
+ # A container alone is not a close authority. Every member of a selected
+ # container/URL group must be in the exact gate receipt; duplicates otherwise
+ # remain ambiguous and are never guessed from WebDriver window order.
+ from collections import Counter
+ by_id={t['id']:t for t in tabs};ids={c['tabId'] for c in held}
+ assert held and len(ids)==len(held) and ids<=set(by_id),'HELD_CONTEXT_MISSING'
+ assert all(by_id[c['tabId']]['cookieStoreId']==c['containerId'] for c in held),'HELD_CONTEXT_CONTAINER_CHANGED'
+ selected=[by_id[id] for id in ids]
+ assert all(t['cookieStoreId'] in containers and t['url'].startswith('https://perchance.org/') for t in selected),'HELD_CONTEXT_OUTSIDE_FIXTURE_SCOPE'
+ groups=Counter((t['cookieStoreId'],t['url']) for t in selected)
+ for key,count in groups.items():
+  assert sum((t.get('cookieStoreId'),t.get('url'))==key for t in tabs)==count,('AMBIGUOUS_HELD_CONTEXT_GROUP',key)
+ return groups
+
 def close_clean_fixture_contexts(sid,held,owned,receipt):
  # This is the fixture human's explicit close after preserving the evidence.
- # Never close an unknown origin/container/document or discard dirty work.
+ # Never close an unheld, unknown, ambiguous or dirty document.
  containers={a['containerId'] for a in owned}
- assert held and all(c['containerId'] in containers for c in held)
- preserved=[]
+ assert all(any(a['id']==c['accountId'] and a['containerId']==c['containerId'] for a in owned) for c in held),'HELD_CONTEXT_ACCOUNT_CHANGED'
+ tabs=asyncjs(sid,"return (await browser.tabs.query({})).map(t=>({id:t.id,cookieStoreId:t.cookieStoreId,url:t.url}));")
+ groups=held_context_groups(tabs,held,containers);preserved=[]
+ readonly={'/'+NEW:'Independent created output','/'+TAKEN:RESERVED,'/'+UNKNOWN:'Unrecognized provider response'}
  for handle in call('GET',f'/session/{sid}/window/handles'):
   call('POST',f'/session/{sid}/window',{'handle':handle})
   if script(sid,'return location.origin')!='https://perchance.org':continue
   context(sid,'chrome')
   uid=script(sid,'return gBrowser.selectedBrowser.browsingContext?.currentWindowGlobal?.documentPrincipal?.originAttributes?.userContextId')
-  context(sid,'content');container='firefox-container-'+str(uid)
-  if container not in containers:continue
-  evidence=asyncjs(sid,"""const login=!!document.getElementById('fixture-signin');
-   if(login)return {kind:'disposable-fixture-login',url:location.href};
-   if(!document.getElementById('fixture-source-model')||!window.srcState)return {unknown:true};
+  context(sid,'content');container='firefox-container-'+str(uid);url=script(sid,'return location.href');key=(container,url)
+  if not groups.get(key):continue
+  evidence=asyncjs(sid,"""const url=location.href,login=!!document.getElementById('fixture-signin');
+   if(login)return {kind:'disposable-fixture-login',url};
+   if(!document.getElementById('fixture-source-model')||!window.srcState){
+    const expected=arguments[0][location.pathname],text=document.body.innerText.trim();
+    if(expected&&text===expected&&!document.querySelector('input,textarea,select,button,form,iframe,[contenteditable]'))
+     return {kind:'disposable-read-only-fixture-result',url,text};
+    return {unknown:true,url};
+   }
    const clean=!window.__saveInFlight&&modelTextEditor.isClean()&&outputTemplateEditor.isClean()&&
     !(await srcState.isDirty())&&!srcState.hasPending()&&!srcState.conflictPaths().length&&
     menuBar.saveState==='saved'&&(!window.fixtureAi||document.getElementById('aiAgentStopBtn').hidden);
-   if(!clean)return {dirty:true,url:location.href};
+   if(!clean)return {dirty:true,url};
    const files={};for(const path of srcState.list()){let raw='';for(const n of await srcState.readFile(path))raw+=String.fromCharCode(n);files[path]=btoa(raw);}
-   return {kind:'disposable-clean-native-fixture',url:location.href,model:modelTextEditor.getValue(),html:outputTemplateEditor.getValue(),files,
-    chat:window.fixtureAi?{messages:document.getElementById('aiAgentMsgsEl').textContent,input:document.getElementById('aiAgentInputEl').value,sends:fixtureAi.sends,session:srcState.getDraftChatSid()}:null};""")
+   return {kind:'disposable-clean-native-fixture',url,model:modelTextEditor.getValue(),html:outputTemplateEditor.getValue(),files,
+    chat:window.fixtureAi?{messages:document.getElementById('aiAgentMsgsEl').textContent,input:document.getElementById('aiAgentInputEl').value,sends:fixtureAi.sends,session:srcState.getDraftChatSid()}:null};""",[readonly])
+  evidence.setdefault('url',url)
   assert evidence.get('kind') and not evidence.get('dirty') and not evidence.get('unknown'),('FIXTURE_CONTEXT_NOT_SAFE_TO_CLOSE',container,evidence)
-  evidence['containerId']=container;preserved.append(evidence)
+  evidence['containerId']=container;evidence['heldGroupTabIds']=[t['id'] for t in tabs if (t.get('cookieStoreId'),t.get('url'))==key];preserved.append(evidence)
   # Persist all source/chat evidence before closing, even if a later leg fails.
   receipt['preservedRestoreContexts']=preserved
   (OUT/'installed-integrated-contexts.json').write_text(json.dumps(preserved,indent=2)+'\n')
-  call('DELETE',f'/session/{sid}/window')
+  call('DELETE',f'/session/{sid}/window');groups[key]-=1
  dashboard(sid);backup_page(sid)
- assert len(preserved)==len(held),('EXACT_HELD_CONTEXTS_NOT_CLOSED',len(held),len(preserved))
+ assert len(preserved)==len(held) and not any(groups.values()),('EXACT_HELD_CONTEXTS_NOT_CLOSED',len(held),len(preserved))
  return preserved
 
 def catalog(sid):
  script(sid,"location.hash='#generators'");wait(lambda:script(sid,"return !!document.getElementById('catalog-check')"));click(sid,'#catalog-check')
 
-def reveal_discover_results(sid):
+def reveal_discover_results(sid,last=False):
  frame(sid)
- script(sid,"document.getElementById('discover-rows').scrollIntoView({block:'start'});")
+ script(sid,"const rows=document.getElementById('discover-rows');(arguments[0]?rows.lastElementChild:rows).scrollIntoView({block:'start'});",[last])
  top(sid)
 
 def done(sid,version):
@@ -136,7 +159,7 @@ def main():
     from installed_accounts import page as account_page
     account_page(sid,owner);login(sid,owner,email);click(sid,'#account-confirm');settle(sid,owner,'READY')
    owners=[account(sid,id) for id in ids];assert len({a['expectedPrincipal'] for a in owners})==2 and len({a['routeId'] for a in owners})==2 and len({a['containerId'] for a in owners})==2;assert len(modules(sid))==7 and all(m['enabled'] for m in modules(sid));receipt['checks'].append('one-persistent-clean-profile/two-real-UI-Confirm/distinct-principals-containers-routes/seven-enabled')
-   connections(sid);set_input(sid,'#git-repository','fixture/catalog');set_input(sid,'#git-token',TOKEN);click(sid,'#git-save');wait(lambda:'Connection saved' in script(sid,"return document.getElementById('git-result').textContent"));discover(sid);import_batch(sid,NEW+'\n'+TAKEN+'\n'+UNKNOWN,ids[0]);wait(lambda:'UNKNOWN' in script(sid,"return document.getElementById('discover-state').textContent"),75);top(sid);state_matrix(sid,'discover-classified-batch',receipt);state_matrix(sid,'discover-classified-results',receipt,prepare=lambda:reveal_discover_results(sid))
+   connections(sid);set_input(sid,'#git-repository','fixture/catalog');set_input(sid,'#git-token',TOKEN);click(sid,'#git-save');wait(lambda:'Connection saved' in script(sid,"return document.getElementById('git-result').textContent"));discover(sid);import_batch(sid,NEW+'\n'+TAKEN+'\n'+UNKNOWN,ids[0]);wait(lambda:'UNKNOWN' in script(sid,"return document.getElementById('discover-state').textContent"),75);top(sid);state_matrix(sid,'discover-classified-batch',receipt);state_matrix(sid,'discover-classified-results',receipt,prepare=lambda:reveal_discover_results(sid));state_matrix(sid,'discover-unknown-result',receipt,prepare=lambda:reveal_discover_results(sid,True))
    created=wait(lambda:(lambda g:g if g and g.get('creatorState')=='CREATED' else None)(target(sid,NEW)),120);assert created['listing']=='UNLISTED' and created['allocation'] is None and provider.created==1 and [w['kind'] for w in provider.writes]==['CREATE','RENAME'];snapshot=remote.snapshot();folder='generators/'+NEW+'/';assert [p for p in snapshot['files'] if p.startswith(folder)]==[folder+'DEPLOYMENT.md'];assert base64.b64decode(snapshot['files'][folder+'DEPLOYMENT.md']['bytes'])==b'Format: PCMS-1\nVersion: v1\nAction: DEVELOP\nStatus: NOT_READY\n';assert not any(p.startswith(('generators/'+TAKEN+'/','generators/'+UNKNOWN+'/')) for p in snapshot['files']);receipt['checks'].append('actual-Discover-Available-Taken-Unknown/marker-only-Git-preparation/automatic-Creator/one-private-create-and-rename/unlisted-stable-identity/no-negative-folder-or-provider-write')
    ready_unicode_deploy(remote);catalog(sid);deployed=done(sid,'chain-deploy');expected={'main.pjs':b'pinned candidate not saved in P20\n','index.html':b'<p>Pinned selected candidate</p>','src/new.bin':bytes([0,255,128,17]),'src/雪.bin':bytes([255,0,128,42])};assert stored(provider)==expected and not provider.generator['isPrivate'] and deployed['g']['poolMember'] and deployed['g']['writerHold'] is None;assert len(provider.save_requests)==3;cycle=deployed['g']['refreshCycle']['cycleId'];receipt['checks'].append('same-profile/separate-DEPLOY-folder/unlist-full-PJS-HTML-binary-Unicode-source/publication-pool-DONE/independent-bytes/writer-release')
    ready(remote,version='chain-develop',action='DEVELOP');catalog(sid);wait(lambda:len(provider.ai_records)==2,120);wait(lambda:(deployment(sid)['j'] or {}).get('deployment',{}).get('phase')=='AI_RUNNING',90);finish_review(sid,'output\n  Integrated accepted 雪','<p>Integrated accepted 🐈</p>');developed=done(sid,'chain-develop');expected.update({'main.pjs':'output\n  Integrated accepted 雪'.encode(),'index.html':'<p>Integrated accepted 🐈</p>'.encode(),'src/reviewed.bin':bytes([0,255,128,17,42]),**{'src/'+p:INSTRUCTIONS[p] for p in ['specification.md','ui.md','agents.md']}});assert stored(provider)==expected and not provider.generator['isPrivate'] and developed['g']['refreshCycle']['cycleId']==cycle;check_git(remote,expected,INSTRUCTIONS,4);assert remote.snapshot()['files']['README.md']==baseline['files']['README.md'];assert provider.ai_records==[{'action':'NEW_CHAT'},{'action':'SEND','text':INSTRUCTIONS['prompt.md'].decode()},{'action':'STOP'}],provider.ai_records;receipt['checks'].append('same-generator-DEVELOP-update/distinct-src-instructions/exact-native-prompt/real-human-review-Finish/full-source-Git-SOURCE/publication-pool-DONE/preserved-cycle-and-root-instructions')

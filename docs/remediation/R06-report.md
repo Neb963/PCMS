@@ -63,3 +63,6 @@ Prepared explicit Work-route captures from the existing real Creator Unknown, he
 
 
 Run360 new-state pixel review: [iteration10](R06-vision-iteration-10.md) directly inspects five original narrow full images; Preparing/Sleep/folder/preview readable, Discover needs additional real scroll-to-results capture.150 visual-only and126 shared UI captures are not a whole V verdict. Human restore DRAIN/account presentation, healthy Home and explicit Work states require the next exact candidate. Final V OPEN.
+
+
+[Iteration11](R06-vision-iteration-11.md) directly inspects eight exact361 originals: actual healthy Home/paused state, Work Unknown/Git-held/AI review/complete and human restore-context hold are readable. Discover last row needs its own real scroll capture; summary preview copy needs conditional wording after activation. Functional integrated closer fails safely on an unknown document; final restored state and full final V remain open. No capture-only or predecessor result becomes final acceptance.
