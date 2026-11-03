@@ -40,11 +40,13 @@ class Provider(account_fixture.Provider):
 account_fixture.Provider=Provider
 
 def source_state(sid):
- return asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();let cursor=null,found=null;do{const p=await c.list({table:'generators',cursor});for(const r of p.rows)if(r.slug==='existing-sentinel')found=await c.read('generators',r.id);cursor=p.cursor;}while(cursor);if(!found){c.close();return null;}const job=found.sourceJobId?await c.read('jobs',found.sourceJobId):null,files=found.sourceManifest?await c.verifySource(found.sourceManifest):[],previous=found.previousGood?await c.verifySource(found.previousGood):[];const bytes={};for(const f of files){let raw='';const data=await c.bytes(f.blobId);for(const b of data)raw+=String.fromCharCode(b);bytes[f.path]=btoa(raw);}const receipt=job?.inspection?await c.view('source-read:'+job.id+':'+job.inspection.cycle+':'+job.inspection.phase+':'+job.inspection.cursor+':'+(job.inspection.verifyAttempt??0)):null;c.close();return {generator:found,job,files,previous,bytes,receipt};""")
+ return asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();let cursor=null,found=null;do{const p=await c.list({table:'generators',cursor});for(const r of p.rows)if(r.slug==='existing-sentinel')found=await c.read('generators',r.id);cursor=p.cursor;}while(cursor);if(!found){c.close();return null;}const job=found.sourceJobId?await c.read('jobs',found.sourceJobId):null,files=found.sourceManifest?await c.verifySource(found.sourceManifest):[],previous=found.previousGood?await c.verifySource(found.previousGood):[];const bytes={};for(const f of files){let raw='';const data=await c.bytes(f.blobId);for(const b of data)raw+=String.fromCharCode(b);bytes[f.path]=btoa(raw);}const receipt=job?.inspection?await c.view('source-read:'+job.id+':'+job.inspection.cycle+':'+job.inspection.phase+':'+job.inspection.cursor+':'+(job.inspection.verifyAttempt??0)):null;const latest=await c.read('generators',found.id),consistent=latest?.rev===found.rev&&latest.sourceJobId===found.sourceJobId&&latest.sourceManifest===found.sourceManifest;c.close();return {generator:found,job,files,previous,bytes,receipt,consistent};""")
 def completed_source(sid,previous=None):
  state=source_state(sid)
- if state and state['job'] and state['job']['state']=='HELD':raise AssertionError(('SOURCE_INSPECTION_HELD',state['generator'].get('sourceHoldCode'),state.get('receipt')))
- return state if state and state['job'] and state['job']['state']=='COMPLETE' and (previous is None or state['generator']['sourceManifest']!=previous) else None
+ if not state or not state.get('consistent') or not state['job']:return None
+ if state['job']['state']=='HELD':raise AssertionError(('SOURCE_INSPECTION_HELD',state['generator'].get('sourceHoldCode'),state.get('receipt')))
+ g=state['generator'];j=state['job'];i=j.get('inspection') or {}
+ return state if j['state']=='COMPLETE' and i.get('phase')=='COMPLETE' and g.get('sourceState') in ['VERIFIED','EDITOR_ATTENTION'] and g.get('sourceJobId')==j['id'] and g.get('sourceManifest')==i.get('manifestId') and (previous is None or g['sourceManifest']!=previous) else None
 def editor(sid):
  def find():
   for handle in call('GET',f'/session/{sid}/window/handles'):

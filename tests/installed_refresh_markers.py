@@ -49,8 +49,8 @@ def verified(sid,counter,target_id=SLUG):
   if cut['g'].get('refreshMarker',{}).get('counter')==counter and cut['g'].get('refreshLast',{}).get('state')=='VERIFIED':return cut
   return None
  return wait(get,100)
-def assert_bytes(provider,initial,marker,counter):
- files=stored(provider);pjs='// pcms-refresh:'+marker+':'+str(counter)+'\r\n';html='<!-- pcms-refresh:'+marker+':'+str(counter)+' -->';assert files['main.pjs'].count(pjs.encode())==1 and files['index.html'].count(html.encode())==1
+def assert_bytes(provider,initial,marker,counter,pjs_newline='\r\n'):
+ files=stored(provider);pjs='// pcms-refresh:'+marker+':'+str(counter)+pjs_newline;html='<!-- pcms-refresh:'+marker+':'+str(counter)+' -->';assert files['main.pjs'].count(pjs.encode())==1 and files['index.html'].count(html.encode())==1
  assert files['main.pjs'].replace(pjs.encode(),b'')==initial['main.pjs'] and files['index.html'].replace(html.encode(),b'')==initial['index.html']
  for path,expected in initial.items():
   if path.startswith('src/'):assert files[path]==expected,(path,files[path],expected)
