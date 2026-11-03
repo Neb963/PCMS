@@ -66,3 +66,6 @@ Run360 new-state pixel review: [iteration10](R06-vision-iteration-10.md) directl
 
 
 [Iteration11](R06-vision-iteration-11.md) directly inspects eight exact361 originals: actual healthy Home/paused state, Work Unknown/Git-held/AI review/complete and human restore-context hold are readable. Discover last row needs its own real scroll capture; summary preview copy needs conditional wording after activation. Functional integrated closer fails safely on an unknown document; final restored state and full final V remain open. No capture-only or predecessor result becomes final acceptance.
+
+
+[Iteration12](R06-vision-iteration-12.md) directly inspects the exact362 last-Unknown-result PNG: the entire row is now visible with real scrolling and no frame resize. Raw secondary classifier/preparation tokens remain a cosmetic P2. Integrated fixture safely refuses retained chain-free-name; known before/after fixture response handling needs next B. Final complete restore and full final V remain open.

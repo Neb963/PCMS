@@ -94,7 +94,9 @@ def close_clean_fixture_contexts(sid,held,owned,receipt):
  assert all(any(a['id']==c['accountId'] and a['containerId']==c['containerId'] for a in owned) for c in held),'HELD_CONTEXT_ACCOUNT_CHANGED'
  tabs=asyncjs(sid,"return (await browser.tabs.query({})).map(t=>({id:t.id,cookieStoreId:t.cookieStoreId,url:t.url}));")
  groups=held_context_groups(tabs,held,containers);preserved=[]
- readonly={'/'+NEW:'Independent created output','/'+TAKEN:RESERVED,'/'+UNKNOWN:'Unrecognized provider response'}
+ # A checking document keeps its original response after CREATE. Inspect it
+ # as loaded; never reload it merely to make it agree with current inventory.
+ readonly={'/'+NEW:[AVAILABLE,'Independent created output'],'/'+TAKEN:[RESERVED],'/'+UNKNOWN:['Unrecognized provider response']}
  for handle in call('GET',f'/session/{sid}/window/handles'):
   call('POST',f'/session/{sid}/window',{'handle':handle})
   if script(sid,'return location.origin')!='https://perchance.org':continue
@@ -105,10 +107,11 @@ def close_clean_fixture_contexts(sid,held,owned,receipt):
   evidence=asyncjs(sid,"""const url=location.href,login=!!document.getElementById('fixture-signin');
    if(login)return {kind:'disposable-fixture-login',url};
    if(!document.getElementById('fixture-source-model')||!window.srcState){
-    const expected=arguments[0][location.pathname],text=document.body.innerText.trim();
-    if(expected&&text===expected&&!document.querySelector('input,textarea,select,button,form,iframe,[contenteditable]'))
-     return {kind:'disposable-read-only-fixture-result',url,text};
-    return {unknown:true,url};
+    const expected=arguments[0][location.pathname],text=document.body.innerText.trim(),title=document.title,
+     controls=document.querySelectorAll('input,textarea,select,button,form,iframe,[contenteditable]').length;
+    if(expected?.includes(text)&&title==='Integrated slug fixture'&&!controls)
+     return {kind:'disposable-read-only-fixture-result',url,title,text};
+    return {unknown:true,url,title,controls,text:text.slice(0,2000)};
    }
    const clean=!window.__saveInFlight&&modelTextEditor.isClean()&&outputTemplateEditor.isClean()&&
     !(await srcState.isDirty())&&!srcState.hasPending()&&!srcState.conflictPaths().length&&

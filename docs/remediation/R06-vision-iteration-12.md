@@ -1,0 +1,9 @@
+# Installed pixel review — iteration12 PARTIAL; exact362 last result
+
+2026-11-03. Current vision-capable assistant directly inspected the original full PNG at original resolution. Source0b978844d3fcb2968143f24ccbbde7e8e304ff34/XPIe33afe09fe868b9619afb055734c01f43764d7ee53e8f975bd02b5085f826b9d. Early13237864537/ZIP09ed97b21ef895a696bacf962dbe38b6d9292a2aa9897074ec55798f7a4482a1 independently CRC-reopens475 entries. No separate reviewer/model identifier is exposed; all data is disposable fixture data.
+
+| Original path | SHA-256 | Finding |
+|---|---|---|
+| visual/journey-discover-unknown-result/discover-unknown-result-392-full.png | f89ce42d863000542227c417ebc9ecd077bdc8b231c6d5a84ab0cde09f66d007 | The entire final Unknown row, cause and observation timestamp are now visible inside the real scrolled module frame. Available/Taken are retained in other real scroll captures. English classification is clear; raw classifier/preparation tokens remain secondary technical copy, a cosmetic P2. No resize or new check/effect used. |
+
+Independent162-image visual and126-image shared UI capture pass in their scopes. Integrated7b635e4cedfa83b85e600eb3b8b79918a1390dda8aa74f4fae141bbf403af975 again preserves the DRAIN/unchanged dataset/source/effects/no-allocation hold, then refuses chain-free-name. It already preserved/closed exactly held read-only chain-unknown-name and left unheld roots alone. The new URL is established; exact original page text remains unproved because the refusal omitted it. Actual fixture producer independently yields an Available document before CREATE and created output afterward; an already-open document can keep its first snapshot. Next helper accepts only those exact known snapshots with the exact fixture title and no editable/work controls, preserving actual text, and still refuses every unknown/dirty context. Final full-chain, restored screen and full same-artifact V remain open.
