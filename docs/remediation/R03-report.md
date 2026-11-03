@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R02 `cd6ed32c69afcae029148fdddca8e44a2b091e1f` / tree `16e5032cc274c81e21db5b0045cb7fb95f992726`. Authorities unchanged. Plan committed before R03 code.
 
-**Status: FIXED_PENDING_B / PARTIAL. No live H claim.**
+**Status: FIXED_VERIFIED at T + installed local B/DSK oncd638db8. Final R08/vision remains open; real H NOT TESTED.**
 
 ## Root causes and changes
 
@@ -51,3 +51,9 @@ For an already enrolled explicit REPAIR only, VERIFY now advances to the existin
 Artifact13225424798/ZIP46ed18a09d181f03f6ecc1fe11d3b20923b5fdf17ef3891821fd6121e356f8c6 independently reopens342 entries on sourcea775e392/XPI3514adb5. Route receipt677d3ab647307a54361dc4d45f3d543fd9b9bd3f97d128f6a72a1a270c5586a7 proves two UI-confirmed distinct tuples, actual process restart, typed native outage holds MULLVAD_LOCAL_SERVICE_UNAVAILABLE and automatic real-deadline recovery without Repair/Verify/new containers. A second restart obtains one-account DNS_LEAK_DETECTED while the other is freshly READY; original pixels record that hold. Explicit Repair verifies the route, then IDENTITY holds ACCOUNT_CONTEXT_CHANGED against the stale tab. This corroborates the independently reproduced cold context gap;0c0a56e uses protected OPEN before identity. Both missing and wrong-context document negatives and changed-principal refusal pass T.
 
 The actual donor function now has explicit899/900/901-second, future and changed route/security context tests; the900000ms TTL is unchanged. Prepared installed additions independently return missing DNS evidence, unknown IPv6, and an exit equal to the other account’s IPv4; require isolated original-code holds, unchanged tuples, contextual fresh-proof recovery and ordinary Journal disk causes. Added stage names and immediate workflow receipt upload support exact diagnosis.38 focused account/donor/observation/UI T PASS/5.530s; Python syntax/fixture-response/import/scope smoke PASS, not B. Matching extended installed B remains required; real H stays NOT TESTED.
+
+## Matching359 installed matrix PASS
+
+Sourcecd638db81b6ec99418d65c68906483e469b36d61/treee1ae4b97f7b0edd7b275e3b06fefea15f53c254d, exact XPId24e4d3f2fbcae73143661b8e79fbcec3b8d6bf02ddd6c633f111f7678f49fd4/909455bytes. [Run359](https://github.com/Neb963/PCMS/actions/runs/41628069043) focused288T PASS/69.246s. Immediate route artifact13227321144 ZIP62dac76f2068c54e35ec08975fe8a66cebf2779f8874a5625c637800b18be141 independently CRC-reopens2 files; route receipt2b33066f0e0a26386b53185317ad2333ed2596788a0b58c00ae892f374fb36f8 is PASS and matches source/XPI. Candidate13225889865 ZIP5ccc4821dec9c6566b5b2126798089894ca4820e0f208c28aae9b2f601f09e3e independently CRC-reopens to the clean local XPI byte-for-byte.
+
+All seven route assertions pass: two real confirmed distinct identities/containers/exits; actual process restart and native outage holds followed by automatic deadline recovery without Repair/Verify/new tuple; isolated leaking DNS; missing DNS; unknown IPv6; changed exit equal to the other account’s IPv4; explicit contextual fresh-proof Repair and changed-principal refusal without rebinding. Default Journal’s actual disk reopen passes CRC/range/hashes for sequences1–561, SHAca4d31a6c447ee71c7faf2a77d300481aaa236b5c55923e2f5a546caefe2786e, retaining MULLVAD_LOCAL_SERVICE_UNAVAILABLE/DNS_LEAK_DETECTED/ACCOUNT_IPV6_UNVERIFIED/ACCOUNT_EXIT_CHANGED/ACCOUNT_PRINCIPAL_CHANGED and no session token.18 real state screenshots and6 Tab audits are recorded; pixels are not in the small immediate artifact and still require final V. Source TTL/future/context/unknown-operation tests retain their stated T scope. This closes the changed local R03 recovery/negative gates, not real-host H or overall release qualification.
