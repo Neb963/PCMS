@@ -19,7 +19,7 @@ const messages = {
   BRIDGE_MISSING:'The PersonaMonkey route bridge is not available. Use the existing bridge setup before account work.',
   BRIDGE_UNKNOWN:'The route bridge did not return a status. Work stays blocked.',
   BRIDGE_INCOMPATIBLE:'The route bridge is incompatible. Check the existing bridge installation.',
-  USERSCRIPTS_PERMISSION_REQUIRED:'Firefox has not granted the userscript permission. Module setup will provide that action.',
+  USERSCRIPTS_PERMISSION_REQUIRED:'Allow website scripts in Modules so PCMS can use protected pages.',
   HOST_ONLY:'The host is available. Protected work requires the account route and session checks.',
   STATUS_UNAVAILABLE:'Startup status is unavailable. Restart the clean profile to check again.'
 };
@@ -161,7 +161,7 @@ async function renderOther(area){
 async function renderModuleSettings(area){
  area.append(node('h2','Modules'));const rows=node('div');renderInstall(area,()=>renderModuleRows(rows));
  const permission=await core('modules.permission');
- if(permission.ok&&!permission.result.granted){const button=node('button','Allow website scripts');button.id='allow-userscripts';button.type='button';const result=node('p');result.setAttribute('role','status');button.addEventListener('click',async()=>{try{const granted=await browser.permissions.request({permissions:['userScripts']});result.textContent=granted?'Website scripts allowed.':'Website scripts are still blocked. You can allow them here later.';if(granted){await core('modules.rebuild');if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}}catch{result.textContent='Firefox could not grant website scripts. Check this extension’s permissions.';}});area.append(button,result);}
+ if(permission.ok&&!permission.result.granted){const button=node('button','Allow website scripts');button.id='allow-userscripts';button.type='button';const result=node('p');result.setAttribute('role','status');button.addEventListener('click',async()=>{try{const granted=await browser.permissions.request({permissions:['userScripts']});result.textContent=granted?'Website scripts allowed.':'Website scripts are still blocked. You can allow them here later.';if(granted){await core('modules.rebuild');const refreshed=await core('host.status');if(refreshed.ok)show(refreshed.result);if(location.hash.startsWith('#settings/modules'))await renderRecords('settings');}}catch{result.textContent='Firefox could not grant website scripts. Check this extension’s permissions.';}});area.append(button,result);}
 
  const status=await core('modules.seed.status');
  if(!status.ok){area.append(failure(status.code));}

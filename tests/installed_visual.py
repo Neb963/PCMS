@@ -38,11 +38,13 @@ def main():
   try:
    wait(driver_ready,15);sid,caps=account_session(binary,profile);receipt.update(browserVersion=caps['browserVersion'],buildId=caps.get('moz:buildID'));assert int(caps['browserVersion'].split('.')[0])>=155 and caps['acceptInsecureCerts'] is False
    context(sid,'chrome');script(sid,"Components.classes['@mozilla.org/security/x509certdb;1'].getService(Components.interfaces.nsIX509CertDB).addCertFromBase64(arguments[0],'C,,');return true;",[base64.b64encode(provider.ca).decode()]);prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content');assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid)
-   wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Running'"));state_matrix(sid,'home-idle',receipt)
-   click(sid,'#pause-core');wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Paused'"));state_matrix(sid,'home-paused',receipt);click(sid,'#pause-core');wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Running'"))
+   wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Running'"));state_matrix(sid,'home-permission-needed',receipt)
+   click(sid,'#pause-core');wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Paused'"));state_matrix(sid,'home-permission-needed-paused',receipt);click(sid,'#pause-core');wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Running'"))
    for width in [1280,560,390]:
     viewport(sid,width);click(sid,'nav a[href="#generators"]');wait(lambda:script(sid,"return !!document.getElementById('catalog-search')"));capture(sid,'generators-empty',receipt)
    settings(sid);wait(lambda:script(sid,"return !!document.getElementById('allow-userscripts')"));click(sid,'#allow-userscripts');permission_choice(sid,True);wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"))
+   click(sid,'nav a[href="#home"]');wait(lambda:script(sid,"return document.body.dataset.startup==='HOST_ONLY'&&document.querySelector('.status').hidden;"));state_matrix(sid,'home-healthy-idle',receipt)
+   click(sid,'#pause-core');wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Paused'"));state_matrix(sid,'home-healthy-paused',receipt);click(sid,'#pause-core');wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Running'"))
    owner=add(sid,'Continuity owner');assert provider.prepare_entered.wait(15),'FIXTURE_PREPARE_NOT_OBSERVED'
    try:
     wait(lambda:script(sid,"return document.getElementById('account-state')?.textContent.startsWith('Preparing')"));state_matrix(sid,'account-real-preparing',receipt)
