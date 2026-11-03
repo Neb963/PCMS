@@ -19,7 +19,7 @@ from installed_creator import target
 from installed_accounts import account
 from installed_backup_export import request_export,completed,file_receipt,read_archive
 from installed_backup_sessions import backup_page,inspect_paused
-from installed_restore import restore,select_archive,confirm,census,unrelated,assert_unrelated
+from installed_restore import restore,select_archive,confirm,check_restore,census,unrelated,assert_unrelated
 from installed_journal import journal,inspect as journal_state,read_zip
 from installed_search_contract import run as search_contract
 from installed_long_session import modules
@@ -72,8 +72,46 @@ def complete_restore(sid):
   return None
  return wait(get,240)
 
+def close_clean_fixture_contexts(sid,held,owned,receipt):
+ # This is the fixture human's explicit close after preserving the evidence.
+ # Never close an unknown origin/container/document or discard dirty work.
+ containers={a['containerId'] for a in owned}
+ assert held and all(c['containerId'] in containers for c in held)
+ preserved=[]
+ for handle in call('GET',f'/session/{sid}/window/handles'):
+  call('POST',f'/session/{sid}/window',{'handle':handle})
+  if script(sid,'return location.origin')!='https://perchance.org':continue
+  context(sid,'chrome')
+  uid=script(sid,'return gBrowser.selectedBrowser.browsingContext?.currentWindowGlobal?.documentPrincipal?.originAttributes?.userContextId')
+  context(sid,'content');container='firefox-container-'+str(uid)
+  if container not in containers:continue
+  evidence=asyncjs(sid,"""const login=!!document.getElementById('fixture-signin');
+   if(login)return {kind:'disposable-fixture-login',url:location.href};
+   if(!document.getElementById('fixture-source-model')||!window.srcState)return {unknown:true};
+   const clean=!window.__saveInFlight&&modelTextEditor.isClean()&&outputTemplateEditor.isClean()&&
+    !(await srcState.isDirty())&&!srcState.hasPending()&&!srcState.conflictPaths().length&&
+    menuBar.saveState==='saved'&&(!window.fixtureAi||document.getElementById('aiAgentStopBtn').hidden);
+   if(!clean)return {dirty:true,url:location.href};
+   const files={};for(const path of srcState.list()){let raw='';for(const n of await srcState.readFile(path))raw+=String.fromCharCode(n);files[path]=btoa(raw);}
+   return {kind:'disposable-clean-native-fixture',url:location.href,model:modelTextEditor.getValue(),html:outputTemplateEditor.getValue(),files,
+    chat:window.fixtureAi?{messages:document.getElementById('aiAgentMsgsEl').textContent,input:document.getElementById('aiAgentInputEl').value,sends:fixtureAi.sends,session:srcState.getDraftChatSid()}:null};""")
+  assert evidence.get('kind') and not evidence.get('dirty') and not evidence.get('unknown'),('FIXTURE_CONTEXT_NOT_SAFE_TO_CLOSE',container,evidence)
+  evidence['containerId']=container;preserved.append(evidence)
+  # Persist all source/chat evidence before closing, even if a later leg fails.
+  receipt['preservedRestoreContexts']=preserved
+  (OUT/'installed-integrated-contexts.json').write_text(json.dumps(preserved,indent=2)+'\n')
+  call('DELETE',f'/session/{sid}/window')
+ dashboard(sid);backup_page(sid)
+ assert len(preserved)==len(held),('EXACT_HELD_CONTEXTS_NOT_CLOSED',len(held),len(preserved))
+ return preserved
+
 def catalog(sid):
  script(sid,"location.hash='#generators'");wait(lambda:script(sid,"return !!document.getElementById('catalog-check')"));click(sid,'#catalog-check')
+
+def reveal_discover_results(sid):
+ frame(sid)
+ script(sid,"document.getElementById('discover-rows').scrollIntoView({block:'start'});")
+ top(sid)
 
 def done(sid,version):
  return wait(lambda:(lambda s:s if s['j'] and s['j']['state']=='COMPLETE' and s['j']['deployment']['phase']=='COMPLETE' and s['j']['deployment']['version']==version else None)(deployment(sid)),150)
@@ -98,13 +136,30 @@ def main():
     from installed_accounts import page as account_page
     account_page(sid,owner);login(sid,owner,email);click(sid,'#account-confirm');settle(sid,owner,'READY')
    owners=[account(sid,id) for id in ids];assert len({a['expectedPrincipal'] for a in owners})==2 and len({a['routeId'] for a in owners})==2 and len({a['containerId'] for a in owners})==2;assert len(modules(sid))==7 and all(m['enabled'] for m in modules(sid));receipt['checks'].append('one-persistent-clean-profile/two-real-UI-Confirm/distinct-principals-containers-routes/seven-enabled')
-   connections(sid);set_input(sid,'#git-repository','fixture/catalog');set_input(sid,'#git-token',TOKEN);click(sid,'#git-save');wait(lambda:'Connection saved' in script(sid,"return document.getElementById('git-result').textContent"));discover(sid);import_batch(sid,NEW+'\n'+TAKEN+'\n'+UNKNOWN,ids[0]);wait(lambda:'UNKNOWN' in script(sid,"return document.getElementById('discover-state').textContent"),75);top(sid);state_matrix(sid,'discover-classified-batch',receipt)
+   connections(sid);set_input(sid,'#git-repository','fixture/catalog');set_input(sid,'#git-token',TOKEN);click(sid,'#git-save');wait(lambda:'Connection saved' in script(sid,"return document.getElementById('git-result').textContent"));discover(sid);import_batch(sid,NEW+'\n'+TAKEN+'\n'+UNKNOWN,ids[0]);wait(lambda:'UNKNOWN' in script(sid,"return document.getElementById('discover-state').textContent"),75);top(sid);state_matrix(sid,'discover-classified-batch',receipt);state_matrix(sid,'discover-classified-results',receipt,prepare=lambda:reveal_discover_results(sid))
    created=wait(lambda:(lambda g:g if g and g.get('creatorState')=='CREATED' else None)(target(sid,NEW)),120);assert created['listing']=='UNLISTED' and created['allocation'] is None and provider.created==1 and [w['kind'] for w in provider.writes]==['CREATE','RENAME'];snapshot=remote.snapshot();folder='generators/'+NEW+'/';assert [p for p in snapshot['files'] if p.startswith(folder)]==[folder+'DEPLOYMENT.md'];assert base64.b64decode(snapshot['files'][folder+'DEPLOYMENT.md']['bytes'])==b'Format: PCMS-1\nVersion: v1\nAction: DEVELOP\nStatus: NOT_READY\n';assert not any(p.startswith(('generators/'+TAKEN+'/','generators/'+UNKNOWN+'/')) for p in snapshot['files']);receipt['checks'].append('actual-Discover-Available-Taken-Unknown/marker-only-Git-preparation/automatic-Creator/one-private-create-and-rename/unlisted-stable-identity/no-negative-folder-or-provider-write')
    ready_unicode_deploy(remote);catalog(sid);deployed=done(sid,'chain-deploy');expected={'main.pjs':b'pinned candidate not saved in P20\n','index.html':b'<p>Pinned selected candidate</p>','src/new.bin':bytes([0,255,128,17]),'src/雪.bin':bytes([255,0,128,42])};assert stored(provider)==expected and not provider.generator['isPrivate'] and deployed['g']['poolMember'] and deployed['g']['writerHold'] is None;assert len(provider.save_requests)==3;cycle=deployed['g']['refreshCycle']['cycleId'];receipt['checks'].append('same-profile/separate-DEPLOY-folder/unlist-full-PJS-HTML-binary-Unicode-source/publication-pool-DONE/independent-bytes/writer-release')
    ready(remote,version='chain-develop',action='DEVELOP');catalog(sid);wait(lambda:len(provider.ai_records)==2,120);wait(lambda:(deployment(sid)['j'] or {}).get('deployment',{}).get('phase')=='AI_RUNNING',90);finish_review(sid,'output\n  Integrated accepted 雪','<p>Integrated accepted 🐈</p>');developed=done(sid,'chain-develop');expected.update({'main.pjs':'output\n  Integrated accepted 雪'.encode(),'index.html':'<p>Integrated accepted 🐈</p>'.encode(),'src/reviewed.bin':bytes([0,255,128,17,42]),**{'src/'+p:INSTRUCTIONS[p] for p in ['specification.md','ui.md','agents.md']}});assert stored(provider)==expected and not provider.generator['isPrivate'] and developed['g']['refreshCycle']['cycleId']==cycle;check_git(remote,expected,INSTRUCTIONS,4);assert remote.snapshot()['files']['README.md']==baseline['files']['README.md'];assert provider.ai_records==[{'action':'NEW_CHAT'},{'action':'SEND','text':INSTRUCTIONS['prompt.md'].decode()},{'action':'STOP'}],provider.ai_records;receipt['checks'].append('same-generator-DEVELOP-update/distinct-src-instructions/exact-native-prompt/real-human-review-Finish/full-source-Git-SOURCE/publication-pool-DONE/preserved-cycle-and-root-instructions')
    settings_clock(sid,1,1);check(sid);wait(lambda:measured(sid),100);refresh(sid,provider,target_id=developed['g']['id']);saved=verified(sid,1,target_id=developed['g']['id']);marker=saved['g']['refreshMarker']['id'];assert_bytes(provider,expected,marker,1,pjs_newline='\n');receipt['measuredResponse']=measured_response(sid,saved);receipt['checks'].append('same-profile/actual-rendered-directory/fixed-pin-filter-scope/automatic-Refresher/both-markers/full-byte-neutrality/measured-response')
    search_contract(sid,receipt);journal(sid);before={f['id'] for f in journal_state(sid)['files']};click(sid,'#export-journal');export=wait(lambda:next((f for f in journal_state(sid)['files'] if f['id'] not in before and f['state']=='COMPLETE'),None),60);jm,events=read_zip(disk/export['filename']);assert any(e.get('step')=='UI_QUERY' and e.get('code')=='STORAGE_UNAVAILABLE' for e in events);journal_raw=b''.join(zipfile.ZipFile(disk/export['filename']).read(n) for n in ['manifest.json','events.jsonl','diagnostics.json']);assert TOKEN.encode() not in journal_raw and 'Integrated accepted 雪'.encode() not in journal_raw and all(u['sessionToken'].encode() not in journal_raw for u in provider.logins.values());receipt['journal']={'sha256':export['sha256'],'first':jm['first'],'last':jm['last'],'count':jm['count']};receipt['checks'].append('actual-IDB-query-fault/default-causal-Journal/real-Export/independent-disk-CRC-hashes/no-missing-sequence')
-   backup_page(sid);backup=request_export(sid);assert completed(sid,backup['jobId'])['state']=='COMPLETE';bf=file_receipt(sid,backup['jobId']);path=disk/bf['filename'];manifest,values,binaries=read_archive(path);assert len(manifest['logicalMappings'])==2 and len(values['records/modules.ndjson'])==7 and all(m['enabled'] for m in values['records/modules.ndjson']);archive_hash=hashlib.sha256(path.read_bytes()).hexdigest();assert archive_hash==bf['sha256'];archived_source=next(g for g in values['records/generators.ndjson'] if g.get('slug')==SLUG);expected_hashes={p:hashlib.sha256(b).hexdigest() for p,b in stored(provider).items()};before_saves=len(provider.save_requests);before_git=len(remote.snapshot()['operations']);sentinel=unrelated(sid,'Integrated unrelated');prior=census(sid);old_dataset=restore(sid)['root']['dataset'];select_archive(sid,path);state_matrix(sid,'backup-real-restore-preview',receipt);confirm(sid);restored=complete_restore(sid);control=restored['control'];assert restored['root']['dataset']==control['newDataset'] and control['newDataset']!=old_dataset and restored['root']['paused'] and not restored['root'].get('restoreHold');assert len(control['mappings'])==2 and all(m['allocationReceipt']['fresh'] and m['destinationContainerId'] not in prior for m in control['mappings']);assert all(p['route']['state']=='VALIDATED' and p['login']['state']=='VALIDATED' for p in control['participants']);assert all(m['enabled'] for m in modules(sid));assert_unrelated(sid,sentinel)
+   backup_page(sid);backup=request_export(sid);assert completed(sid,backup['jobId'])['state']=='COMPLETE';bf=file_receipt(sid,backup['jobId']);path=disk/bf['filename'];manifest,values,binaries=read_archive(path);assert len(manifest['logicalMappings'])==2 and len(values['records/modules.ndjson'])==7 and all(m['enabled'] for m in values['records/modules.ndjson']);archive_hash=hashlib.sha256(path.read_bytes()).hexdigest();assert archive_hash==bf['sha256'];archived_source=next(g for g in values['records/generators.ndjson'] if g.get('slug')==SLUG);expected_hashes={p:hashlib.sha256(b).hexdigest() for p,b in stored(provider).items()};before_saves=len(provider.save_requests);before_git=len(remote.snapshot()['operations']);sentinel=unrelated(sid,'Integrated unrelated');prior=census(sid);old_dataset=restore(sid)['root']['dataset'];select_archive(sid,path);state_matrix(sid,'backup-real-restore-preview',receipt);confirmed=confirm(sid)
+   held=wait(lambda:(lambda s:s if s['control']['state']=='DRAIN' and s['control'].get('code')=='RESTORE_EDITOR_INSPECTION_REQUIRED' and s['job']['state']=='HELD' else None)(restore(sid)),45)
+   assert held['root']['dataset']==old_dataset and held['root']['restoreHold']['id']==confirmed['id']
+   assert held['control']['mappings']==[] and held['control']['progress'].get('blobs',0)==0 and held['control']['progress'].get('rows',0)==0
+   assert census(sid)==prior and not held['job']['effect'] and not held['job']['effects']
+   assert {p:hashlib.sha256(b).hexdigest() for p,b in stored(provider).items()}==expected_hashes
+   assert len(provider.save_requests)==before_saves and len(remote.snapshot()['operations'])==before_git
+   receipt['restoreContextHold']={'restoreId':confirmed['id'],'jobId':held['job']['id'],'code':held['control']['code'],'contexts':held['control']['contexts'],'datasetUnchanged':True,'allocationStarted':False,'effectsUnchanged':True}
+   wait(lambda:script(sid,"const buttons=[...document.querySelectorAll('[data-restore-inspect]')];return buttons.length===arguments[0]&&buttons.every(b=>b.getAttribute('aria-label').includes('Integrated '))&&document.getElementById('backup-restore-state').textContent.includes('Current data is still active')",[len(held['control']['contexts'])]))
+   state_matrix(sid,'backup-restore-contexts-held',receipt)
+   close_clean_fixture_contexts(sid,held['control']['contexts'],owners,receipt)
+   assert_unrelated(sid,sentinel)
+   assert not asyncjs(sid,"const ids=arguments[0];return (await browser.tabs.query({})).some(t=>ids.includes(t.id));",[[c['tabId'] for c in held['control']['contexts']]])
+   assert len(provider.save_requests)==before_saves and len(remote.snapshot()['operations'])==before_git
+   receipt['checks'].append('real-DRAIN/editor-inspection-hold/unchanged-dataset-source-effects/no-allocation/preserve-clean-fixture-source-chat/explicit-scoped-human-close/unrelated-context-preserved')
+   check_restore(sid);restored=complete_restore(sid);control=restored['control']
+   assert control['id']==confirmed['id'] and restored['job']['id']==held['job']['id']
+   assert restored['root']['dataset']==control['newDataset'] and control['newDataset']!=old_dataset and restored['root']['paused'] and not restored['root'].get('restoreHold');assert len(control['mappings'])==2 and all(m['allocationReceipt']['fresh'] and m['destinationContainerId'] not in prior for m in control['mappings']);assert all(p['route']['state']=='VALIDATED' and p['login']['state']=='VALIDATED' for p in control['participants']);assert all(m['enabled'] for m in modules(sid));assert_unrelated(sid,sentinel)
    restored_source=target(sid,SLUG);assert restored_source['sourceManifest']==archived_source['sourceManifest'] and restored_source['previousGood']==archived_source['previousGood'];actual_hashes=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),files=await c.verifySource(arguments[0]);c.close();return Object.fromEntries(files.map(f=>[f.path,f.sha256]));",[restored_source['sourceManifest']]);assert actual_hashes==expected_hashes;assert len(provider.save_requests)==before_saves and len(remote.snapshot()['operations'])==before_git;assert hashlib.sha256(path.read_bytes()).hexdigest()==archive_hash;assert provider.unexpected==[] and all(r.get('force') is not True for r in remote.requests());backup_page(sid);state_matrix(sid,'backup-real-restore-complete',receipt);receipt['backup']={'sha256':archive_hash,'bytes':bf['bytes'],'freshMappings':2,'enabledModules':7};receipt['checks'].append('same-profile/full-production-Backup/all-entry-disk-hashes/real-File-Confirm/complete-restore/fresh-containers/validated-distinct-logins-routes/seven-enabled/Pause/unrelated-preserved');receipt['result']='PASS'
   except Exception as error:
    receipt['error']=str(error);receipt['aiRecords']=provider.ai_records;receipt['serverHashes']={p:hashlib.sha256(b).hexdigest() for p,b in stored(provider).items()}

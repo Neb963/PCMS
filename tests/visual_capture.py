@@ -60,13 +60,15 @@ def capture(sid,label,receipt):
  if state['width']>=1200 or state['width']<450:keyboard(sid,label,receipt)
  (directory/'manifest.json').write_text(json.dumps(receipt['screenshots'],indent=2)+'\n')
 
-def state_matrix(sid,label,receipt):
+def state_matrix(sid,label,receipt,prepare=None):
  # Called only after the owning installed journey verified this actual state.
  # Keep every pixel and its real viewport; never replace the operational DOM.
  previous=receipt.get('visualSuite');receipt['visualSuite']='journey-'+label
  try:
   for width in [1280,560,390]:
-   viewport(sid,width);capture(sid,label,receipt)
+   viewport(sid,width)
+   if prepare:prepare()
+   capture(sid,label,receipt)
  finally:
   viewport(sid,1280)
   if previous is None:receipt.pop('visualSuite',None)
