@@ -4,7 +4,11 @@ Status: **BLOCKED / in progress. No operator-ready candidate or release XPI is d
 
 The R08 plan was committed before integration changes (`fd545fc`, based on remote R07 `bef12ba9db4a68b37b439400dfc98379bd3e041e`, tree `514f1c894c564db1681f5e739ba3890a44cb1d47`). Main remains `a3a084dcdb52cb51ff1ef82d1287d18fa7661129`; PR45 is draft and unmerged. No live Perchance/native/content-repository operation was performed. Publication writes are scoped to this authorized implementation repository and non-forced branch/PR operations.
 
-## Current exact-artifact evidence
+## Current361 exact-artifact evidence
+
+PR45 head924480d0cec80cdec6b77a9cfe5dbeebe5715098/tree7f00cff8fdf6ea9c0ebc30e165b526838d5a125c is clean/fetched. Local exact XPI875962d0153edd91910c389ae6917e7f519bfc6dc0d3e736a36402a2ce5ab7c3/909859bytes passes seven-module/donor-first/no-bypass preflight. [Run361](https://github.com/Neb963/PCMS/actions/runs/41643348596) focused288 PASS/78.554s. Candidate13234480712/ZIPd8d50907a8bac269693b3f96d729546edf0c987240d7a48f7e43f0db21fabdc5 independently CRC-reopens two entries and matches local bytes. Full local source suite524 PASS/0fail/378.766s on the same implementation; that source test ran in a dirty worktree and is separate from the subsequent clean artifact preflight. Installed full chain/remaining B/capacity/real-hour/final V are open. Keep361 fixed while original receipts/pixels arrive. No merge/release/operator package.
+
+## Earlier implementation/run evidence
 
 - Prior full source run:497 PASS/0fail. R07 changed boundary:52 focused PASS, Deployer61 PASS. Clean local artifact preflight PASS on identical implementation tree; that local source ID/XPI is not the remote CI artifact.
 - CI41510668203, source2c83d531: focused/default installed Journal/Git writer PASS; Discover FAIL at final provider-scope assertion. All subsequent installed stages skipped. Its artifacts are retained; no failed step is promoted to PASS.

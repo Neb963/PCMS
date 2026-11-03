@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R05 `fc4a2bcf0480fadf3f245c702a65c104e4a58a99` / tree `c6c03a5470b320fde6ec4469cb52eb58959f4966`. Authority unchanged; todo plan preceded code.
 
-**Status: FAIL / BLOCKED — first installed pixel review found blockers; corrected source/capture needs reinspection.**
+**Status: PARTIAL / BLOCKED — historical defects and corrections retained below; final same-artifact pixel/interaction matrix remains open on361.**
 
 ## Baseline pixel review
 
