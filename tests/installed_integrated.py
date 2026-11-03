@@ -87,48 +87,81 @@ def held_context_groups(tabs,held,containers):
   assert sum((t.get('cookieStoreId'),t.get('url'))==key for t in tabs)==count,('AMBIGUOUS_HELD_CONTEXT_GROUP',key)
  return groups
 
+def inspect_fixture_context(sid,readonly):
+ evidence=asyncjs(sid,"""const url=location.href,login=!!document.getElementById('fixture-signin');
+  if(login)return {kind:'disposable-fixture-login',url};
+  if(!document.getElementById('fixture-source-model')||!window.srcState){
+   const expected=arguments[0][location.pathname],text=document.body.innerText.trim(),title=document.title,
+    controls=document.querySelectorAll('input,textarea,select,button,form,iframe,[contenteditable]').length,
+    frames=document.querySelectorAll('iframe');
+   if(location.pathname==='/generators'&&title==='Native directory'&&text==='Unrelated navigation'&&controls===1&&frames.length===1&&frames[0].src===arguments[1]&&frames[0].title==='Recently updated')
+    return {frameInspectionRequired:true,url,title,text,frameUrl:frames[0].src};
+   if(expected?.includes(text)&&title==='Integrated slug fixture'&&!controls)
+    return {kind:'disposable-read-only-fixture-result',url,title,text};
+   return {unknown:true,url,title,controls,text:text.slice(0,2000)};
+  }
+  const clean=!window.__saveInFlight&&modelTextEditor.isClean()&&outputTemplateEditor.isClean()&&
+   !(await srcState.isDirty())&&!srcState.hasPending()&&!srcState.conflictPaths().length&&
+   menuBar.saveState==='saved'&&(!window.fixtureAi||document.getElementById('aiAgentStopBtn').hidden);
+  if(!clean)return {dirty:true,url};
+  const files={};for(const path of srcState.list()){let raw='';for(const n of await srcState.readFile(path))raw+=String.fromCharCode(n);files[path]=btoa(raw);}
+  return {kind:'disposable-clean-native-fixture',url,model:modelTextEditor.getValue(),html:outputTemplateEditor.getValue(),files,
+   chat:window.fixtureAi?{messages:document.getElementById('aiAgentMsgsEl').textContent,input:document.getElementById('aiAgentInputEl').value,sends:fixtureAi.sends,session:srcState.getDraftChatSid()}:null};""",[readonly,'https://'+FRAME+'/generators'])
+ if evidence.get('frameInspectionRequired'):
+  try:
+   element=call('POST',f'/session/{sid}/element',{'using':'css selector','value':'iframe'})['element-6066-11e4-a52e-4f735466cecf']
+   call('POST',f'/session/{sid}/frame',{'id':{'element-6066-11e4-a52e-4f735466cecf':element}})
+   child=script(sid,"""const list=document.getElementById('generatorList'),filter=document.getElementById('native-filter'),more=document.getElementById('more'),
+    controls=[...document.querySelectorAll('input,textarea,select,button,form,iframe,[contenteditable]')];
+    const ok=location.href===arguments[0]&&document.title==='Rendered directory fixture'&&document.designMode!=='on'&&
+     !window.srcState&&!window.modelTextEditor&&!window.outputTemplateEditor&&!window.fixtureAi&&list?.tagName==='UL'&&
+     list.getAttribute('data-revision')?.startsWith('fixture-filtered-')&&filter?.tagName==='SELECT'&&more?.tagName==='BUTTON'&&
+     more.getAttribute('aria-controls')==='generatorList'&&JSON.stringify([...filter.options].map(o=>o.value))===JSON.stringify(['public','all'])&&
+     ['public','all'].includes(filter.value)&&controls.length===2&&controls.every(e=>e===filter||e===more);
+    return {ok:!!ok,url:location.href,title:document.title,controls:controls.map(e=>({tag:e.tagName,id:e.id})),filter:filter?.value,
+     busy:list?.getAttribute('aria-busy'),revision:list?.getAttribute('data-revision'),total:list?.getAttribute('data-total-displayed'),moreHidden:more?.hidden,
+     rows:list?[...list.children].map(li=>({slug:li.getAttribute('data-generator-name'),position:li.getAttribute('aria-posinset'),pinned:li.getAttribute('data-pinned'),text:li.textContent,links:[...li.querySelectorAll('a')].map(a=>({text:a.textContent,href:a.href}))})):[]};""",[evidence['frameUrl']])
+  finally:top(sid)
+  evidence={**evidence,'frame':child}
+  if child.get('ok'):evidence['kind']='disposable-read-only-fixture-directory'
+  else:evidence['unknown']=True
+ return evidence
+
+def fixture_context_location(sid,handle):
+ call('POST',f'/session/{sid}/window',{'handle':handle});top(sid)
+ if script(sid,'return location.origin')!='https://perchance.org':return None
+ context(sid,'chrome');uid=script(sid,'return gBrowser.selectedBrowser.browsingContext?.currentWindowGlobal?.documentPrincipal?.originAttributes?.userContextId');context(sid,'content')
+ return ('firefox-container-'+str(uid),script(sid,'return location.href'))
+
 def close_clean_fixture_contexts(sid,held,owned,receipt):
- # This is the fixture human's explicit close after preserving the evidence.
- # Never close an unheld, unknown, ambiguous or dirty document.
+ # Inspect every held document before closing any. This is an explicit fixture
+ # human action; no production auto-close, reload or dirty/unknown override.
  containers={a['containerId'] for a in owned}
  assert all(any(a['id']==c['accountId'] and a['containerId']==c['containerId'] for a in owned) for c in held),'HELD_CONTEXT_ACCOUNT_CHANGED'
  tabs=asyncjs(sid,"return (await browser.tabs.query({})).map(t=>({id:t.id,cookieStoreId:t.cookieStoreId,url:t.url}));")
- groups=held_context_groups(tabs,held,containers);preserved=[]
- # A checking document keeps its original response after CREATE. Inspect it
- # as loaded; never reload it merely to make it agree with current inventory.
+ remaining=held_context_groups(tabs,held,containers);prepared=[];inventory=[];preserved=[]
  readonly={'/'+NEW:[AVAILABLE,'Independent created output'],'/'+TAKEN:[RESERVED],'/'+UNKNOWN:['Unrecognized provider response']}
+ safe={'disposable-fixture-login','disposable-read-only-fixture-result','disposable-read-only-fixture-directory','disposable-clean-native-fixture'}
+ def describe(key,evidence):return {**evidence,'containerId':key[0],'heldGroupTabIds':[t['id'] for t in tabs if (t.get('cookieStoreId'),t.get('url'))==key]}
+ def materialize():
+  data=json.dumps({'inspected':inventory,'preservedBeforeClose':preserved},indent=2)+'\n';path=OUT/'installed-integrated-contexts.json';path.write_text(data);assert path.read_text()==data
+  receipt['restoreContextInventory']=inventory;receipt['preservedRestoreContexts']=preserved;receipt['restoreContextPreservationFile']={'filename':path.name,'bytes':len(data.encode()),'sha256':hashlib.sha256(data.encode()).hexdigest()}
  for handle in call('GET',f'/session/{sid}/window/handles'):
-  call('POST',f'/session/{sid}/window',{'handle':handle})
-  if script(sid,'return location.origin')!='https://perchance.org':continue
-  context(sid,'chrome')
-  uid=script(sid,'return gBrowser.selectedBrowser.browsingContext?.currentWindowGlobal?.documentPrincipal?.originAttributes?.userContextId')
-  context(sid,'content');container='firefox-container-'+str(uid);url=script(sid,'return location.href');key=(container,url)
-  if not groups.get(key):continue
-  evidence=asyncjs(sid,"""const url=location.href,login=!!document.getElementById('fixture-signin');
-   if(login)return {kind:'disposable-fixture-login',url};
-   if(!document.getElementById('fixture-source-model')||!window.srcState){
-    const expected=arguments[0][location.pathname],text=document.body.innerText.trim(),title=document.title,
-     controls=document.querySelectorAll('input,textarea,select,button,form,iframe,[contenteditable]').length;
-    if(expected?.includes(text)&&title==='Integrated slug fixture'&&!controls)
-     return {kind:'disposable-read-only-fixture-result',url,title,text};
-    return {unknown:true,url,title,controls,text:text.slice(0,2000)};
-   }
-   const clean=!window.__saveInFlight&&modelTextEditor.isClean()&&outputTemplateEditor.isClean()&&
-    !(await srcState.isDirty())&&!srcState.hasPending()&&!srcState.conflictPaths().length&&
-    menuBar.saveState==='saved'&&(!window.fixtureAi||document.getElementById('aiAgentStopBtn').hidden);
-   if(!clean)return {dirty:true,url};
-   const files={};for(const path of srcState.list()){let raw='';for(const n of await srcState.readFile(path))raw+=String.fromCharCode(n);files[path]=btoa(raw);}
-   return {kind:'disposable-clean-native-fixture',url,model:modelTextEditor.getValue(),html:outputTemplateEditor.getValue(),files,
-    chat:window.fixtureAi?{messages:document.getElementById('aiAgentMsgsEl').textContent,input:document.getElementById('aiAgentInputEl').value,sends:fixtureAi.sends,session:srcState.getDraftChatSid()}:null};""",[readonly])
-  evidence.setdefault('url',url)
-  assert evidence.get('kind') and not evidence.get('dirty') and not evidence.get('unknown'),('FIXTURE_CONTEXT_NOT_SAFE_TO_CLOSE',container,evidence)
-  evidence['containerId']=container;evidence['heldGroupTabIds']=[t['id'] for t in tabs if (t.get('cookieStoreId'),t.get('url'))==key];preserved.append(evidence)
-  # Persist all source/chat evidence before closing, even if a later leg fails.
-  receipt['preservedRestoreContexts']=preserved
-  (OUT/'installed-integrated-contexts.json').write_text(json.dumps(preserved,indent=2)+'\n')
-  call('DELETE',f'/session/{sid}/window');groups[key]-=1
+  key=fixture_context_location(sid,handle)
+  if not key or not remaining.get(key):continue
+  evidence=inspect_fixture_context(sid,readonly);evidence.setdefault('url',key[1]);inventory.append(describe(key,evidence));prepared.append((handle,key,evidence));remaining[key]-=1
+ materialize()
+ assert len(prepared)==len(held) and not any(remaining.values()),('EXACT_HELD_CONTEXTS_NOT_INSPECTED',len(held),len(prepared))
+ refused=[v for v in inventory if v.get('kind') not in safe or v.get('dirty') or v.get('unknown')]
+ assert not refused,('FIXTURE_CONTEXTS_NOT_SAFE_TO_CLOSE',refused)
+ for handle,key,prior in prepared:
+  assert fixture_context_location(sid,handle)==key,'HELD_DOCUMENT_CHANGED_BEFORE_CLOSE'
+  evidence=inspect_fixture_context(sid,readonly)
+  assert evidence.get('kind')==prior.get('kind') and evidence.get('kind') in safe and not evidence.get('dirty') and not evidence.get('unknown'),('FIXTURE_CONTEXT_CHANGED_BEFORE_CLOSE',key,evidence)
+  if evidence['kind']=='disposable-clean-native-fixture':assert evidence==prior,'NATIVE_DRAFT_CHANGED_BEFORE_CLOSE'
+  preserved.append(describe(key,evidence));materialize();call('DELETE',f'/session/{sid}/window')
  dashboard(sid);backup_page(sid)
- assert len(preserved)==len(held) and not any(groups.values()),('EXACT_HELD_CONTEXTS_NOT_CLOSED',len(held),len(preserved))
+ assert len(preserved)==len(held),('EXACT_HELD_CONTEXTS_NOT_CLOSED',len(held),len(preserved))
  return preserved
 
 def catalog(sid):

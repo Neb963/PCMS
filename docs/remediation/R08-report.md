@@ -4,6 +4,12 @@ Status: **BLOCKED / in progress. No operator-ready candidate or release XPI is d
 
 The R08 plan was committed before integration changes (`fd545fc`, based on remote R07 `bef12ba9db4a68b37b439400dfc98379bd3e041e`, tree `514f1c894c564db1681f5e739ba3890a44cb1d47`). Main remains `a3a084dcdb52cb51ff1ef82d1287d18fa7661129`; PR45 is draft and unmerged. No live Perchance/native/content-repository operation was performed. Publication writes are scoped to this authorized implementation repository and non-forced branch/PR operations.
 
+## Current363 exact-artifact gate
+
+Source dcc1f57c3b933a2d6a528ac7333ed51e51d71ed7/tree0c52cdc7797504ca1191ad817a704a2dc39674e8 is fetched/clean on PR45. Local XPI727c8a0f16ad619b3ef1d0a99b8a38874d5c4636a72ee03c133558832bff8298/909884bytes passes full preflight. All248 shipping entries match exact362 CI XPI e33afe09 byte-for-byte; only build-identity.json changes. Git src/scripts/vendor/package files are unchanged from0b978844, so its source509+15 coverage is reused with original commands/identity, not a new524-case green invocation. New exact artifact B/V remains mandatory.
+
+[Run363](https://github.com/Neb963/PCMS/actions/runs/41656429222) now executes the independent one-profile rehearsal first after build/preflight and immediately retains its receipt/log. Every other independent check remains selected after failure, long capacity/hour remains success-only and final artifact always retained. Actual fixture producer before/after and exact embedded-script positive/four-negative checks pass, preserving strict exact-held tuple/unknown/dirty gates. No production donor, route, effect, source or validation change. CI-artifact equality/focused/full installed/full-chain/final V/capacity/hour remain open. Keep candidate fixed until original receipts arrive; no release/merge/operator package.
+
 ## Completed362 exact-artifact evidence
 
 Source0b978844d3fcb2968143f24ccbbde7e8e304ff34/treeaa6604e88fef40104be25dd1abfe6913e51db648 is fetched/clean on PR45. Local XPIe33afe09fe868b9619afb055734c01f43764d7ee53e8f975bd02b5085f826b9d/909884bytes passes seven-module/donor-first/no-bypass preflight. [Run362](https://github.com/Neb963/PCMS/actions/runs/41649185239) focused288 PASS/92.722s. Candidate13235424773/ZIP5795e1aecbb45c39a50817483016697f67901084db3bb4268a5e167d69bf6522 independently CRC-reopens two entries and matches local XPI bytes; downloaded CI artifact also passes preflight in the exact-source isolated checkout.
@@ -192,3 +198,12 @@ Early13237864537/ZIP09ed97b21ef895a696bacf962dbe38b6d9292a2aa9897074ec55798f7a44
 
 
 Exact embedded helper-script counterfactuals run under Node VM: both original Available and later-created known snapshots accepted; unknown text, foreign fixture title, interactive controls and unrecognized path refused. This is T/fixture only. Exact held-ID/account/container/URL selection and dirty/unknown refusal remain; original profile/source/effect invariants and same-job real Check remain mandatory. New B must verify preserved actual page text and complete restore.
+
+
+## 363 immediate original and complete inventory correction
+
+Immediate13239733545/ZIPb46fb71b45757e23f4b4d9ca3bdbd74b409318aaaf00759b48465536b100732d independently CRC-reopens2 entries on exact dcc1f57c/727c8a0f. Integratedc1e32918feced8e51f2e4d8587491dcfb1badb473dcba0642b3b54c4f099fe77 proves both exact read-only snapshots now preserved: chain-unknown-name and the original Available response at chain-free-name. It then correctly refuses https://perchance.org/generators, title Native directory, one iframe. DRAIN/source/effects/no-allocation stay protected. This confirms the retained-view cause rather than guessing from current inventory.
+
+Next fixture inspector explicitly validates the known directory shell and configured rendered frame: exact origins/URLs/titles, fixture list revision, native public/all filter and More control only, no native editor/chat globals, extra controls or editable document. It preserves actual filter/rows/links without clicking, fetching or reloading. Every held context is inspected and materialized/reopened before any close; all unknown/dirty contexts are reported together. Each close revalidates identity/type/cleanliness; native source/chat must remain byte-identical to its preserved snapshot. A real local file readback and SHA binds preservation.
+
+Exact embedded parent/child script counterfactuals pass: known shell requires further inspection and has no close authority by itself; foreign frame/extra shell control refused; known read-only child accepted; extra editor control/native editor global/designMode on/foreign child URL/unknown filter refused. Independent helper sequencing proves unknown inventory causes zero closes and the entire inventory is on disk before each known close. These are T/fixture checks, new installed B remains mandatory. Shipping runtime/src/scripts/vendor/package and all donor/effect/TTL/source guards are unchanged. Reuse scoped source509+15/248-entry equivalence, not fabricated new full-suite execution.
