@@ -1,0 +1,540 @@
+{
+  "schema": 1,
+  "scope": "R08 run364 completed CI and interrupted local recovery work",
+  "result": "BLOCKED",
+  "source": "41b5af74923815c84c080f271702239a94e40184",
+  "tree": "241cd18950beb11c58836e1968de7c759bff6866",
+  "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+  "xpiBytes": 909884,
+  "run": {
+    "id": 41661871922,
+    "url": "https://github.com/Neb963/PCMS/actions/runs/41661871922",
+    "jobs": [
+      {
+        "id": 126007633807,
+        "name": "focused",
+        "conclusion": "success",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run npm ci --ignore-scripts",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run npm run build",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run python3 scripts/release-preflight.py build/pcms-dev.xpi",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run node --test tests/host.test.mjs tests/seed.test.mjs tests/modules.test.mjs tests/queue.test.mjs tests/source-writer.test.mjs tests/source-save-native.test.mjs tests/capture-cut.test.mjs tests/records.test.mjs tests/journal.test.mjs tests/retention.test.mjs tests/git-writer.test.mjs tests/remediation-diagnostics.test.mjs tests/git-commit-identity.test.mjs tests/accounts.test.mjs tests/donor-accounts.test.mjs tests/creator-allocation.test.mjs tests/creator-creation.test.mjs tests/deployer.test.mjs tests/ui-queries.test.mjs tests/ui-render-boundary.test.mjs tests/current-rows.test.mjs tests/host-request-diagnostics.test.mjs tests/directory.test.mjs tests/refresher.test.mjs tests/refresh-controller.test.mjs",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      },
+      {
+        "id": 126007634067,
+        "name": "installed",
+        "conclusion": "failure",
+        "steps": [
+          {
+            "name": "Set up job",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/cache@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Prepare qualifying Firefox",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run npm ci --ignore-scripts",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run npm run build",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run python3 scripts/release-preflight.py build/pcms-dev.xpi",
+            "conclusion": "success"
+          },
+          {
+            "name": "R08 one-profile seven-module local rehearsal",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "R01 default diagnostic export, causal faults and disk continuity",
+            "conclusion": "success"
+          },
+          {
+            "name": "R03 actual native outage DNS isolation and changed identity",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "R02 independent Git writer and actual Discover caller",
+            "conclusion": "success"
+          },
+          {
+            "name": "R03-R04 protected local Creator and no-replay integration",
+            "conclusion": "success"
+          },
+          {
+            "name": "R08 full DEPLOY publication pool and DONE",
+            "conclusion": "success"
+          },
+          {
+            "name": "R08 native DEVELOP review Finish and source preservation",
+            "conclusion": "failure"
+          },
+          {
+            "name": "R08 Refresher full-source negative and restart journey",
+            "conclusion": "success"
+          },
+          {
+            "name": "Persistent complete-candidate startup and user registry",
+            "conclusion": "success"
+          },
+          {
+            "name": "Full shared UI, module lifecycle and source recovery",
+            "conclusion": "success"
+          },
+          {
+            "name": "R06 independent actual installed pixel matrix",
+            "conclusion": "success"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Production disk backup and scoped restore activation",
+            "conclusion": "success"
+          },
+          {
+            "name": "R07 installed representative capacity and disk export",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Post Run actions/cache@v4",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "conclusion": "skipped"
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "conclusion": "success"
+          },
+          {
+            "name": "Complete job",
+            "conclusion": "success"
+          }
+        ]
+      }
+    ]
+  },
+  "artifactMetadata": [
+    {
+      "id": 13246936901,
+      "name": "installed-candidate-41b5af74923815c84c080f271702239a94e40184",
+      "bytes": 34466043,
+      "digest": "sha256:8d0ff557a2a94f4c2cbb8f24cc480f28a415c3be42ec837edc1887f526353437",
+      "expired": false,
+      "expiresAt": "2027-02-01T15:14:48Z"
+    },
+    {
+      "id": 13244233754,
+      "name": "visual-41b5af74923815c84c080f271702239a94e40184",
+      "bytes": 33322978,
+      "digest": "sha256:6b7f13ecb026e951af1ec42f26f3ba60fa2ac94233e3ceccf6b42c94b370c6ec",
+      "expired": false,
+      "expiresAt": "2027-02-01T15:14:48Z"
+    },
+    {
+      "id": 13243791347,
+      "name": "integrated-diagnostics-41b5af74923815c84c080f271702239a94e40184",
+      "bytes": 20808,
+      "digest": "sha256:b9789878b744fe319852377996068a62da69d3e4708bf97dce676987d10b2944",
+      "expired": false,
+      "expiresAt": "2027-02-01T15:14:48Z"
+    },
+    {
+      "id": 13243286521,
+      "name": "pcms-candidate-41b5af74923815c84c080f271702239a94e40184",
+      "bytes": 891786,
+      "digest": "sha256:d1d300afb0957901918f57c1781f683985d21d7201b445a544351fd2903647f2",
+      "expired": false,
+      "expiresAt": "2027-02-01T15:14:48Z"
+    },
+    {
+      "id": 13242709242,
+      "name": "route-diagnostics-41b5af74923815c84c080f271702239a94e40184",
+      "bytes": 8488,
+      "digest": "sha256:52d8d8e91c18a381a8175d59534da4def6fcd04e18b4ea5507f0b659572cc727",
+      "expired": false,
+      "expiresAt": "2027-02-01T15:14:48Z"
+    }
+  ],
+  "finalArchiveVerification": "GitHub API metadata retained; final13246936901 ZIP has not been independently downloaded or reopened. Do not infer CRC/content verification.",
+  "logReceiptSummaries": [
+    {
+      "lineZeroBased": 203,
+      "tier": "T/P41/artifact",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "clean-source-and-inner-outer-identity",
+        "retained-ID-permissions-floor-CSP-donor-first",
+        "seven-complete-package-hashes-capabilities",
+        "no-fixture-endpoint-test-bypass-credential-or-legacy-surface"
+      ],
+      "screenshots": 0,
+      "keyboard": 0
+    },
+    {
+      "lineZeroBased": 211,
+      "tier": "B/DSK-one-profile-seven-module-rehearsal",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "one-persistent-clean-profile/two-real-UI-Confirm/distinct-principals-containers-routes/seven-enabled",
+        "actual-Discover-Available-Taken-Unknown/marker-only-Git-preparation/automatic-Creator/one-private-create-and-rename/unlisted-stable-identity/no-negative-folder-or-provider-write",
+        "same-profile/separate-DEPLOY-folder/unlist-full-PJS-HTML-binary-Unicode-source/publication-pool-DONE/independent-bytes/writer-release",
+        "same-generator-DEVELOP-update/distinct-src-instructions/exact-native-prompt/real-human-review-Finish/full-source-Git-SOURCE/publication-pool-DONE/preserved-cycle-and-root-instructions",
+        "same-profile/actual-rendered-directory/fixed-pin-filter-scope/automatic-Refresher/both-markers/full-byte-neutrality/measured-response",
+        "R05-real-IDB/Unicode-case/duplicate-label-distinct-ID/folder-job-exact-navigation/no-match/out-of-order-valid-Core-replies/stale-result-fence/actual-IDB-boundary-failure/explicit-error-preserved-input/retry/default-causal-record",
+        "actual-IDB-query-fault/default-causal-Journal/real-Export/independent-disk-CRC-hashes/no-missing-sequence",
+        "real-DRAIN/editor-inspection-hold/unchanged-dataset-source-effects/no-allocation/preserve-clean-fixture-source-chat/explicit-scoped-human-close/unrelated-context-preserved",
+        "same-profile/full-production-Backup/all-entry-disk-hashes/real-File-Confirm/complete-restore/fresh-containers/validated-distinct-logins-routes/seven-enabled/Pause/unrelated-preserved"
+      ],
+      "screenshots": 48,
+      "keyboard": 16
+    },
+    {
+      "lineZeroBased": 249,
+      "tier": "B/DSK",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "actual-render-construction-TypeError/visible-fixed-alert/failed-not-ready/real-Reload-view/full-Accounts-controls-restored/one-typed-default-Core-record/no-provider-or-account-effect",
+        "actual-invalid-settings-control/unchanged-prior-settings/default-causal-host-rejection/independent-disk-original-code/action-correlation/request-canary-excluded",
+        "R01-default-disk-ZIP/original-Git-cause/mismatched-message/no-replay/route-age-expiry/secret-safe-checkpoint",
+        "actual-Export-now/sandbox-step/Core-Downloads/independent-production-ZIP-CRC-hashes/all-range-records/65-exact-fixture-targets/no-secret/manual-no-watermark",
+        "real-search/later-page/exact-target-filter/details/settings-save",
+        "global-Pause/closed-dashboard/native-event-page-termination/alarm-wake/automatic-disk-export/completion-before-reopen/initial-retained-range",
+        "actual-Disable/no-new-export/Core-recording/actual-Enable/one-coalesced-due-export",
+        "real-browser-process-restart/paused-maintenance-without-dashboard/incremental-no-overlap/no-missed-export-burst",
+        "injected-IDB-receipt-loss-after-real-download/exact-browser-identity-reconciliation/no-second-file",
+        "real-unwritable-relative-destination/error/no-false-completion/watermark-and-earlier-files-preserved/unrelated-sentinel",
+        "R01-actual-Firefox/100k-90day-prefix/single-tail-export/bounded-cursor/real-UI-Downloads-independent-disk"
+      ],
+      "screenshots": 7,
+      "keyboard": 2
+    },
+    {
+      "lineZeroBased": 257,
+      "tier": "B/DSK-R03-native-outage-DNS-isolation-and-principal",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "two-real-UI-enrollments/post-Confirm-distinct-principals-containers-exits/real-process-restart/native-outage/fail-closed-typed-holds/automatic-deadline-recovery/no-Repair-Verify-click/no-new-Persona-or-route",
+        "second-real-process-restart/one-route-DNS-rejection/other-account-verified/unchanged-tuple/explicit-DNS-hold/contextual-Repair-fresh-proof/no-Direct",
+        "real-process-restart/unknown-DNS/DNS_LEAK_DETECTED/other-account-fresh/unchanged-tuple/no-new-container/no-silent-adoption/contextual-Repair-fresh-proof",
+        "real-process-restart/unknown-IPv6/ACCOUNT_IPV6_UNVERIFIED/other-account-fresh/unchanged-tuple/no-new-container/no-silent-adoption/contextual-Repair-fresh-proof",
+        "real-process-restart/changed-duplicate-exit/ACCOUNT_EXIT_CHANGED/other-account-fresh/unchanged-tuple/no-new-container/no-silent-adoption/contextual-Repair-fresh-proof",
+        "real-human-login-change/actual-Open-identity-check/principal-mismatch-held/no-silent-rebind/other-account-usable/remote-source-unchanged",
+        "default-Journal/actual-Export/independent-disk-CRC-range-hashes/original-native-DNS-principal-causes/no-session-token"
+      ],
+      "screenshots": 18,
+      "keyboard": 6
+    },
+    {
+      "lineZeroBased": 296,
+      "tier": "B/actual-Git-plumbing-HTTPS-fixture",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "real-ZIP-caller/page-authority-denied/exact-host-held-target/real-Pause-between-object-calls/nonforced-concurrent-ref-rejection/applied-ref-reply-lost",
+        "real-process-restart/same-operation-readback/no-early-verification/actual-Work-Check/independent-real-Git-commit-parent-tree-blobs/protected-modes-binary-bytes/concurrent-README-preserved/one-reachable-logical-commit/no-ref-replay/duplicate-control-no-new-job-or-write"
+      ],
+      "screenshots": 0,
+      "keyboard": 0
+    },
+    {
+      "lineZeroBased": 297,
+      "tier": "B/actual-Discover-protected-rendered-caller/independent-bare-Git-HTTPS",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "actual-Check-slugs/Available-auto-enqueue/exact-host-held-proof/real-batch-Pause-between-object-calls/one-attributed-commit/marker-only-defaults/unchanged-existing-source-root-instructions-binary-modes/actual-View-generator/catalog-row",
+        "second-Available/applied-ref-body-loss/no-early-verification/real-process-restart/same-operation-actual-Work-readback/no-new-writes/no-completed-classifier-recheck/existing-folder-preserved/Available-date-kept/no-provider-create"
+      ],
+      "screenshots": 0,
+      "keyboard": 0
+    },
+    {
+      "lineZeroBased": 305,
+      "tier": "B/installed-Creator/independent-protected-provider-and-bare-Git",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "actual-folder/Available/private-template/empty-top-level-manifest/create-body-loss/real-Firefox-restart/automatic-protected-renewal-and-recorded-check/same-operation/one-create-one-rename/exact-stable-ID/unlisted/source-preserved",
+        "second-folder/rename-body-loss/real-process-restart/read-both-names/same-stable-ID/one-rename/no-create-or-rename-replay",
+        "ambiguous-inventory/actual-protected-inspection-and-check/retained-reservation/no-replay/independent-Reserved-target-continues-queue/no-write/no-existing-source-or-Git-change",
+        "default-real-Creator-causal-diagnostics/actual-Journal-Export/independent-disk-ZIP/exact-readback-codes-and-operation/no-source-payload"
+      ],
+      "screenshots": 24,
+      "keyboard": 8
+    },
+    {
+      "lineZeroBased": 633,
+      "tier": "B/installed-P22/production-publication-pool-DONE/independent-provider-Git",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "actual-READY/native-unlist/full-source/publication/closed-dashboard/forced-death-after-publication-before-ACK/independent-public-owner-source/pool-atomic/separate-Published-Git-pending/no-publication-replay",
+        "actual-truncated-Git-ref-body/reachable-one-DONE/second-process-death/read-only-commit-recovery/unchanged-source-and-root-files/contextual-Work-Generator-controls/writer-release/no-READY-loop"
+      ],
+      "screenshots": 24,
+      "keyboard": 8
+    },
+    {
+      "lineZeroBased": 991,
+      "tier": "B/installed-P27/full-DEVELOP-first-update/independent-provider-Git",
+      "result": "FAIL",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [],
+      "screenshots": 0,
+      "keyboard": 0
+    },
+    {
+      "lineZeroBased": 1010,
+      "tier": "B/P37/both-markers",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "actual-rendered-directory-demand/automatic-controller/shared-native-guarded-save/both-markers-counter1-then2/no-duplicates/full-independent-root-and-binary-bytes/public-state/previous-good/receipt-separate-from-position",
+        "actual-dirty-human-editor/zero-stage-or-save/preserved-human-text/normal-undo-and-Pause-Resume-recheck",
+        "server-applied-third-save/actual-process-crash/lost-ACK/readback-outage/original-POSSIBLE-and-counter2-retained/normal-route-reverify/real-Check-control/full-readback-resolves-same-operation/counter3/no-resend",
+        "real-Open-protected-editor-after-cold-start/external-version-race/stale-rejection-no-repair/marker-counter-not-advanced/previous-good-and-user-base-preserved/independent-directory-work-continues-on-same-account"
+      ],
+      "screenshots": 12,
+      "keyboard": 4
+    },
+    {
+      "lineZeroBased": 1018,
+      "tier": "B",
+      "result": "PASS",
+      "source": null,
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "persistent-install/real-toolbar-twice/single-dashboard/bridge-missing",
+        "ordered-navigation/actual-settings-click/no-fake-operations",
+        "new-process/persistent-addon/cold-blocked-start",
+        "existing-donor-data-refused-and-preserved"
+      ],
+      "screenshots": 0,
+      "keyboard": 0
+    },
+    {
+      "lineZeroBased": 1019,
+      "tier": "B/P41/complete-candidate-startup",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "fresh-persistent-install/seven-enabled-current-ZIPs/real-Journal-Disable",
+        "real-process-restart/exact-package-registry-and-user-Disable-preserved/no-reseed",
+        "same-candidate/actual-toolbar-single-dashboard/normal-sandbox/cold-bridge-block/existing-donor-refused-with-exact-data-preservation"
+      ],
+      "screenshots": 0,
+      "keyboard": 0
+    },
+    {
+      "lineZeroBased": 1027,
+      "tier": "B/P39/shared-UI",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "narrow560/real-keyboard-Enter/joined-global-later-page-search/exact-Work-and-Journal-links/grouped65-Unknown-observations/Reviewed-retains-original-POSSIBLE-and-unresolved-state",
+        "R05-real-generator-owner-label-search/listing-filter/multi-selection/selected-only/navigation-continuity/default-query-diagnostics",
+        "Work-later-page/filter/row-focus-restored/six-searchable-Settings/Advanced/Other-search/actual-ZIP-install-update-disable-enable/one-pinned-page-Settings-last/module-input-survives/failed-module-contextual-Open-Modules",
+        "actual-FileList-bytes/explicit-folder-metadata/durable-selected-source-no-provider-effect/navigation-and-real-restart-preserve-draft/exact-account-reverification/real-Save-selected-source/independent-full-server-root-binary-readback/one-effect/updated-module-persists",
+        "R06-actual-packaged-primary-settings-module-waiting-search-screens/1280-560-390/hidden-computed-geometry/no-horizontal-overflow/vision-verdict-pending",
+        "R05-real-IDB/Unicode-case/duplicate-label-distinct-ID/folder-job-exact-navigation/no-match/out-of-order-valid-Core-replies/stale-result-fence/actual-IDB-boundary-failure/explicit-error-preserved-input/retry/default-causal-record"
+      ],
+      "screenshots": 126,
+      "keyboard": 42
+    },
+    {
+      "lineZeroBased": 1035,
+      "tier": "B/pixel-capture-NOT-vision-verdict",
+      "result": "CAPTURED — VISION REVIEW REQUIRED",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "actual-protected-source-readback/qualified-P22-pool/real-Settings/directory/30s-adjacent-eligible-Active/actual-Sleep/no-clock-edit/no-provider-save/full-byte-preservation"
+      ],
+      "screenshots": 162,
+      "keyboard": 54
+    },
+    {
+      "lineZeroBased": 1086,
+      "tier": "B/DSK-production-restore-activation",
+      "result": "PASS",
+      "source": "41b5af74923815c84c080f271702239a94e40184",
+      "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+      "checks": [
+        "actual-production-disk-archive/CRC-all-entry-hashes/same-profile-unresolved-write-held-before-native-change/no-false-resolution",
+        "valid-session/real-File-Confirm/fresh-map/early-first-site-script-exact-NUL-auth/actual-cookie-attributes/active-binary-history-draft/packages-disable-Pause/possible-source-job-held/registration-removed/unrelated-preserved/separate-login-route-work-report",
+        "rejected-session/real-File-Confirm/fresh-map/early-first-site-script-exact-NUL-auth/actual-cookie-attributes/active-binary-history-draft/packages-disable-Pause/possible-source-job-held/registration-removed/unrelated-preserved/separate-login-route-work-report",
+        "actual-rejected-session/Complete-login/Confirm/same-mapped-Persona/fresh-independent-identity/no-automatic-source-replay"
+      ],
+      "screenshots": 0,
+      "keyboard": 0
+    }
+  ],
+  "developFailure": {
+    "originalReceiptSha256": "a06d78c9f48c04f5b4d7a4bea815bbf1d254caaa75a131e8d3c35b174b136b02",
+    "error": "('CONDITION_TIMEOUT', False)",
+    "checks": [],
+    "creator": {
+      "id": "52c9ff0b-b50a-41c1-b27b-2e78f29a19f1",
+      "state": "HELD",
+      "rev": 4,
+      "step": "QUEUED",
+      "creator": {
+        "accounts": null,
+        "cursor": 0,
+        "cycle": 0,
+        "observations": [],
+        "phase": "SCAN",
+        "schema": 1
+      },
+      "accountId": null,
+      "effects": [],
+      "recovery": {
+        "action": "OPEN_MODULES",
+        "code": "MODULE_STEP_FAILED"
+      }
+    },
+    "deployer": {
+      "id": "9e245391-f709-491d-9885-ea51db380fba",
+      "state": "WAITING",
+      "rev": 5,
+      "phase": "WAIT_CREATOR",
+      "effects": [],
+      "creatorDependency": {
+        "accountId": null,
+        "action": "OPEN_MODULES",
+        "code": "MODULE_STEP_FAILED",
+        "jobId": "52c9ff0b-b50a-41c1-b27b-2e78f29a19f1",
+        "revision": 4,
+        "state": "HELD"
+      }
+    },
+    "conclusion": "Failed before AI/DEVELOP provider activity. Sandbox discarded original underlying exception; incident root cause remains unproved.",
+    "fixtureError": {
+      "occurrences": 20,
+      "type": "AttributeError",
+      "message": "'Fixture' object has no attribute 'slug_reads'",
+      "file": "tests/installed_discover.py",
+      "line": 19,
+      "callerChain": [
+        "tests/installed_develop_review.py",
+        "tests/installed_source_save.py",
+        "tests/installed_source.py",
+        "tests/installed_discover_preparation.py"
+      ]
+    }
+  },
+  "localRecovery": {
+    "beforeFix": "Actual Core + Creator + opaque module sandbox/host regression injects concurrent generator mutation before START_CREATOR_SCAN. Test observed HELD instead of expected WAITING, with no effects. This reproduces a failure mechanism, not the discarded run364 exception.",
+    "patchStatus": "Local edits were applied to module-host.mjs, module-sandbox.mjs, modules.test.mjs and account_fixture.py immediately before workspace outage. Post-fix test command result and working tree cannot be recovered while environment unavailable. None of these edits is published or qualified.",
+    "requirements": [
+      "Preserve parent-issued, frame-and-step-bound causal reference; never accept module-forged stale code.",
+      "Retry same read-only job only with matching dataset/generation/package/revision and no POSSIBLE or historical write effects.",
+      "Do not overwrite newer progress or replay uncertain effects.",
+      "Record only safe structured failure details; exclude raw messages, stacks, source, tokens and prompts.",
+      "Initialize fixture slug_reads; add immediate standalone DEVELOP receipt, default disk Journal and unique driver log.",
+      "Run generated-build prerequisite then affected and complete source tests; publish only reviewed candidate and repeat exact-artifact B/V/capacity/hour."
+    ]
+  },
+  "interruption": {
+    "status": "workspace unavailable",
+    "error": "exec-server transport disconnected; recovery timed out",
+    "effects": "No subsequent code publication, merge, release or operator guide. PR45 remains draft at41b5af74."
+  },
+  "remaining": [
+    "Standalone DEVELOP",
+    "Full same-artifact visual review",
+    "Representative capacity",
+    "Two actual 30-minute Journal rounds including globally paused second round",
+    "Final closure and qualification"
+  ],
+  "realP42P49": "NOT TESTED"
+}
