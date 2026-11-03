@@ -36,3 +36,7 @@ Final local focused38T PASS/5.530s; strict JS/Python syntax, fixture response/im
 ## Next action
 
 Keep PR45 oncd638db8 while359 finishes the corrected full-chain/Refresher/UI/visual/restore checks. Original358 final13227405361/ZIP4a13590da08d8a9252d813e4b91694dc337a044eac5dfe78408447d08d1b804c CRC353 entries confirms restore PASS; capacity/long-session JSON absent. Do not skip or soften required failures. Complete full one-profile chain and exact final state/accessibility/vision matrix; captures alone are not V. Reuse unchanged356 metrics with source attribution. Merge/deliver the actual tested XPI and concise guide only when every pre-operator gate passes. Never ask for operator piecemeal reproductions or relax source/route/unknown-effect protections.
+
+## Prepared final visual coverage plan (before test edits)
+
+Keep359 fixed. Add actual Preparing capture with a bounded disposable native-fixture barrier (release in finally; no product clock/proof change); real qualified source/pool with30s eligible Active accounting then actual Sleep capture through existing services/Settings/directory, independent unchanged-source/no-save assertions; visible selected folder-only READY/dependency view; and actual Discover batch/Backup preview/completed restore screenshots in the one-profile journey. These additions fill required R06 state gaps; source syntax alone is not B/V. Publish separately while359 continues; do not replace its candidate until original receipts/pixels are inspected.
