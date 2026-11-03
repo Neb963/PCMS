@@ -60,7 +60,15 @@ jobs:
       - name: R03 actual native outage DNS isolation and changed identity
         if: ${{ !cancelled() }}
         run: python3 tests/installed_route_recovery.py build/pcms-dev.xpi
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: route-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            test-results/installed-route-recovery.json
+            test-results/route-recovery-driver.log
       - name: R02 independent Git writer and actual Discover caller
+        if: ${{ !cancelled() }}
         run: |
           python3 tests/installed_git_writer.py build/pcms-dev.xpi
           python3 tests/installed_discover_preparation.py build/pcms-dev.xpi
@@ -109,7 +117,7 @@ jobs:
         if: ${{ !cancelled() }}
         run: python3 tests/installed_restore_activation.py build/pcms-dev.xpi
       - name: R07 installed representative capacity and disk export
-        if: ${{ !cancelled() }}
+        if: ${{ success() }}
         env:
           PCMS_REAL_JOURNAL_ROUNDS: '2'
         run: python3 tests/installed_capacity.py build/pcms-dev.xpi
