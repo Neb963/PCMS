@@ -27,3 +27,5 @@ Latest completed356/source654ed3a/XPI fa349bede1f178a2cc05cbf4b11586d6049de05dfd
 ## 357 evidence and next bounded correction
 
 357/sourcef2770c2/XPI913a3ef2 provides matching local Creator/DEPLOY/DEVELOP/Refresher PASS receipts; exact hashes are in R04/R08. Shared UI/integrated remain FAIL with diagnosed harness range/render-wait causes; historical operator search root remains UNKNOWN. Iteration7 is partial/FAIL with storage-error and Unknown-CREATE wording corrections pending installed reinspection. Added route-negative B remains NOT TESTED. No final qualification.
+
+358/sourcea775e392/XPI3514adb5 has full shared UI/search B PASS with40 Tab audits; historical operator query/root remains UNKNOWN. Route B proves automatic outage recovery and DNS isolation, then fails at stale Repair identity context; the independently reproduced protected OPEN correction and extended negative matrix need matching B. Integrated B passes through Unicode DEPLOY/DEVELOP/STOP/Git, then fails at a slug-versus-record-ID Refresher helper. [Iteration8](R06-vision-iteration-8.md) is partial/FAIL; new selected-account layout/visibility needs exact pixels. No final closure/release.

@@ -12,15 +12,20 @@ BaseProvider=account_fixture.Provider
 class RouteProvider(BaseProvider):
  def do_GET(self):
   f=self.server.fixture;host=self.headers.get('Host','').split(':')[0]
-  with f.lock:bad=self.route==f.bad_dns_route
+  with f.lock:
+   bad=self.route==f.bad_dns_route;unknown=f.unknown_dns;ipv6=self.route==f.unknown_ipv6_route;changed=self.route==f.changed_exit_route
   if bad and host.endswith('.dnsleak.am.i.mullvad.net'):
    with f.lock:f.rejected_dns.append({'routeId':self.route,'host':host})
-   return self.send([{'ip':'9.9.9.9','mullvad_dns':False}])
+   return self.send([{'ip':'9.9.9.9',**({} if unknown else {'mullvad_dns':False})}])
+  if ipv6 and host=='ipv6.am.i.mullvad.net':return self.send({'mullvad_exit_ip':False,'ip':'::'})
+  if changed and host=='ipv4.am.i.mullvad.net':
+   with f.lock:slot=f.exits[f.duplicate_from_route]['slot']
+   return self.send({'mullvad_exit_ip':True,'ip':'8.8.8.'+str(slot)})
   return super().do_GET()
 
 class RouteFixture(Fixture):
  def __init__(self,root):
-  self.bridge_down=False;self.bad_dns_route=None;self.rejected_dns=[]
+  self.bridge_down=False;self.bad_dns_route=None;self.unknown_dns=False;self.unknown_ipv6_route=None;self.changed_exit_route=None;self.duplicate_from_route=None;self.rejected_dns=[]
   super().__init__(root)
  def native(self,message):
   with self.lock:down=self.bridge_down
@@ -51,12 +56,13 @@ def main():
    wait(driver_ready,15);sid,caps=account_session(binary,profile);receipt.update(browserVersion=caps['browserVersion'],buildId=caps.get('moz:buildID'));assert int(caps['browserVersion'].split('.')[0])>=155 and caps['acceptInsecureCerts'] is False
    context(sid,'chrome');script(sid,"Components.classes['@mozilla.org/security/x509certdb;1'].getService(Components.interfaces.nsIX509CertDB).addCertFromBase64(arguments[0],'C,,');Services.prefs.setStringPref('browser.download.dir',arguments[1]);Services.prefs.setIntPref('browser.download.folderList',2);Services.prefs.setBoolPref('browser.download.useDownloadDir',true);return true;",[base64.b64encode(fixture.ca).decode(),str(disk)]);prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content')
    assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid);settings(sid);visible(sid,'#allow-userscripts');click(sid,'#allow-userscripts');permission_choice(sid,True);wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"))
-   owners=[];original={}
+   receipt['stage']='enrollment';owners=[];original={}
    for n in [1,2]:
-    id=add(sid,'Route negative '+str(n));settle(sid,id,'LOGIN_REQUIRED');login(sid,id,'route-'+str(n)+'@fixture.test');visible(sid,'#account-confirm');click(sid,'#account-confirm');a=settle(sid,id,'READY');owners.append(id);original[id]=tuple_of(a)
+    id=add(sid,'Route negative '+str(n));settle(sid,id,'LOGIN_REQUIRED');login(sid,id,'route-'+str(n)+'@fixture.test');visible(sid,'#account-confirm');click(sid,'#account-confirm');a=settle(sid,id,'READY');owners.append(id);original[id]=tuple_of(a);visible(sid,'#account-open');assert script(sid,"return ['account-login','account-confirm','account-repair','account-check'].every(id=>document.getElementById(id).hidden);")
    assert len({v['containerId'] for v in original.values()})==2 and len({v['routeId'] for v in original.values()})==2 and len({json.dumps(v['exitAddresses']) for v in original.values()})==2
    containers=asyncjs(sid,"return (await browser.contextualIdentities.query({})).map(c=>c.cookieStoreId).sort();")
    previous={id:account(sid,id)['flow']['jobId'] for id in owners};old=stop(sid,profile);sid=None
+   receipt['stage']='native-outage'
    with fixture.lock:fixture.bridge_down=True
    sid,_=account_session(binary,profile);assert not old.intersection(pids(profile));toolbar(sid);dashboard(sid);page(sid)
    held=wait(lambda:(lambda rows:rows if len(rows)==2 else None)([a for a in inspect(sid)['accounts'] if a['id'] in owners and a['state']=='HELD' and a.get('holdCode') and a['flow']['purpose']=='RENEW']),100)
@@ -68,11 +74,12 @@ def main():
    assert asyncjs(sid,"return (await browser.contextualIdentities.query({})).map(c=>c.cookieStoreId).sort();")==containers
    receipt['checks'].append('two-real-UI-enrollments/post-Confirm-distinct-principals-containers-exits/real-process-restart/native-outage/fail-closed-typed-holds/automatic-deadline-recovery/no-Repair-Verify-click/no-new-Persona-or-route')
    previous={id:account(sid,id)['flow']['jobId'] for id in owners};old=stop(sid,profile);sid=None
+   receipt['stage']='DNS-hold-and-contextual-repair'
    with fixture.lock:fixture.bad_dns_route=original[owners[0]]['routeId']
    sid,_=account_session(binary,profile);assert not old.intersection(pids(profile));toolbar(sid);dashboard(sid);page(sid)
    dns=wait(lambda:(lambda a:a if a['state']=='HELD' and a.get('holdCode')=='DNS_LEAK_DETECTED' else None)(account(sid,owners[0])),100);assert tuple_of(dns)==original[owners[0]]
    good=wait(lambda:renew_ready(sid,owners[1],previous[owners[1]]),100);assert tuple_of(good)==original[owners[1]] and fixture.rejected_dns
-   page(sid,owners[0]);wait(lambda:script(sid,"return document.getElementById('account-state')?.textContent.startsWith('Needs attention')"));state_matrix(sid,'account-dns-proof-held',receipt)
+   page(sid,owners[0]);wait(lambda:script(sid,"return document.getElementById('account-state')?.textContent.startsWith('Needs attention')"));visible(sid,'#account-repair');assert script(sid,"return ['account-login','account-confirm','account-open','account-check'].every(id=>document.getElementById(id).hidden);");state_matrix(sid,'account-dns-proof-held',receipt)
    with fixture.lock:fixture.bad_dns_route=None
    # A real DNS protection failure remains an explicit hold. Its contextual
    # Repair route action must prove the same binding afresh before admission;
@@ -80,11 +87,26 @@ def main():
    assert account(sid,owners[0])['holdCode']=='DNS_LEAK_DETECTED'
    page(sid,owners[0]);visible(sid,'#account-repair');click(sid,'#account-repair');dashboard(sid);repaired=settle(sid,owners[0],'READY');assert tuple_of(repaired)==original[owners[0]] and repaired['routeObservedAt']>dns['routeObservedAt']
    receipt['checks'].append('second-real-process-restart/one-route-DNS-rejection/other-account-verified/unchanged-tuple/explicit-DNS-hold/contextual-Repair-fresh-proof/no-Direct')
-   login(sid,owners[0],'changed-principal@fixture.test');visible(sid,'#account-open');click(sid,'#account-open');dashboard(sid);changed=settle(sid,owners[0],'HELD','ACCOUNT_PRINCIPAL_CHANGED');assert tuple_of(changed)==original[owners[0]] and account(sid,owners[1])['state']=='READY'
+   for fault,code,index in [('unknown-DNS','DNS_LEAK_DETECTED',0),('unknown-IPv6','ACCOUNT_IPV6_UNVERIFIED',0),('changed-duplicate-exit','ACCOUNT_EXIT_CHANGED',1)]:
+    receipt['stage']=fault;affected=owners[index];other=owners[1-index];previous=account(sid,other)['flow']['jobId'];old=stop(sid,profile);sid=None
+    with fixture.lock:
+     if fault=='unknown-DNS':fixture.bad_dns_route=original[affected]['routeId'];fixture.unknown_dns=True
+     elif fault=='unknown-IPv6':fixture.unknown_ipv6_route=original[affected]['routeId']
+     else:fixture.changed_exit_route=original[affected]['routeId'];fixture.duplicate_from_route=original[other]['routeId']
+    sid,_=account_session(binary,profile);assert not old.intersection(pids(profile));toolbar(sid);dashboard(sid);page(sid)
+    blocked=wait(lambda:(lambda a:a if a['state']=='HELD' and a.get('holdCode')==code else None)(account(sid,affected)),100);good=wait(lambda:renew_ready(sid,other,previous),100)
+    assert tuple_of(blocked)==original[affected] and tuple_of(good)==original[other]
+    if fault=='unknown-IPv6':page(sid,affected);state_matrix(sid,'account-unknown-ipv6-held',receipt)
+    with fixture.lock:fixture.bad_dns_route=None;fixture.unknown_dns=False;fixture.unknown_ipv6_route=None;fixture.changed_exit_route=None;fixture.duplicate_from_route=None
+    assert account(sid,affected)['holdCode']==code;page(sid,affected);visible(sid,'#account-repair');click(sid,'#account-repair');dashboard(sid);fresh=settle(sid,affected,'READY');assert tuple_of(fresh)==original[affected] and fresh['routeObservedAt']>blocked['routeObservedAt']
+    assert asyncjs(sid,"return (await browser.contextualIdentities.query({})).map(c=>c.cookieStoreId).sort();")==containers
+    receipt['checks'].append('real-process-restart/'+fault+'/'+code+'/other-account-fresh/unchanged-tuple/no-new-container/no-silent-adoption/contextual-Repair-fresh-proof')
+   page(sid,owners[0]);visible(sid,'#account-open');click(sid,'#account-open');dashboard(sid);settle(sid,owners[0],'READY')
+   receipt['stage']='changed-principal';login(sid,owners[0],'changed-principal@fixture.test');visible(sid,'#account-open');click(sid,'#account-open');dashboard(sid);changed=settle(sid,owners[0],'HELD','ACCOUNT_PRINCIPAL_CHANGED');assert tuple_of(changed)==original[owners[0]] and account(sid,owners[1])['state']=='READY'
    page(sid,owners[0]);wait(lambda:script(sid,"return document.getElementById('account-state')?.textContent.includes('differs from this account')"));state_matrix(sid,'account-changed-principal-held',receipt)
    assert fixture.receipt()['remoteInventory']==remote_before and fixture.receipt()['unexpected']==[]
    receipt['checks'].append('real-human-login-change/actual-Open-identity-check/principal-mismatch-held/no-silent-rebind/other-account-usable/remote-source-unchanged')
-   journal(sid);before={f['id'] for f in journal_state(sid)['files']};click(sid,'#export-journal');export=wait(lambda:next((f for f in journal_state(sid)['files'] if f['id'] not in before and f['state']=='COMPLETE'),None),60);path=disk/export['filename'];manifest,events=read_zip(path);codes={e.get('code') for e in events};assert 'DNS_LEAK_DETECTED' in codes and 'ACCOUNT_PRINCIPAL_CHANGED' in codes and any(c in codes for c in receipt['nativeOutageCodes'])
+   receipt['stage']='default-Journal-disk';journal(sid);before={f['id'] for f in journal_state(sid)['files']};click(sid,'#export-journal');export=wait(lambda:next((f for f in journal_state(sid)['files'] if f['id'] not in before and f['state']=='COMPLETE'),None),60);path=disk/export['filename'];manifest,events=read_zip(path);codes={e.get('code') for e in events};assert {'DNS_LEAK_DETECTED','ACCOUNT_PRINCIPAL_CHANGED','ACCOUNT_IPV6_UNVERIFIED','ACCOUNT_EXIT_CHANGED'}<=codes and any(c in codes for c in receipt['nativeOutageCodes'])
    import zipfile
    with zipfile.ZipFile(path) as z:
     for name in z.namelist():

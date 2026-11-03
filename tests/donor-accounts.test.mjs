@@ -5,6 +5,15 @@ import {openCore} from '../src/core/records.mjs';
 import {bindingObservation} from '../src/modules/account-observations.mjs';
 import {createDonorAccounts} from '../src/host/donor-accounts.mjs';
 import {accountRouteAllowed,closeAccountPins,refreshAccountPins} from '../src/host/account-pins.mjs';
+import {currentRouteTest,routeTestContext,ROUTE_TEST_MAX_AGE_MS} from '../vendor/personamonkey/extension/lib/persona-intelligence.js';
+test('R03: actual donor proof accepts14:59 and15:00, rejects15:01, future evidence and changed route/security context',()=>{
+ const checkedAt=1700000000000,profile={managed:true,containerId:'firefox-container-1',routeId:'one',killSwitch:true,blockLocalNetwork:true},route={id:'one',provider:'mullvad',enabled:true,host:'10.124.0.1',port:1080},security={ready:true,privacyRequired:true,privacySafe:true,proxyControl:'controlled_by_this_extension',strictProxyVerification:true},entry={context:routeTestContext(profile,route,security),result:{ok:true,checkedAt:new Date(checkedAt).toISOString(),data:{ip:'8.8.8.8'}}};
+ assert.equal(ROUTE_TEST_MAX_AGE_MS,900000);
+ for(const [age,valid] of [[899000,true],[900000,true],[901000,false],[-1,false]])assert.equal(currentRouteTest(profile,route,security,entry,checkedAt+age)?.ok===true,valid);
+ assert.equal(currentRouteTest(profile,{...route,host:'10.124.0.2'},security,entry,checkedAt),null);
+ assert.equal(currentRouteTest(profile,route,{...security,privacySafe:false},entry,checkedAt),null);
+ assert.equal(currentRouteTest(profile,route,security,null,checkedAt),null);
+});
 async function fixture(t){
  closeAccountPins();t.after(closeAccountPins);const core=await openCore({name:'donor-'+crypto.randomUUID()});t.after(()=>core.close());const state={global:{strictProxyVerification:true},profiles:{},routes:{one:{id:'one',provider:'mullvad',host:'10.124.0.1',port:1080,enabled:true}}},verified=new Map(),tabs=new Map(),tags=new Map(),stored=new Map(),effects=[];let permitted=true,changedDocument=false;
  const api={permissions:{contains:async()=>permitted},storage:{local:{get:async k=>({[k]:stored.get(k)})}},contextualIdentities:{query:async()=>Object.keys(state.profiles).map(cookieStoreId=>({cookieStoreId})),get:async id=>{if(!state.profiles[id])throw Error('absent');return {cookieStoreId:id};}},tabs:{remove:async ids=>{effects.push('close-tabs');for(const id of ids)tabs.delete(id);},query:async({cookieStoreId})=>[...tabs.values()].filter(x=>x.cookieStoreId===cookieStoreId),get:async id=>{if(!tabs.has(id))throw Error('absent');return {...tabs.get(id)};},update:async(id,patch)=>{Object.assign(tabs.get(id),patch);return {...tabs.get(id)};}},windows:{update:async()=>({})},sessions:{getTabValue:async id=>tags.get(id),setTabValue:async(id,key,value)=>tags.set(id,value)},scripting:{executeScript:async({target,world,func,args=[]})=>{assert.equal(world,'ISOLATED');assert.deepEqual(target.frameIds,[0]);return [{frameId:0,result:changedDocument&&func.name==='accountDocumentWitness'?'new-document':await func(...args)}];}}};

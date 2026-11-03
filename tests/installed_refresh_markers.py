@@ -1,7 +1,7 @@
 """P37 B: real Refresher controls -> shared source writer -> independent native/server.
 No live provider operations; only disposable protected native/HTTPS fixtures.
 """
-from installed_directory import Provider,FRAME,ORDER,state,page,visibility,measured,check,native_filter,directory_cut
+from installed_directory import Provider,FRAME,ORDER,state,page,visibility,measured,check,native_filter,directory_cut,observer_tabs
 from installed_refresh_clock import settings_clock,pause
 from installed_source_save import configure,editor,dashboard,stored,SLUG,hard_stop
 from installed_source import completed_source
@@ -13,26 +13,39 @@ from visual_capture import state_matrix
 from account_fixture import Fixture
 import account_fixture
 account_fixture.Provider=Provider
-def refresh_cut(sid):
- return asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),g=await c.read('generators',arguments[0]),j=g.sourceSaveJobId?await c.read('jobs',g.sourceSaveJobId):null;c.close();return {g,j};",[SLUG])
-def refresh(sid,provider):
+def refresh_cut(sid,target_id=SLUG):
+ return asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),g=await c.read('generators',arguments[0]);if(!g)throw Error('FIXTURE_GENERATOR_ID_MISSING');const j=g.sourceSaveJobId?await c.read('jobs',g.sourceSaveJobId):null;c.close();return {g,j};",[target_id])
+def refresh(sid,provider,target_id=SLUG):
  # Real competitor movement creates demand; the production controller alone
  # selects and dispatches the next Refresh. No hidden/manual control bypass.
  before=len(provider.save_requests)
- with provider.lock:provider.marker_demand={'before':before,'order':[('competitor-replacement-'+str(i)) if slug==SLUG else slug for i,slug in enumerate(provider.marker_order)]}
+ with provider.lock:
+  order=[('competitor-replacement-'+str(i)) if slug==SLUG else slug for i,slug in enumerate(provider.marker_order)];provider.marker_demand={'before':before,'order':order}
+ # The fixture polls its independent server every500ms. Observe that real
+ # rendered revision before asking PCMS to measure it; a completed snapshot
+ # of the preceding revision is not the new competitor movement.
+ tabs=observer_tabs(sid);assert len(tabs)==1,('FIXTURE_DIRECTORY_OBSERVER_COUNT',len(tabs))
+ selected=None
+ for handle in call('GET',f'/session/{sid}/window/handles'):
+  call('POST',f'/session/{sid}/window',{'handle':handle})
+  if script(sid,"return location.href")=='https://perchance.org/generators':selected=handle;break
+ assert selected,'FIXTURE_DIRECTORY_DOCUMENT_MISSING'
+ frame=call('POST',f'/session/{sid}/element',{'using':'css selector','value':'iframe'})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/frame',{'id':{'element-6066-11e4-a52e-4f735466cecf':frame}})
+ try:wait(lambda:len(provider.save_requests)>before or script(sid,"return document.getElementById('generatorList')?.getAttribute('data-revision')==='fixture-filtered-'+JSON.stringify(arguments[0]);",[order]),100)
+ finally:call('POST',f'/session/{sid}/frame',{'id':None});dashboard(sid)
  check(sid)
  # The rendered frame applies competitor movement asynchronously. Establish
  # that independent demand before waiting for a save, or accept an already
  # applied next save; a stale prior measurement is not the new demand oracle.
- wait(lambda:len(provider.save_requests)>before or (lambda v:v['fresh'] and v['positions'].get(SLUG,{}).get('state')=='NOT_SEEN')(visibility(sid)),100)
+ wait(lambda:len(provider.save_requests)>before or (lambda v:v['fresh'] and v['positions'].get(target_id,{}).get('state')=='NOT_SEEN')(visibility(sid)),100)
 def measured_response(sid,cut):
  def get():
   c=state(sid)['controller'];last=c.get('last') or {}
   return last if not c.get('pending') and last.get('jobId')==cut['j']['id'] and last.get('responded') is True and last.get('observedAt',0)>=cut['g']['refreshLast']['verifiedAt']+5000 else None
  return wait(get,100)
-def verified(sid,counter):
+def verified(sid,counter,target_id=SLUG):
  def get():
-  cut=refresh_cut(sid)
+  cut=refresh_cut(sid,target_id)
   if cut['g'].get('refreshMarker',{}).get('counter')==counter and cut['g'].get('refreshLast',{}).get('state')=='VERIFIED':return cut
   return None
  return wait(get,100)

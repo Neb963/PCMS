@@ -50,3 +50,5 @@ Prepared remaining captures use the existing actual no-result/IDB-failure search
 ## 357 evidence and next bounded correction
 
 [Iteration7](R06-vision-iteration-7.md) reviews three exact357 originals; partial/FAIL. The accessible scrolling search list now passes real Tab traversal and human module labels are visible. Correct the raw storage-error/recovery wording and Unknown-CREATE primary label, then recapture; no functional unknown is resolved by this wording.
+
+[Iteration8](R06-vision-iteration-8.md) directly reviews three original358 PNGs: short storage error/Search-again and Unknown-CREATE primary wording pass in scope; the narrow DNS-held account has a P1 action/hierarchy problem. Prepared selected-detail-first routing, compact list rows and state-appropriate login/Confirm/Repair/Open/Check visibility keep the full cause/evidence and every Core guard. Real Ready/DNS controls are now asserted by the route journey. IPv6/changed-exit failures gain concise causal text.38 relevant account/donor/UI T PASS; matching complete B/new pixels remain pending. No final V is inferred from the132 captured images or44 Tab audits.
