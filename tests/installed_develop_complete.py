@@ -25,6 +25,7 @@ def finish_review(sid,model,html,receipt=None):
  if receipt:
   wait(lambda:script(sid,"const b=document.getElementById('deployment-ai-check'),a=document.getElementById('ai-ready-attestation');return b&&!b.disabled&&a&&!a.parentElement.hidden;"),30)
   state_matrix(sid,'develop-review-readiness-unknown',receipt)
+  job=deployment(sid)['j']['id'];click(sid,'#deployment-detail a[href="#work/'+job+'"]');wait(lambda:script(sid,"return !!document.getElementById('work-job-state')&&!!document.getElementById('deployment-ai-check')"));state_matrix(sid,'work-develop-review-unknown',receipt);click(sid,'#source-work-generator');wait(lambda:script(sid,"return !!document.getElementById('deployment-ai-check')"))
  select_editor(sid,SLUG);wait(lambda:script(sid,"return !!document.getElementById('pcms-finish-publish')&&!document.getElementById('pcms-finish-publish').disabled"));click(sid,'#pcms-finish-ready');click(sid,'#pcms-finish-publish');toolbar(sid);dashboard(sid)
 
 def check_git(remote,expected,instructions,count):
