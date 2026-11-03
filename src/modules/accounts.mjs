@@ -44,9 +44,13 @@ export function createAccounts({core,donor,pins=async()=>{},clock=Date.now}){
    check(binding.routeObservedAt>=flow.startedAt&&binding.routeObservedAt<=clock(),'ACCOUNT_ROUTE_STALE');
    // A verified existing account never silently acquires a different exit.
    if(a.expectedPrincipal&&!await restoredPending(a))check(JSON.stringify(binding.exitAddresses)===JSON.stringify(a.exitAddresses),'ACCOUNT_EXIT_CHANGED');
-   Object.assign(patch,binding);if(flow.purpose==='RENEW')patch.protection={...a.protection,state:'VERIFIED',bootId:(await core.queue.status()).bootId,observedAt:binding.routeObservedAt,nextDue:clock()+RENEW_MS,code:null};flow.stage=flow.purpose==='RENEW'?'READY':['LOGIN','OPEN'].includes(flow.purpose)?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
+   // An enrolled account's explicit repair may follow a cold restart with no
+   // live document. Open its protected context before checking the principal.
+   // Ordinary route-only renewal still creates no tab or identity read.
+   const repairIdentity=flow.purpose==='REPAIR'&&flow.wasReady;
+   Object.assign(patch,binding);if(flow.purpose==='RENEW')patch.protection={...a.protection,state:'VERIFIED',bootId:(await core.queue.status()).bootId,observedAt:binding.routeObservedAt,nextDue:clock()+RENEW_MS,code:null};flow.stage=flow.purpose==='RENEW'?'READY':['LOGIN','OPEN'].includes(flow.purpose)||repairIdentity?'OPEN':flow.confirmationAt!=null||flow.wasReady?'IDENTITY':'OPEN';
   }else if(stage==='OPEN'){
-   check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.openedAt=clock();flow.stage=flow.purpose==='OPEN'?'IDENTITY':flow.purpose==='LOGIN'?'LOGIN_REQUIRED':flow.wasReady?'READY':'LOGIN_REQUIRED';
+   check(Number.isSafeInteger(value.tabId)&&value.tabId>=0&&value.personaUid===a.personaUid&&value.containerId===a.containerId&&value.routeId===a.routeId,'ACCOUNT_CONTEXT_CHANGED');patch.tabId=value.tabId;flow.openedAt=clock();flow.stage=flow.purpose==='OPEN'||flow.purpose==='REPAIR'&&flow.wasReady?'IDENTITY':flow.purpose==='LOGIN'?'LOGIN_REQUIRED':flow.wasReady?'READY':'LOGIN_REQUIRED';
   }else check(false,'ACCOUNT_STAGE_INVALID');
   patch.flow=flow;patch.state=a.admission==='ARCHIVED'?'ARCHIVED':END.has(flow.stage)?flow.stage:'PREPARING';await save(a,patch,'ACCOUNT_'+stage);return result(job,END.has(flow.stage)?'COMPLETE':'CONTINUE');
  }

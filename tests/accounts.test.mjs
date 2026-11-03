@@ -111,3 +111,20 @@ test('R08: current route with no live context queues one original OPEN/identity 
  context=true;await f.drain();assert.equal((await f.accounts.ensureProtection(id,{context:true})).ready,true);const after=await f.core.read('accounts',id);assert.equal(after.state,'READY');assert.equal(after.expectedPrincipal,before.expectedPrincipal);assert.equal(after.personaUid,before.personaUid);assert.equal(after.routeId,before.routeId);assert.deepEqual(f.calls.slice(count),['VERIFY','OPEN']);assert.equal(f.identities(),reads+1);
  context=false;await f.accounts.ensureProtection(id,{context:true});context=true;f.principal('b'.repeat(64));await f.drain();assert.equal((await f.core.read('accounts',id)).holdCode,'ACCOUNT_PRINCIPAL_CHANGED');assert.equal((await f.core.read('accounts',id)).expectedPrincipal,before.expectedPrincipal);
 });
+test('R03: contextual Repair after a cold DNS hold opens the protected document before fresh identity and refuses a changed principal',async t=>{
+ for(const changed of [false,true]){
+  const f=await fixture(t),id=f.id();await f.accounts.add({requestId:id,label:'Cold DNS repair'});await f.drain();await f.accounts.command({id,kind:'CONFIRM',requestId:f.id()});await f.drain();
+  const before=await f.core.read('accounts',id),prepare=f.donor.preparePersona,checkBinding=f.donor.checkBinding,open=f.donor.openProtectedTab;
+  let leaking=true,document=false;
+  f.donor.preparePersona=async(a,args)=>leaking&&args.stage==='VERIFY'?{ok:false,noDispatch:true,code:'DNS_LEAK_DETECTED',stage:args.stage,operationId:args.operationId}:prepare(a,args);
+  f.donor.checkBinding=async(a,args)=>args.stage==='PROTECTION'?{ok:false,code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'}:args.stage==='DOCUMENT_READY'&&!document?{ok:false,code:'ACCOUNT_LOGIN_TAB_MISSING'}:checkBinding(a,args);
+  f.donor.openProtectedTab=async(a,args)=>{const value=await open(a,args);document=true;return value;};
+  await f.restart();await f.accounts.maintain();assert.equal((await f.drain()).code,'DNS_LEAK_DETECTED');assert.equal((await f.accounts.get(id)).state,'HELD');
+  leaking=false;f.advance();if(changed)f.principal('b'.repeat(64));const calls=f.calls.length,reads=f.identities();
+  await f.accounts.command({id,kind:'REPAIR',requestId:f.id()});const outcome=await f.drain(),after=await f.core.read('accounts',id);
+  assert.equal(outcome.state,changed?'HELD':'COMPLETE',JSON.stringify({code:outcome.code,calls:f.calls.slice(calls)}));assert.equal(after.state,changed?'HELD':'READY');if(changed)assert.equal(after.holdCode,'ACCOUNT_PRINCIPAL_CHANGED');
+  assert.deepEqual(f.calls.slice(calls),['VERIFY','OPEN']);assert.equal(f.identities(),reads+1);
+  for(const key of ['personaUid','containerId','routeId','exitAddresses','expectedPrincipal'])assert.deepEqual(after[key],before[key]);
+  assert.equal(f.calls.filter(x=>x==='CREATE').length,1);assert.equal(f.calls.filter(x=>x==='CREATE_ROUTE').length,1);
+ }
+});
