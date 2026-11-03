@@ -29,3 +29,7 @@ Observed B: sourcebef12ba9/XPI87ac1cf4b0afef3cdb6e0d7d0bac01df4e0a80b11a79950304
 ## Additional installed search matrix prepared
 
 Added test-side actual Port-delivery ordering and IndexedDB transaction-failure probes to the existing installed shared-UI journey. Production query/record/render/navigation code is retained. Synthetic records cover mixed-case Unicode owner names, duplicate labels with different IDs, folder and job targets, no matches, stale response rejection, explicit database-error feedback/retry and default correlated query events. This new B matrix is NOT TESTED until the next matching CI execution. Six focused source query/page-lifetime checks pass. Historical IB-09 universal cause remains UNKNOWN.
+
+## 357 evidence and next bounded correction
+
+357 shared UI reaches real Core/IDB Unicode/duplicate-ID/folder/job navigation, no results, out-of-order delivery, actual one-shot IDB failure, preserved input and retry. It then fails its private diagnostic query with JOURNAL_RANGE_INVALID: Core correctly requires first and last together, but the harness supplies only first. Supply current immutable last sequence and retain the typed failed-event assertion. Integrated independently stops at an unawaited initial permission button before search. These are diagnosed harness failures, not proof of the historical operator cause. Complete R05 B/DSK and exact final V remain open. The actual error pixels also need a short storage cause and Search-again instruction; original code stays in causal records and error metadata.

@@ -58,14 +58,14 @@ def run(sid,receipt):
   armed=asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();await c.mutate([{table:'generators',id:'search-invalidation',value:{slug:'invalidation-only',state:'FOLDER_ONLY'}}],{step:'SEARCH_FIXTURE_INVALIDATE',result:'COMPLETE'});c.close();(await browser.runtime.getBackgroundPage()).__searchProbe.fail=true;return true;""")
   assert armed is True
   set_input(sid,'#global-search','fast-needle');click(sid,'#global-search-form button[type="submit"]')
-  wait(lambda:script(sid,"return document.getElementById('global-search-status').textContent==='Search unavailable: STORAGE_UNAVAILABLE'"),30)
+  wait(lambda:script(sid,"const e=document.getElementById('global-search-status');return e.textContent==='Search could not read storage. Try Search again.'&&e.dataset.code==='STORAGE_UNAVAILABLE'"),30)
   assert script(sid,"return document.getElementById('global-search').value==='fast-needle'&&document.querySelectorAll('#global-results a').length===0")
   state_matrix(sid,suite+'-global-search-storage-error',receipt)
   results.append(search('fast-needle',['#generators/search-fast','#work/search-completed-job']))
   probe=asyncjs(sid,"const p=(await browser.runtime.getBackgroundPage()).__searchProbe;return {requests:p.requests,responses:p.responses,failed:p.failed};")
   assert probe['failed']==1 and any(not r['ok'] and r['code']=='STORAGE_UNAVAILABLE' for r in probe['responses']),probe
   slow=next(r for r in probe['responses'] if r['query']=='slow-needle');assert any(r['query']=='fast-needle' and r['at']<slow['at'] for r in probe['responses']),probe
-  diagnostics=asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();const p=await c.list({table:'events',first:arguments[0],search:'UI_QUERY',limit:200});c.close();return p.rows.filter(r=>r.diagnostics?.action==='GLOBAL_SEARCH').map(r=>({operationId:r.operationId,result:r.result,code:r.code,diagnostics:r.diagnostics}));""",[seeded])
+  diagnostics=asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore();const last=(await c.status()).sequence,p=await c.list({table:'events',first:arguments[0],last,search:'UI_QUERY',limit:200});c.close();return p.rows.filter(r=>r.diagnostics?.action==='GLOBAL_SEARCH').map(r=>({operationId:r.operationId,result:r.result,code:r.code,diagnostics:r.diagnostics}));""",[seeded])
   assert any(r.get('code')=='STORAGE_UNAVAILABLE' and r['result']=='FAILED' for r in diagnostics),diagnostics
   receipt['searchContract']={'scope':'real packaged DOM/RPC/Core/IndexedDB; synthetic records; delivery/IDB fault injection only','queries':results,'delivery':probe,'causalEvents':diagnostics}
   receipt['checks'].append('R05-real-IDB/Unicode-case/duplicate-label-distinct-ID/folder-job-exact-navigation/no-match/out-of-order-valid-Core-replies/stale-result-fence/actual-IDB-boundary-failure/explicit-error-preserved-input/retry/default-causal-record')

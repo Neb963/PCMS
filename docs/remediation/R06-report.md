@@ -46,3 +46,7 @@ Prepared remaining captures use the existing actual no-result/IDB-failure search
 ## Completed356 pixels and keyboard finding
 
 [Iteration6](R06-vision-iteration-6.md) inspects eight exact original images. No overall V PASS: narrow global results still expose raw module/error detail; the Firefox-focusable scrolling results list has no accessible name and the strict real-Tab oracle fails at that list. Add its name and format existing typed detail tokens without changing search matching or links. Recapture/reinspect and rerun real keyboard/UI interactions on the corrective candidate. Failed functional journeys keep their actual conclusions.
+
+## 357 evidence and next bounded correction
+
+[Iteration7](R06-vision-iteration-7.md) reviews three exact357 originals; partial/FAIL. The accessible scrolling search list now passes real Tab traversal and human module labels are visible. Correct the raw storage-error/recovery wording and Unknown-CREATE primary label, then recapture; no functional unknown is resolved by this wording.
