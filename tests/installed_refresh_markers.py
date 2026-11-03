@@ -1,7 +1,7 @@
 """P37 B: real Refresher controls -> shared source writer -> independent native/server.
 No live provider operations; only disposable protected native/HTTPS fixtures.
 """
-from installed_directory import Provider,FRAME,ORDER,state,page,visibility,measured,check,native_filter
+from installed_directory import Provider,FRAME,ORDER,state,page,visibility,measured,check,native_filter,directory_cut
 from installed_refresh_clock import settings_clock,pause
 from installed_source_save import configure,editor,dashboard,stored,SLUG,hard_stop
 from installed_source import completed_source
@@ -18,8 +18,13 @@ def refresh_cut(sid):
 def refresh(sid,provider):
  # Real competitor movement creates demand; the production controller alone
  # selects and dispatches the next Refresh. No hidden/manual control bypass.
- with provider.lock:provider.marker_demand={'before':len(provider.save_requests),'order':[('competitor-replacement-'+str(i)) if slug==SLUG else slug for i,slug in enumerate(provider.marker_order)]}
+ before=len(provider.save_requests)
+ with provider.lock:provider.marker_demand={'before':before,'order':[('competitor-replacement-'+str(i)) if slug==SLUG else slug for i,slug in enumerate(provider.marker_order)]}
  check(sid)
+ # The rendered frame applies competitor movement asynchronously. Establish
+ # that independent demand before waiting for a save, or accept an already
+ # applied next save; a stale prior measurement is not the new demand oracle.
+ wait(lambda:len(provider.save_requests)>before or (lambda v:v['fresh'] and v['positions'].get(SLUG,{}).get('state')=='NOT_SEEN')(visibility(sid)),100)
 def measured_response(sid,cut):
  def get():
   c=state(sid)['controller'];last=c.get('last') or {}
@@ -121,7 +126,10 @@ def main():
   except Exception as error:
    receipt['error']=str(error)
    if sid:
-    try:toolbar(sid);dashboard(sid);page(sid);receipt['status']=state(sid);receipt['cut']=refresh_cut(sid);receipt['body']=script(sid,"return document.body.innerText")
+    try:
+     toolbar(sid);dashboard(sid);page(sid);receipt['status']=state(sid);receipt['cut']=refresh_cut(sid);receipt['body']=script(sid,"return document.body.innerText");receipt['directoryCut']=directory_cut(sid)
+     receipt['controllerCut']=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),v=await c.view('refresher-control');c.close();return v;")
+     with provider.lock:receipt['providerFailure']={'saves':provider.save_requests,'demand':provider.marker_demand,'directoryReads':len(provider.directory_reads),'directoryAdvances':provider.directory_advances[-6:]}
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise
   finally:

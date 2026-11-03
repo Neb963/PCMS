@@ -8,6 +8,7 @@ const terminal=j=>['COMPLETE','FAILED'].includes(j.state);
 // Finite Deployer policy; one job retains every input, writer and effect. It
 // waits on Creator without owning the resource needed by that prerequisite.
 export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Date.now}){
+ const gitReadbacks=new Set();
  let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
  const module=()=>core.read('modules',id),enabled=m=>m?.enabled&&!m.lifecycle&&m.manifest?.capabilities?.includes('jobs.deployer');
  async function rows(table){const out=[];let cursor=null;do{const page=await core.list({table,cursor,limit:200});for(const r of page.rows)out.push(await core.read(table,r.id));cursor=page.cursor;}while(cursor);return out;}
@@ -171,7 +172,21 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
   check(j.deployment.phase==='SAVE_ACCEPTED','ACCEPTED_STATE_UNSUPPORTED');if(j.save.phase!=='COMPLETE'){const r=await writer.effect(j,reconcile);if(r.value.state!=='COMPLETE')return r;j=await core.read('jobs',j.id);}
   j=await save(j,{state:'RUNNING',recovery:null,deployment:{...j.deployment,phase:'ACCEPTED_SAVED',sourceReceipt:j.save.receipt}},'VERIFY_ACCEPTED_EDITOR_SOURCE',{deploymentState:'ACCEPTED_SAVED',deploymentCode:'DEVELOP_GIT_SOURCE_PENDING'});return output(j,'CONTINUE');
  }
- async function continueRecovered(r,jobId){const latest=await core.read('jobs',jobId);if(latest.rev===r.jobRevision&&latest.state==='RUNNING'&&latest.effect?.boundary!=='POSSIBLE'&&['CONTINUE','WAITING'].includes(r.value.state)){const queued=await core.queue.transition(latest.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {...r,jobRevision:queued.rev};}return r;}
+ async function continueRecovered(r,jobId){const latest=await core.read('jobs',jobId);if(latest.rev===r.jobRevision&&['RUNNING','HELD'].includes(latest.state)&&latest.effect?.boundary!=='POSSIBLE'&&['CONTINUE','WAITING'].includes(r.value.state)){const queued=await core.queue.transition(latest.id,latest.rev,{state:'WAITING',dueAt:clock(),recovery:null});return {...r,jobRevision:queued.rev};}return r;}
+ async function recover(){
+  const boot=(await core.queue.status()).bootId,m=await module(),status=await core.status();
+  if(!enabled(m)||status.restoreHold)return;
+  for(const j of await rows('jobs')){
+   if(j.moduleId!==id||!j.deployment||terminal(j)||j.runtimeInvalidated||j.generation!==m.generation)continue;
+   // A ref can already be attributed while final object verification is held.
+   // Re-read that exact operation once per boot; a failed read grants no write.
+   const key=JSON.stringify([boot,j.id,j.git?.active?.operationId]);
+   const appliedGit=['DONE','GIT_SOURCE'].includes(j.deployment.phase)&&j.git?.active?.phase==='VERIFY'&&j.effect?.boundary==='OBSERVED'&&j.effect.kind==='GIT_REF'&&j.effect.disposition==='APPLIED'&&!gitReadbacks.has(key);
+   if(appliedGit)gitReadbacks.add(key);
+   if(appliedGit||j.effect?.boundary==='POSSIBLE'||j.save?.phase!=='COMPLETE'&&j.effect?.disposition==='APPLIED')await continueRecovered(await effect(j,true),j.id);
+  }
+  await initialize();
+ }
  async function effect(original,reconcile=false){let j=await core.read('jobs',original.id);check(j?.rev===original.rev&&j.deployment?.schema===1,'STALE_REVISION');
   try{
    if(['ACCEPTED','SAVE_ACCEPTED'].includes(j.deployment.phase))return await acceptedEffect(j,reconcile);
@@ -289,7 +304,7 @@ export function createDeployer({core,donor,inputs,writer,gitWriter=null,clock=Da
    return hold(j,'DEPLOYMENT_STATE_UNSUPPORTED');
   }catch(error){if(error.code==='STALE_REVISION')throw error;const latest=await core.read('jobs',j.id);if(latest.deployment.phase==='PREPARE'&&clock()-latest.deployment.editorRequestedAt<20000&&['EDITOR_NOT_OPEN','EDITOR_CONTRACT_UNVERIFIED','EDITOR_OBSERVATION_UNKNOWN','SOURCE_CONTEXT_MISSING'].includes(error.code))return output(latest,'WAITING',error.code);return hold(latest,error.code??publicError(error));}
  }
- return {validate,recover:()=>run(async()=>{for(const j of await rows('jobs'))if(j.moduleId===id&&j.deployment&&(j.effect?.boundary==='POSSIBLE'||j.save?.phase!=='COMPLETE'&&j.effect?.disposition==='APPLIED'))await continueRecovered(await effect(j,true),j.id);await initialize();}),initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
+ return {validate,recover:()=>run(recover),initialize:()=>run(initialize),effect:(j,r=false)=>run(()=>effect(j,r)),
   async get(targetId){let g=await core.read('generators',targetId);check(g,'TARGET_MISSING');let j=g.deploymentJobId?await core.read('jobs',g.deploymentJobId):null;if(j?.deployment.readiness){j=await run(()=>revalidateReadiness(j));g=await core.read('generators',targetId);}const creator=g.creatorJobId?await core.read('jobs',g.creatorJobId):null;return {creatorDependency:j?.deployment?.phase==='WAIT_CREATOR'?{jobId:creator?.id??null,accountId:creator?.accountId??g.allocation?.accountId??null,state:creator?.state??'WAITING',code:creator?.effect?.boundary==='POSSIBLE'?'CREATOR_OUTCOME_UNKNOWN':creator?.recovery?.code??g.creatorHoldCode??'WAIT_CREATOR'}:null,paused:(await core.status()).paused,acceptanceId:j?.deployment.acceptance?.id??null,acceptedSourceHash:j?.deployment.acceptance?.sourceHash??null,acceptanceHistoryCount:j?.deployment.priorAcceptances?.length??0,readiness:j?.deployment.readiness?.kind??null,cancelRequested:!!j?.deployment.cancelRequestedAt,canReview:!!j?.deployment.ai&&!terminal(j),jobId:j?.id??null,version:j?.deployment?.version??null,action:j?.kind??null,phase:j?.deployment?.phase??null,state:g.deploymentState??'NOT_READY',code:g.deploymentCode??null,inputHash:j?.deployment?.inputHash??null,commit:j?.input.commit??null,conflictManifest:j?.deployment.conflict?.manifestId??null,creatorJobId:j?.deployment.creatorJobId??null,previousGood:j?.deployment.previousGood??null,unlistVerified:!!j?.deployment.unlistReceipt||j?.deployment.baseline?.listing==='UNLISTED',publicationVerified:!!j?.deployment.publicationReceipt,poolMember:g.pool?.member===true,sourceCommit:j?.deployment.gitSourceReceipt?.commit??null,doneCommit:j?.deployment.doneReceipt?.commit??null,chatDigest:j?.deployment.ai?.chatDigest??null,possible:j?.effect?.boundary==='POSSIBLE'};},
   editor:(message,sender)=>run(()=>editor(message,sender)),
   checkAi:args=>run(()=>checkAi(args)),reviewAi:args=>run(()=>reviewAi(args)),cancelAi:args=>run(()=>cancelAi(args)),

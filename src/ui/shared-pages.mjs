@@ -1,4 +1,4 @@
-import {taskLabel,stateLabel} from './labels.mjs';
+import {taskLabel,stateLabel,searchDetail} from './labels.mjs';
 import {rememberPage,restorePage} from './continuity.mjs';
 // Shared shell surfaces. Every action goes through the existing packaged Core.
 export function sharedPages({core,node,view,persist,document,window=globalThis.window}) {
@@ -27,7 +27,7 @@ export function sharedPages({core,node,view,persist,document,window=globalThis.w
  }
  async function search() {
   const input=document.getElementById('global-search'),form=document.getElementById('global-search-form'),list=document.getElementById('global-results'),next=document.getElementById('global-next'),status=document.getElementById('global-search-status');input.value=view.globalSearch??'';let cursor=view.globalCursor??null,nextCursor=null,serial=0,timer;
-  const load=async()=>{const order=++serial;next.disabled=true;status.textContent='Searching…';const r=await core('ui.search',{query:input.value,cursor});if(order!==serial)return;list.replaceChildren();if(!r.ok){if(r.code==='STALE_CURSOR'&&cursor){cursor=null;view.globalCursor=null;void persist();return load();}status.textContent='Search unavailable: '+r.code;return;}for(const p of r.result.rows){const li=node('li'),a=node('a',p.type+' · '+(p.type==='job'?taskLabel(p.label):p.label)+' · '+stateLabel(p.status));a.href=p.href;li.append(a,node('span',' '+p.detail));list.append(li);}nextCursor=r.result.cursor;next.hidden=!nextCursor;next.disabled=false;status.textContent=input.value?(r.result.rows.length?'Matching accounts, generators, folders and work.':'No matching items.'):'';};
+  const load=async()=>{const order=++serial;next.disabled=true;status.textContent='Searching…';const r=await core('ui.search',{query:input.value,cursor});if(order!==serial)return;list.replaceChildren();if(!r.ok){if(r.code==='STALE_CURSOR'&&cursor){cursor=null;view.globalCursor=null;void persist();return load();}status.textContent='Search unavailable: '+r.code;return;}for(const p of r.result.rows){const li=node('li'),a=node('a',p.type+' · '+(p.type==='job'?taskLabel(p.label):p.label)+' · '+stateLabel(p.status));a.href=p.href;li.append(a,node('span',' '+searchDetail(p.detail)));list.append(li);}nextCursor=r.result.cursor;next.hidden=!nextCursor;next.disabled=false;status.textContent=input.value?(r.result.rows.length?'Matching accounts, generators, folders and work.':'No matching items.'):'';};
   form.addEventListener('submit',e=>{e.preventDefault();clearTimeout(timer);cursor=null;view.globalCursor=null;view.globalSearch=input.value;void persist();void load();});input.addEventListener('input',()=>{serial++;clearTimeout(timer);cursor=null;view.globalSearch=input.value;view.globalCursor=null;void persist();timer=setTimeout(()=>void load(),250);});next.addEventListener('click',()=>{cursor=nextCursor;view.globalCursor=cursor;void persist();void load();});if(input.value)await load();
  }
  return {home,settings,advanced,search};

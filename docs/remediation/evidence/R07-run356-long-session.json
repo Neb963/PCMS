@@ -1,0 +1,88 @@
+{
+  "tier": "B/S/DSK-real-duration-Journal",
+  "source": "654ed3a3cacb346dff4ba295984964e343c1345f",
+  "xpiSha256": "fa349bede1f178a2cc05cbf4b11586d6049de05dfde83e3e396f7a974609c2b7",
+  "browserVersion": "155.0",
+  "buildId": "20260817142839",
+  "sandbox": {
+    "remote": true,
+    "sandbox": 6
+  },
+  "realSeconds": 3639.3173364139993,
+  "result": "PASS",
+  "rounds": [
+    {
+      "id": "9e960637-884d-48aa-8069-bce3a685ae11",
+      "automatic": true,
+      "paused": false,
+      "completedAt": 1793666192267,
+      "realElapsedSeconds": 1827.3751199219998,
+      "first": 1,
+      "last": 93584,
+      "count": 93584,
+      "sha256": "153293026c170f74172552437d3651a8b57fb05ab076fc54631eafae8cece2f0",
+      "bytes": 1480009,
+      "probes": 28,
+      "native": {
+        "byExtensionId": "persona-route-manager@local",
+        "exists": true,
+        "fileSize": 1480009,
+        "state": "complete"
+      },
+      "resources": {
+        "aggregateFirefoxRssPeakBytes": 3705892864,
+        "sampledFirefoxCpuSeconds": 1578.5999999999283,
+        "currentFirefoxRssBytes": 2708955136
+      }
+    },
+    {
+      "id": "40f1294a-811a-4d14-83e6-7c83ce7de8fe",
+      "automatic": true,
+      "paused": true,
+      "completedAt": 1793667984577,
+      "realElapsedSeconds": 3625.9678129599997,
+      "first": 93585,
+      "last": 95546,
+      "count": 1962,
+      "sha256": "2f7b7aa7baf673854edfadcc79c91345d3165779aac27cb18b6a30b85cee0b49",
+      "bytes": 56413,
+      "probes": 27,
+      "native": {
+        "byExtensionId": "persona-route-manager@local",
+        "exists": true,
+        "fileSize": 56413,
+        "state": "complete"
+      },
+      "resources": {
+        "aggregateFirefoxRssPeakBytes": 3705892864,
+        "sampledFirefoxCpuSeconds": 2384.230000000088,
+        "currentFirefoxRssBytes": 2548490240
+      }
+    }
+  ],
+  "probeCount": 55,
+  "querySamples": 55,
+  "queryMs": {
+    "min": 82.90417799980787,
+    "median": 87.1278709996659,
+    "max": 133.8590729999396
+  },
+  "firstFirefoxRssBytes": 2789019648,
+  "lastFirefoxRssBytes": 2820866048,
+  "peakFirefoxRssBytes": 3705892864,
+  "sampledFirefoxCpuSeconds": 2375.550000000083,
+  "enabledModules": [
+    "pcms-accounts",
+    "pcms-backup",
+    "pcms-creator",
+    "pcms-deployer",
+    "pcms-discover",
+    "pcms-journal",
+    "pcms-refresher"
+  ],
+  "artifact": {
+    "id": 13194878644,
+    "zipSha256": "0bf3d05e58f41166265b6ca9169972b9092afa62f07ce0675e327e38c20676c8",
+    "run": 41546515392
+  }
+}
