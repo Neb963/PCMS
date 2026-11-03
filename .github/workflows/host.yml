@@ -57,6 +57,9 @@ jobs:
       - run: python3 scripts/release-preflight.py build/pcms-dev.xpi
       - name: R01 default diagnostic export, causal faults and disk continuity
         run: python3 tests/installed_journal.py build/pcms-dev.xpi
+      - name: R03 actual native outage DNS isolation and changed identity
+        if: ${{ !cancelled() }}
+        run: python3 tests/installed_route_recovery.py build/pcms-dev.xpi
       - name: R02 independent Git writer and actual Discover caller
         run: |
           python3 tests/installed_git_writer.py build/pcms-dev.xpi
@@ -94,6 +97,7 @@ jobs:
             test-results/installed-ui-continuity.json
             test-results/installed-visual.json
             test-results/installed-journal.json
+            test-results/installed-route-recovery.json
             test-results/installed-git-writer.json
             test-results/installed-discover-preparation.json
             test-results/installed-creation.json
