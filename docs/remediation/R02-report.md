@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base: R01 source `f48a45228ba0fca83fd43c502a5113a072b68faf`, tree `cb1e1fe8467bec453e73a53a5a5db79863272297`. Accepted v42/design2 and repository governance unchanged.
 
-**Status: PARTIAL — independent installed Git writer PASS; Discover caller scope assertion failed.**
+**Status. FIXED_AND_VERIFIED in independent Git and installed caller fixtures. Real Git acceptance remains NOT TESTED.**
 
 ## Inspection and root causes
 
@@ -33,3 +33,7 @@ Follow-up CI41512200622 (bef12ba9) did **not** reach that same final assertion: 
 ## Actual Discover recovery result
 
 Run41516312430/source7c4f426b and in-progress41524792814/sourceded70205 pass the actual installed Git writer plus Discover caller/provider-scope step. Existing raw Git/normalized-message/identity/ancestry/no-force tests remain unchanged. This corrects the previously open caller result; no real content-repository Git mutation or P43 acceptance is claimed. Final exact-XPI integration remains open.
+
+## Exact candidate verification
+
+Run 365 passes both the installed Git writer and Discover preparation receipts. The independent Git fixture verifies exact commit parent, tree, message and modes despite REST representation differences. The actual Discover flow prepares only the expected marker for an Available slug and opens the exact catalog record. A concurrent ref change rejects the non-forced update and preserves the unrelated README. Applied response loss and Firefox restart reconcile the same operation without another ref write. Existing source, binary and root instructions remain byte-exact. The integrated one-profile flow independently verifies marker-only preparation through eventual publication and Git DONE. Real repository write acceptance stays P42–P49 NOT TESTED. [Run 365 receipt index](evidence/R08-run365-completed.json).

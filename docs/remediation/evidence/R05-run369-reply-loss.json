@@ -1,0 +1,125 @@
+{
+  "runId": 42228025239,
+  "fixtureCommit": "64f9e8d6713898014aa598ec6f217b2b23db8ebc",
+  "artifactId": 13506474153,
+  "artifactSha256": "709bce1bde448a296703206987cf4beaa278a44297ee7f2e8d9e30cd96463180",
+  "scope": "Reproduces an installed search stall after controlled reply loss. Historical operator input, profile and original failure cause remain unknown.",
+  "receipts": {
+    "p41": {
+      "tier": "B/installed-Core-reply-loss",
+      "source": "decd5e84d3546ccd11686c577b95cf94ba0cb0b6",
+      "xpiSha256": "ba8c844dafc72afb44aea1ca7d9d00940e8b021471086995283dd9c6aca7d127",
+      "label": "p41",
+      "browserVersion": "155.0",
+      "buildId": "20260817142839",
+      "sandbox": {
+        "level": 6,
+        "remote": true
+      },
+      "fixtureSequence": 39,
+      "afterLoss": {
+        "code": null,
+        "hrefs": [],
+        "input": "synthetic-reply-loss-needle",
+        "text": "Searching\u2026",
+        "elapsedSeconds": 64.00801299600005
+      },
+      "trace": {
+        "dropped": 1,
+        "requests": [
+          {
+            "at": 1793972814307,
+            "id": "23301654-8899-4b38-90e4-db8e0a303405"
+          },
+          {
+            "at": 1793972878298,
+            "id": "1a92d27e-2ed5-4d34-a2b5-15e0e6d024be"
+          }
+        ],
+        "responses": [
+          {
+            "at": 1793972814354,
+            "code": null,
+            "drop": true,
+            "hrefs": [
+              "#generators/reply-loss-target"
+            ],
+            "id": "23301654-8899-4b38-90e4-db8e0a303405",
+            "ok": true
+          },
+          {
+            "at": 1793972878305,
+            "code": null,
+            "drop": false,
+            "hrefs": [
+              "#generators/reply-loss-target"
+            ],
+            "id": "1a92d27e-2ed5-4d34-a2b5-15e0e6d024be",
+            "ok": true
+          }
+        ]
+      },
+      "navigation": "#generators/reply-loss-target",
+      "result": "REPRODUCED",
+      "receiptSha256": "9ba457ab620d812bc445445ac1691a5d1991d7c0870cd9bef25f4e3aed9cf66b"
+    },
+    "candidate": {
+      "tier": "B/installed-Core-reply-loss",
+      "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+      "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+      "label": "candidate",
+      "browserVersion": "155.0",
+      "buildId": "20260817142839",
+      "sandbox": {
+        "level": 6,
+        "remote": true
+      },
+      "fixtureSequence": 35,
+      "afterLoss": {
+        "code": "CORE_REQUEST_TIMEOUT",
+        "hrefs": [],
+        "input": "synthetic-reply-loss-needle",
+        "text": "Search timed out. Try Search again.",
+        "elapsedSeconds": 60.089543246999995
+      },
+      "trace": {
+        "dropped": 1,
+        "requests": [
+          {
+            "at": 1793972882038,
+            "id": "0d3646c1-3756-406a-a2bf-92223a93adbb"
+          },
+          {
+            "at": 1793972942106,
+            "id": "90458ac1-c9fd-4599-9cb4-3cb1f04db91f"
+          }
+        ],
+        "responses": [
+          {
+            "at": 1793972882086,
+            "code": null,
+            "drop": true,
+            "hrefs": [
+              "#generators/reply-loss-target"
+            ],
+            "id": "0d3646c1-3756-406a-a2bf-92223a93adbb",
+            "ok": true
+          },
+          {
+            "at": 1793972942109,
+            "code": null,
+            "drop": false,
+            "hrefs": [
+              "#generators/reply-loss-target"
+            ],
+            "id": "90458ac1-c9fd-4599-9cb4-3cb1f04db91f",
+            "ok": true
+          }
+        ]
+      },
+      "navigation": "#generators/reply-loss-target",
+      "result": "PASS",
+      "receiptSha256": "c31ce253157168db9e4029da4c11393ff017dfcaa05197828357567649c8d12d"
+    }
+  }
+}

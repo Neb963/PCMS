@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R02 `cd6ed32c69afcae029148fdddca8e44a2b091e1f` / tree `16e5032cc274c81e21db5b0045cb7fb95f992726`. Authorities unchanged. Plan committed before R03 code.
 
-**Status: FIXED_VERIFIED at T + installed local B/DSK oncd638db8. Final R08/vision remains open; real H NOT TESTED.**
+**Status. FIXED_AND_VERIFIED in source tests and the exact installed route and disk fixtures. Real host acceptance remains NOT TESTED.**
 
 ## Root causes and changes
 
@@ -68,3 +68,7 @@ The same complete7-assertion local route B/DSK matrix passes360 on final-in-prog
 
 
 364 repeated exact R03 PASS: source41b5af74923815c84c080f271702239a94e40184/XPIacb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2. Immediate13242709242/ZIP52d8d8e91c18a381a8175d59534da4def6fcd04e18b4ea5507f0b659572cc727 independently CRC-reopens2 entries; receipt46db8bad2aeaefebed1c39c14fbf5f8822032d545af2bd8dd0efd22706ad0991 matches all7 outage/DNS/IPv6/exit/principal/default-disk checks and6 actual Tab audits. Default Journal1–554/SHAa2972f0670a5cba51ae5f8a3fa2ab0416f3d8fd841ad2799a38d6016f5095bc7 retains original causes/no session tokens. Integrated fresh-route/login restore also PASS, independently scoped in R08. Final V and remaining independent gates open.
+
+## Exact candidate verification
+
+Run 365 independently verifies two actual UI enrolments, distinct Personas and expected principals, fresh protected exits, and automatic recovery after native fixture outage without a manual Repair. Restart negatives cover failed DNS, unknown DNS, unknown IPv6, a changed duplicate exit and changed principal. The healthy account remains usable. Repair requires fresh evidence, without Direct, a new container or silent adoption. The normal Journal export carries the original codes. The accepted 15-minute route freshness boundary is preserved. [Exact route evidence](evidence/R03-run365-route.json). The historical PREPARE detail and external Mullvad fleet behavior remain unproved. [Run 365 receipt index](evidence/R08-run365-completed.json).

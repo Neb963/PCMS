@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base: `a3a084dcdb52cb51ff1ef82d1287d18fa7661129` / tree `9fa5ffa20dd70ef2c4570541ee49255eacd2f6d0`. Authority: accepted v42, design revision 2, AGENTS.md, CI-GUIDELINES.md; unchanged.
 
-**Status: PARTIAL — default installed export and bounded suffix evidence PASS; broader diagnostic matrix remains open. No operator testing.**
+**Status. FIXED_AND_VERIFIED in source tests and the exact installed fixture with independent disk reopening.**
 
 ## Actual state and plan
 
@@ -64,3 +64,7 @@ Observed CI355/41544272023/source7f095bea: the expanded installed default Journa
 Final355 artifact13187667106 ZIP6b298a1559ffdbcba25ecfe19d38e4fd687be8c4eb1f379a86e6c0ccb40cee3f independently confirms installed/focused XPI equality, default Journal PASS and24 distinct real Tab controls at desktop/narrow validation states. The Accounts render regression left the ordinary Creator failure ZIP without a UI cause, exposing an additional default recording gap. A single existing-render boundary now emits a fixed alert/reload action, never marks a failed/stale view ready, and reports only fixed page/exception enums through trusted Core. UI_RENDER_FAILED retains original TYPE_ERROR/storage classification without exception messages/source; logger failure is explicit.24 relevantT PASS/1.71s covers actual host archive vocabulary/redaction, render failure/retry/stale-route/failed-logger behavior, queries and records; final unknown-name guard4T PASS. The added actual DOM-construction fault/Reload/full-Accounts recovery/default-disk assertion and matching error pixels remain pending B.
 
 Observed356/41546515392/source654ed3a3: focused and expanded installed Journal **PASS**. The real one-shot DOM-construction TypeError, fixed alert/unready state, actual Reload/full Accounts controls, safe original UI_RENDER cause and independent default disk ZIP now execute successfully. Candidate13188991945 ZIP6f1f42f34bdacae55711d71d6481d44fab9ef76c4ca2c7e3282d10a5c00ae125 independently matches clean source/tree and local preflight: XPIfa349bede1f178a2cc05cbf4b11586d6049de05dfde83e3e396f7a974609c2b7/908393bytes. Full installed identity receipt, other journeys, real-duration and final matrix remain open; this is a scoped B/DSK result, not R01/release closure.
+
+## Exact candidate verification
+
+The exact run 365 Journal receipt passes all 11 checks on Firefox 155.0 with sandbox level 6. The ordinary Export now path, without diagnostic opt-in, yields sequence-complete records with correlated typed causes for host validation, view rendering, Git identity, route evidence and uncertain effects. The integrated default archive independently reopened all 2,624 records, and the route archive independently reopened all 579. Real storage/Downloads interruption and destination failures preserve the watermark and earlier files. While disabled, Journal continues receiving Core records. Re-enable coalesces the due export. A one-row export at the tail of 100,001 records spanning 90 days needed four cursor continuations and took 272 ms. The controlled failures preserve specific codes and causal context while excluding synthetic credential and raw request canaries. [Run 365 receipt index](evidence/R08-run365-completed.json).

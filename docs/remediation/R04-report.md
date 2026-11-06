@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R03 `50f28e1c8f7a8aa4617df92ec4070611ce5cf820` / tree `3c87bcc287328775d504e2ba7cccccfc371faf22`. Authority unchanged. Plan entered in todo before edits.
 
-**Status: FIXED_PENDING_B / PARTIAL.**
+**Status. FIXED_AND_VERIFIED in source tests and the exact installed dependency, Creator and Deployer fixtures.**
 
 ## Root causes and changes
 
@@ -43,3 +43,7 @@ Creator stopped before login-state pixels: Core enrollment is LOGIN_REQUIRED/COM
 357 exact installed receipts onf2770c2/XPI913a3ef2 PASS: Creator lost-CREATE/lost-RENAME/ambiguity/ordinary causal ZIP (receipt4edf62de3a74ee49b0b8617d55dd09a9f008fa1f4643ae0922e4bb6b871d8c22); full DEPLOY/two-restart/DONE no-replay (a4655f9bfc3b48404ca6dfc3ead31460c819ab6f5786bc3884ef6145bdb8e586); DEVELOP first/update (a00bc67aa74108231a1fd68d4cd7a9b43c004d4854fecedfa3fc7df37c9ac758). All independently reopened from early artifact13223103600/ZIPb4d3c407300c3e1136e4b128735e9b6a28fc30ff732c7343295cf11db956630e. Refresher full negative/restart also PASS (26f5df26ca58f34e1257a339276d4559681f86c9a4dc368441150f91713b0058). The helper now waits for independent rendered demand; the old356 third-save failure remains historical cause UNKNOWN. No product controller/source guard was weakened. Final release/route/search/V gates remain.
 
 359/sourcecd638db8/XPId24e4d3f retains Creator/DEPLOY/DEVELOP/Refresher standalone PASS and full route-negative PASS. The integrated chain independently completes Unicode DEPLOY/DEVELOP/STOP/Git, then correctly refuses its plain-text human-review PJS with MARKER_PJS_SYNTAX_UNSUPPORTED. The actual recipe reproduces that rejection; a valid output-list PJS passes with exact LF/CRLF marker-only and Unicode binary neutrality. Prepared positive fixture uses output\n  Integrated accepted 雪 and explicit LF marker expectation; standalone CRLF remains unchanged. No recipe/admission/source/effect guard is relaxed. Matching complete one-profile B remains pending.
+
+## Exact candidate verification
+
+Run 365 passes actual Creator private create and rename with lost replies, protected automatic renewal, restart and same-operation readback. Ambiguity retains its reservation and leaves unrelated reserved work runnable. Affirmative folder presence, pre-dispatch account override and post-dispatch no-replay boundaries pass the source suite. Actual DEPLOY verifies native unlisting, full source and public state, pool admission and Git DONE independently. Lost publication and Git replies reconcile without replay. DEVELOP passes a first Finish and a same-generator update with exact Unicode prompt, binary source and preserved root instructions. The one-profile fixture exercises the chained Git, Creator, DEPLOY and DEVELOP cases. The historic PREPARE fault details and live provider template behavior remain unproved. The narrow initial-scan retry in the final candidate is source-tested through the actual opaque host boundary and has no effect replay. [Run 365 receipt index](evidence/R08-run365-completed.json).

@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R04 `fed3b34845fd194cd329acfc0e2dfadcdf9254f1` / tree `d992a74898785992bfea61bc074041cf947d6fd6`. Plan committed before code. Authority unchanged.
 
-**Status: PARTIAL / installed diagnosis pending. IB-09 historical root remains UNKNOWN.**
+**Status. Installed search regression passes on the exact candidate. The original operator query and cause remain unknown. Final Generator paging is being verified.**
 
 ## Root causes and changes
 
@@ -35,3 +35,11 @@ Added test-side actual Port-delivery ordering and IndexedDB transaction-failure 
 357 shared UI reaches real Core/IDB Unicode/duplicate-ID/folder/job navigation, no results, out-of-order delivery, actual one-shot IDB failure, preserved input and retry. It then fails its private diagnostic query with JOURNAL_RANGE_INVALID: Core correctly requires first and last together, but the harness supplies only first. Supply current immutable last sequence and retain the typed failed-event assertion. Integrated independently stops at an unawaited initial permission button before search. These are diagnosed harness failures, not proof of the historical operator cause. Complete R05 B/DSK and exact final V remain open. The actual error pixels also need a short storage cause and Search-again instruction; original code stays in causal records and error metadata.
 
 358/sourcea775e392/XPI3514adb5: full installed shared UI/search contract PASS, receipt df813f6efb26c7735738f966c5a35b11bf043f4b914893b57ac356c5b12e96cb from independently reopened artifact13225424798. Includes Unicode/case, duplicate labels with distinct IDs, exact folder/job navigation, no-match, out-of-order Core replies, actual IDB query failure, retained input, explicit human error/retry and default causal record.40 strict Tab audits PASS. This closes that installed regression on this source; historical operator’s exact query/root remains UNKNOWN and is not retrospectively attributed. Final artifact/state V still gates acceptance.
+
+## Exact installed search diagnosis
+
+Run 365 passes shared and integrated search on source `1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69` and XPI `609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd`. Actual keyboard submission, Unicode and case folding, duplicate display names with different account IDs, exact folder and job links, empty results, later-page results, out-of-order delivery, one-shot actual IndexedDB transaction failure, retained input and retry all pass. The default causal record preserves a typed storage failure and correlation without raw search text. [Run 365 receipt index](evidence/R08-run365-completed.json).
+
+Run 369 independently compares the original P41 and run 365 XPIs in clean Firefox 155.0, build 20260817142839, sandbox level 6. Both execute the real packaged DOM, Port, Core and IndexedDB flow. A controlled delivery fault drops the first valid Core reply. The independently recorded reply contains the exact expected generator in each build. P41 remains on “Searching…” after 64.008 s. The candidate retains the input and gives “Search timed out. Try Search again.” with `CORE_REQUEST_TIMEOUT` at 60.090 s. The next visible Search and result click reach the exact generator. [Independently reopened comparison](evidence/R05-run369-reply-loss.json).
+
+This reproduces an installed failure in the common search control and verifies recovery under the same fault. The original operator query, profile and response are unavailable. Its exact cause remains unknown.
