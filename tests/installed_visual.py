@@ -67,6 +67,67 @@ def final_catalog_page(sid,owner,receipt):
                            'finalPage':seen[-5:],'selected':['paging-example-0000','paging-example-1004']}
  receipt['checks'].append('1,005 persisted records through 21 visible pages with no gaps or duplicates, cross-page selection and navigation continuity')
 
+def native_accessibility(sid,owner,receipt):
+ assert asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs'));
+  const c=await openCore(),accountId=arguments[0];try{await c.mutate([
+  {table:'generators',id:'ax-wait',value:{slug:'ax-wait',folder:'generators/ax-wait',
+   folderPresent:'YES',markerVersion:'v1',markerAction:'DEPLOY',markerStatus:'READY',
+   creatorJobId:'ax-creator',creatorState:'HELD',creatorHoldCode:'ACCOUNT_ROUTE_RECHECK_REQUIRED',
+   allocationAccountId:accountId,deploymentJobId:'ax-deploy',deploymentState:'WAIT_CREATOR',state:'FOLDER_ONLY'}},
+  {table:'jobs',id:'ax-creator',value:{moduleId:'pcms-creator',generation:1,jobSchema:1,
+   kind:'CREATE',accountId,targetId:'ax-wait',state:'HELD',
+   recovery:{action:'OPEN_ACCOUNT',code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'},
+   creator:{schema:1,phase:'RESERVED',cycle:0,observations:[]}}},
+  {table:'jobs',id:'ax-deploy',value:{moduleId:'pcms-deployer',generation:1,jobSchema:1,
+   kind:'DEPLOY',targetId:'ax-wait',state:'WAITING',step:'WAIT_CREATOR',dueAt:Date.now()+86400000,
+   input:{commit:'a'.repeat(40)},deployment:{schema:1,phase:'WAIT_CREATOR',version:'v1',
+   inputHash:'b'.repeat(64),creatorJobId:'ax-creator'}}}],
+  {step:'VISUAL_FIXTURE_AX',result:'COMPLETE'});return true;}finally{c.close();}""",[owner])
+ set_input(sid,'#global-search','ax-wait')
+ click(sid,'#global-search-form button[type="submit"]')
+ wait(lambda:script(sid,"return !!document.querySelector('#global-results a[href=\"#work/ax-deploy\"]')"))
+ click(sid,'#global-results a[href="#work/ax-deploy"]')
+ hidden=['ai-ready-attestation','deployment-review','deployment-ai-check','deployment-cancel']
+ wait(lambda:script(sid,"return document.getElementById('deployment-state')?.textContent.includes('Waiting for Creator')"))
+ assert script(sid,"return arguments[0].every(id=>{const e=document.getElementById(id);return e&&!e.getClientRects().length;});",[hidden])
+ receipt['accessibility']=[]
+ for w in [1280,560,390]:
+  viewport(sid,w)
+  width=script(sid,'return innerWidth')
+  def tree():
+   context(sid,'chrome')
+   try:
+    return script(sid,"""const svc=window.__PCMSAccessibility??=Components.classes['@mozilla.org/accessibilityService;1'].getService(Components.interfaces.nsIAccessibilityService);
+     const browser=gBrowser.selectedBrowser;
+     const doc=svc.getAccessibleFor(browser)?.firstChild;
+     if(!doc)return null;
+     const all=[],nodes=[doc];
+     while(nodes.length){
+      const a=nodes.pop();let id='',name='',value='';
+      try{id=a.attributes.getStringProperty('id');}catch{}
+      try{name=a.name??'';}catch{}
+      try{value=a.value??'';}catch{}
+      const role=svc.getStringRole(a.role);
+      if(id||name)all.push({id,name,role,attestationText:/I inspected this same chat/.test(name+' '+value)});
+      for(let i=0;i<a.childCount;i++)nodes.push(a.getChildAt(i));
+     }
+     return {remote:browser.isRemoteBrowser,nodes:all};""")
+   finally:context(sid,'content')
+  def ready():
+   ax=tree()
+   if not ax:return None
+   names={n['name'] for n in ax['nodes']}
+   return ax if {'Find anything','Search results','Check recorded deployment','Open Creator work'}<=names else None
+  ax=wait(ready,30)
+  assert ax['remote']
+  assert not any(n['id'] in hidden or n['attestationText'] or n['name'] in
+      ['Review in Perchance','Check AI Helper','Cancel PCMS completion'] for n in ax['nodes']),ax
+  roles=[n for n in ax['nodes'] if n['name'] in
+       ['Find anything','Search results','Check recorded deployment','Open Creator work']]
+  assert all(n['role'] for n in roles)
+  receipt['accessibility'].append({'width':width,'roles':roles,'absentInapplicable':hidden,'remote':ax['remote']})
+ receipt['checks'].append('native Gecko accessibility tree at three widths/real global search and Work navigation/named search and recovery/hidden DEPLOY AI absent')
+
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k)
  receipt={'tier':'B/pixel-capture-NOT-vision-verdict','visualSuite':'visual-only','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]};assert receipt['xpiSha256']==identity['xpiSha256']
@@ -89,6 +150,8 @@ def main():
     wait(lambda:script(sid,"return document.getElementById('account-state')?.textContent.startsWith('Preparing')"));state_matrix(sid,'account-real-preparing',receipt)
    finally:provider.prepare_release.set()
    settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'visual@fixture.test');state_matrix(sid,'account-awaiting-confirm',receipt);click(sid,'#account-confirm');settle(sid,owner,'READY')
+   if os.environ.get('PCMS_AX_ONLY')=='1':
+    native_accessibility(sid,owner,receipt);receipt['result']='PASS';return
    if not supplement:matrix(sid,receipt,click,set_input,owner)
    viewport(sid,1280)
    real_sleep(sid,provider,owner,expected,receipt)
