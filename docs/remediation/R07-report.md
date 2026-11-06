@@ -1,6 +1,6 @@
 # R07 — bounded refresh, persistence and dependency wake
 
-Status: **PARTIAL — installed capacity, comparable before/after and long-session gates remain open.** No release claim.
+**Status. FIXED_AND_VERIFIED in source, synthetic load, installed Firefox and independent disk checks on the exact candidate.**
 
 The phase plan was committed before code (`87e45cc`, based on remotely verified R06 `2c83d531`). Authority files, schedules, retention, module enablement and Core dispatch authority are unchanged.
 
@@ -42,3 +42,20 @@ Implemented the private shared projection for those three existing services. **2
 Source654ed3a / XPI fa349bede1f178a2cc05cbf4b11586d6049de05dfde83e3e396f7a974609c2b7, Firefox155.0/build20260817142839/sandbox6. Final artifact13194878644 ZIP0bf3d05e58f41166265b6ca9169972b9092afa62f07ce0675e327e38c20676c8 independently downloaded/CRC-reopened and installed identity matches. The actual CI disk oracle passes two unmocked30-minute automatic Journal rounds over3639.32s: first1–93584/93584events/1480009bytes/SHA153293026c170f74172552437d3651a8b57fb05ab076fc54631eafae8cece2f0 at1827.38s; second93585–95546/1962events/56413bytes/SHA2f7b7aa7baf673854edfadcc79c91345d3165779aac27cb18b6a30b85cee0b49 at3625.97s, globally paused.55 recorded probes; all seven enabled. Query samples82.90–133.86ms, median87.13ms. Scoped aggregate Firefox RSS peak3705892864bytes, first/last samples2789019648/2820866048bytes; sampled CPU2375.55s (multi-process aggregate; not wall time or private RSS). [Compact exact receipt](evidence/R07-run356-long-session.json).
 
 Capacity PASS:50accounts/1001generators/90000 initial events/90days/32MiB binary; two independent manual archives35774173/35826147bytes and90417/90546events. Barriers1794/1386ms, captures42.888/49.565s; four global pages431.36ms; warm59.50/59.43/59.23ms with0background version-cursor continuations; exact late query76.67ms;21Core pages1170ms. Hardware4logical CPUs/16759312384bytes/Intel Xeon Platinum8573C. No cross-machine speed or memory improvement inference. The previous real-duration gap is now evidenced on this exact source. Refresher third-save, full state/route/search/final-V/integration gates remain open; no phase-wide acceptance.
+
+## Final exact candidate
+
+Run 367 installed the original XPI from run 365 after exact SHA-256 and release preflight. The only retry change was the test driver. After restart it uses Complete login, enters the exact fixture account in its protected context, and confirms and verifies the original principal and route. The run 365 failure and partial results remain in the original receipt index. [Run 367](https://github.com/Neb963/PCMS/actions/runs/42226606447). [Reopened capacity and duration receipts](evidence/R07-run367-capacity-duration.json).
+
+| Installed measure | Observed |
+|---|---|
+| Synthetic scale | 50 accounts, 1,001 generators, 90,000 seeded events across 90 days, exact current and previous-good source, 32 MiB binary |
+| Two production backup archives | 35,774,286 and 35,825,494 bytes. Each independently reopened with all entry hashes and exact source history. |
+| Capture barriers and elapsed captures | 2.230 and 1.295 s barriers. 30.996 and 56.398 s full captures. |
+| Loaded queries | Four global pages in 255.75 ms. Exact late result in 67.12 ms. Three warm round trips in 57.04, 57.67 and 57.01 ms, with zero background version cursor continuations. All 1,001 Core rows in 21 pages took 940 ms. |
+| Host | AMD EPYC 9V45, 4 logical CPUs, 16,760,344,576 bytes memory, Linux Azure, Firefox 155.0 build 20260817142839, multiprocess sandbox level 6 |
+| Resource samples | 3,557,781,504 bytes aggregate Firefox RSS peak and 1,825.12 sampled CPU seconds across processes over 3,990.35 s wall time. RSS includes shared pages. |
+
+The unchanged production 30-minute schedule ran for 3,626.40 s with all seven modules enabled. The first automatic disk archive was observed at 1,811.92 s and covered 1–93,734. The second was observed at 3,613.37 s and covered 93,735–95,821 while globally paused. Independent disk reopen verified CRC, file identity, all sequences and every one of 58 correlated probes across both ranges. During the hour the dashboard repeatedly opened for typing/navigation and closed between probes. Search latency across the 58 observations was 71.62–99.06 ms, median 78.40 ms.
+
+The manual and failure oracles passed after the restart recovery, including unsupported auth, process stop and same-job resume, cancelled Firefox download, blocked destination, Disable, and manual/unrelated file preservation. The measured comparable source baselines above retain their original tier. Real 50-route capacity remains P49 NOT TESTED.

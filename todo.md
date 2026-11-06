@@ -1,12 +1,8 @@
-# R08 active qualification
+# R08 qualified candidate
 
-The accepted v42, design revision 2, PHASES, AGENTS, CI guidelines and full remediation/I-A–I-F package were reviewed. Continue draft PR #45.
+Pre-operator fixture gates pass for PCMS 0.49.0. Source `1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69`, tree `2f862d4ece13f052bdfb3ba3fc2031a58e7f455a`, XPI SHA-256 `609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd`, 911,159 bytes. Use the actual run 365 artifact. [R08 qualification](docs/remediation/R08-report.md), [defect closure](docs/remediation/DEFECT-CLOSURE.md).
 
-Candidate `1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69`, XPI `609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd`. Clean local/CI byte match and preflight pass. Source 531/0 and CI focused 295/0 pass. Standalone DEVELOP first and update pass on the exact candidate. The reproduced read-only Creator CAS mechanism is fixed and tested. The original 364 hidden exception remains unproved. [Early receipt](docs/remediation/evidence/R08-run365-early.json).
-
-1. Run 365 integrated, route, standalone restore and independent module receipts pass. The reopened final archive matches the exact XPI and all early pixels. [Original result and failed capacity fixture diagnosis](docs/remediation/evidence/R08-run365-completed.json).
-2. The original-pixel, keyboard and native accessibility checks pass on the exact XPI. The P41 comparison reproduces a controlled search reply-loss stall and verifies the candidate timeout and retry. The historical operator query and cause remain unknown. [Vision](docs/remediation/R06-final-vision.md), [search](docs/remediation/R05-report.md).
-3. Verify the exact-XPI capacity retry and two actual 30-minute Journal exports with the second globally paused. The first capacity attempt stopped at a hidden Confirm button before the hour. The corrected fixture drives the visible Complete login and Confirm sequence. Prior hour evidence belongs to its original artifact.
-4. Complete the phase reports and defect closure. Keep PR45 draft and frozen until the required gates pass. Deliver the exact tested XPI and concise operator guide after qualification. Real P42–P49 remain NOT TESTED.
-
-Preserve donor-first fail-closed routing, original 15-minute TTL, no Direct fallback, same-operation recovery, all seven enabled modules and current/previous-good/manual/binary/path/root-instruction preservation. Use independent fixtures for provider, route and content-repository effects.
+- Source 531/531 and focused CI 295/295 pass. Integrated seven-module B/DSK, independent module journeys, routes, startup, search and restore pass.
+- Run 365 capacity stopped at the fixture's hidden Confirm. The same-XPI run 367 passed representative capacity, disk faults/restart and both real 30-minute Journal exports, including the second during global Pause. [R07](docs/remediation/R07-report.md).
+- V passes with original pixels, real interactions and native accessibility. The historical operator search query/cause remains unknown. The controlled P41 search stall and candidate recovery are independently reproduced. [R06](docs/remediation/R06-final-vision.md), [R05](docs/remediation/R05-report.md).
+- P42–P49 real host, Git, Perchance, AI, directory, portable session and fleet cases remain **NOT TESTED**. Their next eligible scopes and authorizations are in [PHASES.md](PHASES.md).

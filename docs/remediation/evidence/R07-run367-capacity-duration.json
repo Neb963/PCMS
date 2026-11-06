@@ -1,0 +1,1064 @@
+{
+  "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+  "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+  "receipts": {
+    "backupExportSha256": "ae708df292dfda85c01da22b59b9d2ffb7b653f5ddf84db25ddc9fc114182f14",
+    "capacitySha256": "65fae25b447e8bfe217a93cd39063661d25503e98a8bed816b05068996b94ba8",
+    "longSessionSha256": "2b9079710008fdf3dabd42d12e5bd67d0d8bab65d46de7b334e0a10527a382f3"
+  },
+  "capacity": {
+    "tier": "S/B/DSK/P40",
+    "hardware": {
+      "platform": "Linux-7.0.0-1017-azure-x86_64-with-glibc2.39",
+      "logicalCpus": 4,
+      "memoryBytes": 16760344576,
+      "cpu": "AMD EPYC 9V45 96-Core Processor"
+    },
+    "archives": [
+      {
+        "bytes": 35774286,
+        "events": 90411,
+        "generators": 1001,
+        "accounts": 50,
+        "binaryBytes": 33554432,
+        "independentReopenMs": 869.6519009999975
+      },
+      {
+        "bytes": 35825494,
+        "events": 90539,
+        "generators": 1001,
+        "accounts": 50,
+        "binaryBytes": 33554432,
+        "independentReopenMs": 1167.2352859999933
+      }
+    ],
+    "exports": [
+      {
+        "jobId": "09f76733-bbdc-41c5-abff-490620df73de",
+        "waitMs": 48075.88290000001,
+        "barrierMs": 2230,
+        "captureMs": 30996,
+        "verifiedBytes": 34636648,
+        "native": {
+          "byExtensionId": "persona-route-manager@local",
+          "bytesReceived": 10092544,
+          "exists": true,
+          "fileSize": 35774286,
+          "state": "complete",
+          "totalBytes": 35774286
+        },
+        "expectedBytes": 35774286,
+        "expectedSha256": "e78b98fd33925ded6e9b6c0846c36d87df4efcd9944b8fc174344bad006ccb41"
+      },
+      {
+        "jobId": "184a232a-5ac1-4b96-ae6a-98e35aab12c4",
+        "waitMs": 11581.092764999994,
+        "barrierMs": 1295,
+        "captureMs": 56398,
+        "verifiedBytes": 34636648,
+        "native": {
+          "byExtensionId": "persona-route-manager@local",
+          "bytesReceived": 11534336,
+          "exists": true,
+          "fileSize": 35825494,
+          "state": "complete",
+          "totalBytes": 35825494
+        },
+        "expectedBytes": 35825494,
+        "expectedSha256": "bbbe390afb300db0ba45a8de1cddc027cabc95c479af1f8d886b215b0aaee6f8"
+      }
+    ],
+    "aggregateFirefoxRssPeakBytes": 3557781504,
+    "sampledFirefoxCpuSeconds": 1825.1199999998923,
+    "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+    "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+    "fixture": {
+      "accounts": 50,
+      "binaryBytes": 33554432,
+      "binaryHash": "c548a0ff3b3ac0f584a42b925f28c79a46588d5e2259a64f307643ec1d6f68af",
+      "current": "3010d62965885e0f37772e52ef048d6b1a1008b07761414cf20374689b60057b",
+      "eventCount": 90000,
+      "generators": 1000,
+      "old": "e41cd149a9afca57e5066686d855392776b0c9f9cc75afb6cc45d083b4340287",
+      "seedMs": 16444,
+      "spanDays": 90
+    },
+    "fourGlobalPagesMs": 255.74698399998397,
+    "warmRepeatedGlobalSearch": {
+      "uiRoundTripsMs": [
+        57.040693000004694,
+        57.66852499999686,
+        57.00527000001898
+      ],
+      "backgroundVersionCursorReads": 0
+    },
+    "exactLaterSearchMs": 67.11765700001138,
+    "corePagingRetention": {
+      "binaryBytes": 33554432,
+      "n": 1001,
+      "pages": 21,
+      "pagingMs": 940
+    },
+    "result": "PASS",
+    "wallSeconds": 3990.34778539
+  },
+  "backupChecks": [
+    "actual-Back-up-now/qualified-production-capture/streamed-ZIP/Core-Downloads/independent-disk-CRC-manifest-all-entry-hashes/exact-source-history-binary-NUL-auth-cookie-credential-draft-donor/current-and-staged-module-ZIPs/7-modules/Pause/Journal-disabled",
+    "unsupported-auth-schema/no-download/no-false-completion/last-complete-preserved",
+    "actual-process-stop-mid-Blob-staging/durable-cut-pin-receipt/restart/actual-Check-export/same-job-and-filename/no-pre-restart-download/independent-production-disk-reopen",
+    "actual-browser-download-cancel/failed-receipt/no-last-good-replacement/no-automatic-replay",
+    "actual-destination-error/Backup-Disable/no-export/manual-and-unrelated-sentinels/earlier-complete-hash-preserved/no-provider-write",
+    "real-two-30-minute-automatic-Journal-rounds/50-accounts-1k-generators-90k-history/loaded-typing-navigation-open-close/all-seven-enabled/second-round-global-Pause/native-download-and-independent-disk/range-continuity/every-causal-probe/no-clock-or-alarm-override"
+  ],
+  "duration": {
+    "tier": "B/S/DSK-real-duration-Journal",
+    "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+    "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+    "browserVersion": "155.0",
+    "buildId": "20260817142839",
+    "sandbox": {
+      "remote": true,
+      "sandbox": 6
+    },
+    "rounds": [
+      {
+        "id": "acc9e333-ef8e-4882-9c03-158c5bffa990",
+        "automatic": true,
+        "paused": false,
+        "completedAt": 1793974258010,
+        "realElapsedSeconds": 1811.9241515730002,
+        "first": 1,
+        "last": 93734,
+        "count": 93734,
+        "sha256": "9fc135c97b8dd259dd80fc59322eefd7b6e9b6156aac7383864603cae28703d0",
+        "bytes": 1484613,
+        "probes": 29,
+        "native": {
+          "byExtensionId": "persona-route-manager@local",
+          "exists": true,
+          "fileSize": 1484613,
+          "state": "complete"
+        },
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1197.1899999999548,
+          "currentFirefoxRssBytes": 2481958912
+        }
+      },
+      {
+        "id": "9109c31b-e8bd-44e1-9b1f-029d3b396fff",
+        "automatic": true,
+        "paused": true,
+        "completedAt": 1793976057563,
+        "realElapsedSeconds": 3613.3711992,
+        "first": 93735,
+        "last": 95821,
+        "count": 2087,
+        "sha256": "7e0475a9045db65ca6bb6f485c11b7f554eb7098de7daf6ce86b60368ebbd7e4",
+        "bytes": 58774,
+        "probes": 29,
+        "native": {
+          "byExtensionId": "persona-route-manager@local",
+          "exists": true,
+          "fileSize": 58774,
+          "state": "complete"
+        },
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1820.6199999998928,
+          "currentFirefoxRssBytes": 2542612480
+        }
+      }
+    ],
+    "probes": [
+      {
+        "sequence": 91044,
+        "operationId": "long-session-0"
+      },
+      {
+        "sequence": 91157,
+        "operationId": "long-session-1"
+      },
+      {
+        "sequence": 91248,
+        "operationId": "long-session-2"
+      },
+      {
+        "sequence": 91339,
+        "operationId": "long-session-3"
+      },
+      {
+        "sequence": 91430,
+        "operationId": "long-session-4"
+      },
+      {
+        "sequence": 91521,
+        "operationId": "long-session-5"
+      },
+      {
+        "sequence": 91613,
+        "operationId": "long-session-6"
+      },
+      {
+        "sequence": 91703,
+        "operationId": "long-session-7"
+      },
+      {
+        "sequence": 91794,
+        "operationId": "long-session-8"
+      },
+      {
+        "sequence": 91884,
+        "operationId": "long-session-9"
+      },
+      {
+        "sequence": 91974,
+        "operationId": "long-session-10"
+      },
+      {
+        "sequence": 92075,
+        "operationId": "long-session-11"
+      },
+      {
+        "sequence": 92175,
+        "operationId": "long-session-12"
+      },
+      {
+        "sequence": 92267,
+        "operationId": "long-session-13"
+      },
+      {
+        "sequence": 92358,
+        "operationId": "long-session-14"
+      },
+      {
+        "sequence": 92449,
+        "operationId": "long-session-15"
+      },
+      {
+        "sequence": 92540,
+        "operationId": "long-session-16"
+      },
+      {
+        "sequence": 92630,
+        "operationId": "long-session-17"
+      },
+      {
+        "sequence": 92721,
+        "operationId": "long-session-18"
+      },
+      {
+        "sequence": 92813,
+        "operationId": "long-session-19"
+      },
+      {
+        "sequence": 92903,
+        "operationId": "long-session-20"
+      },
+      {
+        "sequence": 92993,
+        "operationId": "long-session-21"
+      },
+      {
+        "sequence": 93083,
+        "operationId": "long-session-22"
+      },
+      {
+        "sequence": 93174,
+        "operationId": "long-session-23"
+      },
+      {
+        "sequence": 93264,
+        "operationId": "long-session-24"
+      },
+      {
+        "sequence": 93375,
+        "operationId": "long-session-25"
+      },
+      {
+        "sequence": 93465,
+        "operationId": "long-session-26"
+      },
+      {
+        "sequence": 93557,
+        "operationId": "long-session-27"
+      },
+      {
+        "sequence": 93651,
+        "operationId": "long-session-28"
+      },
+      {
+        "sequence": 93764,
+        "operationId": "long-session-29"
+      },
+      {
+        "sequence": 93837,
+        "operationId": "long-session-30"
+      },
+      {
+        "sequence": 93908,
+        "operationId": "long-session-31"
+      },
+      {
+        "sequence": 93979,
+        "operationId": "long-session-32"
+      },
+      {
+        "sequence": 94050,
+        "operationId": "long-session-33"
+      },
+      {
+        "sequence": 94121,
+        "operationId": "long-session-34"
+      },
+      {
+        "sequence": 94192,
+        "operationId": "long-session-35"
+      },
+      {
+        "sequence": 94263,
+        "operationId": "long-session-36"
+      },
+      {
+        "sequence": 94334,
+        "operationId": "long-session-37"
+      },
+      {
+        "sequence": 94405,
+        "operationId": "long-session-38"
+      },
+      {
+        "sequence": 94476,
+        "operationId": "long-session-39"
+      },
+      {
+        "sequence": 94547,
+        "operationId": "long-session-40"
+      },
+      {
+        "sequence": 94618,
+        "operationId": "long-session-41"
+      },
+      {
+        "sequence": 94689,
+        "operationId": "long-session-42"
+      },
+      {
+        "sequence": 94760,
+        "operationId": "long-session-43"
+      },
+      {
+        "sequence": 94831,
+        "operationId": "long-session-44"
+      },
+      {
+        "sequence": 94902,
+        "operationId": "long-session-45"
+      },
+      {
+        "sequence": 94973,
+        "operationId": "long-session-46"
+      },
+      {
+        "sequence": 95044,
+        "operationId": "long-session-47"
+      },
+      {
+        "sequence": 95115,
+        "operationId": "long-session-48"
+      },
+      {
+        "sequence": 95187,
+        "operationId": "long-session-49"
+      },
+      {
+        "sequence": 95258,
+        "operationId": "long-session-50"
+      },
+      {
+        "sequence": 95329,
+        "operationId": "long-session-51"
+      },
+      {
+        "sequence": 95400,
+        "operationId": "long-session-52"
+      },
+      {
+        "sequence": 95471,
+        "operationId": "long-session-53"
+      },
+      {
+        "sequence": 95542,
+        "operationId": "long-session-54"
+      },
+      {
+        "sequence": 95613,
+        "operationId": "long-session-55"
+      },
+      {
+        "sequence": 95684,
+        "operationId": "long-session-56"
+      },
+      {
+        "sequence": 95755,
+        "operationId": "long-session-57"
+      }
+    ],
+    "modules": [
+      {
+        "enabled": true,
+        "id": "pcms-accounts",
+        "lifecycle": null,
+        "packageHash": "0a0a6124eec6ee904032e16dc8597e1bdc001d4c66a0b0907b6c4a75c7d2be52"
+      },
+      {
+        "enabled": true,
+        "id": "pcms-backup",
+        "lifecycle": null,
+        "packageHash": "ea006d3e29220125a215cc259a130a9d03f97d285b7d6d137ec9a7c3adce651d"
+      },
+      {
+        "enabled": true,
+        "id": "pcms-creator",
+        "lifecycle": null,
+        "packageHash": "da80a9d9991ef8a593b3aef097e32332ffa016d2176279f00790fd74757f8fcd"
+      },
+      {
+        "enabled": true,
+        "id": "pcms-deployer",
+        "lifecycle": null,
+        "packageHash": "aa37359291e872f622158a07d629e46b1757ed2690da6d2a8ebccd747c186f6d"
+      },
+      {
+        "enabled": true,
+        "id": "pcms-discover",
+        "lifecycle": null,
+        "packageHash": "b0696bbf96a3bc8d3e80d6ccf7c381f43f156ddb63a80c67d6f917051c1c8a76"
+      },
+      {
+        "enabled": true,
+        "id": "pcms-journal",
+        "lifecycle": null,
+        "packageHash": "121da8e272b2c59dc1f9edcef412e1f04a197fb23698da7b432f6468ee00757f"
+      },
+      {
+        "enabled": true,
+        "id": "pcms-refresher",
+        "lifecycle": null,
+        "packageHash": "88e9c67e7e9abda4c060b5b9ff3d7234b23fd3e7243a9ea5256301dc4196844a"
+      }
+    ],
+    "configuredAt": 1793972455098,
+    "initialDeadline": 1793974255098,
+    "realSeconds": 3626.400176493,
+    "result": "PASS",
+    "observationCount": 58,
+    "processSamples": [
+      {
+        "elapsedSeconds": 2.744025518000001,
+        "queryMs": 84.8179040000332,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 458.7999999999977,
+          "currentFirefoxRssBytes": 2612531200
+        }
+      },
+      {
+        "elapsedSeconds": 67.99442523399995,
+        "queryMs": 84.9762660000124,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 490.9699999999968,
+          "currentFirefoxRssBytes": 2315759616
+        }
+      },
+      {
+        "elapsedSeconds": 130.005659427,
+        "queryMs": 99.0626399999428,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 516.2599999999959,
+          "currentFirefoxRssBytes": 2397351936
+        }
+      },
+      {
+        "elapsedSeconds": 192.03041510600002,
+        "queryMs": 87.22608799996578,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 542.749999999994,
+          "currentFirefoxRssBytes": 2511970304
+        }
+      },
+      {
+        "elapsedSeconds": 255.09056573799995,
+        "queryMs": 89.17182599998341,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 570.229999999993,
+          "currentFirefoxRssBytes": 2525302784
+        }
+      },
+      {
+        "elapsedSeconds": 318.48587920999995,
+        "queryMs": 82.3569359999965,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 596.889999999991,
+          "currentFirefoxRssBytes": 2633240576
+        }
+      },
+      {
+        "elapsedSeconds": 382.37680937199997,
+        "queryMs": 84.64426299997285,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 623.5099999999893,
+          "currentFirefoxRssBytes": 2716667904
+        }
+      },
+      {
+        "elapsedSeconds": 445.897322394,
+        "queryMs": 90.79915200004507,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 649.8399999999876,
+          "currentFirefoxRssBytes": 2917408768
+        }
+      },
+      {
+        "elapsedSeconds": 509.51170428099994,
+        "queryMs": 87.77104299997518,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 678.099999999986,
+          "currentFirefoxRssBytes": 3021459456
+        }
+      },
+      {
+        "elapsedSeconds": 574.1372673380001,
+        "queryMs": 78.95227599988175,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 704.4499999999838,
+          "currentFirefoxRssBytes": 2933510144
+        }
+      },
+      {
+        "elapsedSeconds": 636.5360422860001,
+        "queryMs": 75.09638700003052,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 726.9299999999822,
+          "currentFirefoxRssBytes": 2991263744
+        }
+      },
+      {
+        "elapsedSeconds": 706.4660898550001,
+        "queryMs": 78.33031099994514,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 755.5699999999803,
+          "currentFirefoxRssBytes": 2757636096
+        }
+      },
+      {
+        "elapsedSeconds": 768.884870418,
+        "queryMs": 80.14038200008144,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 783.7299999999783,
+          "currentFirefoxRssBytes": 2878386176
+        }
+      },
+      {
+        "elapsedSeconds": 832.7165075340001,
+        "queryMs": 75.88972899998225,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 807.5699999999765,
+          "currentFirefoxRssBytes": 2806280192
+        }
+      },
+      {
+        "elapsedSeconds": 892.785259986,
+        "queryMs": 78.32101999997576,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 832.1899999999749,
+          "currentFirefoxRssBytes": 2838528000
+        }
+      },
+      {
+        "elapsedSeconds": 953.814331108,
+        "queryMs": 78.29536400004145,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 855.6599999999733,
+          "currentFirefoxRssBytes": 2849521664
+        }
+      },
+      {
+        "elapsedSeconds": 1023.708742284,
+        "queryMs": 85.01293099993745,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 879.4899999999726,
+          "currentFirefoxRssBytes": 2819035136
+        }
+      },
+      {
+        "elapsedSeconds": 1084.107675381,
+        "queryMs": 78.16313300008915,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 903.8199999999712,
+          "currentFirefoxRssBytes": 2774790144
+        }
+      },
+      {
+        "elapsedSeconds": 1145.024252936,
+        "queryMs": 79.44479999991927,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 929.2299999999696,
+          "currentFirefoxRssBytes": 2776911872
+        }
+      },
+      {
+        "elapsedSeconds": 1205.4134894400001,
+        "queryMs": 76.20654099991953,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 956.019999999968,
+          "currentFirefoxRssBytes": 2802077696
+        }
+      },
+      {
+        "elapsedSeconds": 1267.399104305,
+        "queryMs": 78.13797999983763,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 979.7899999999665,
+          "currentFirefoxRssBytes": 2789265408
+        }
+      },
+      {
+        "elapsedSeconds": 1328.133061649,
+        "queryMs": 82.02327499998319,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1006.4499999999649,
+          "currentFirefoxRssBytes": 2835083264
+        }
+      },
+      {
+        "elapsedSeconds": 1388.820243096,
+        "queryMs": 75.69896900008644,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1032.7199999999634,
+          "currentFirefoxRssBytes": 2848174080
+        }
+      },
+      {
+        "elapsedSeconds": 1449.20348932,
+        "queryMs": 77.9158859998006,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1058.9499999999614,
+          "currentFirefoxRssBytes": 2821689344
+        }
+      },
+      {
+        "elapsedSeconds": 1510.404633001,
+        "queryMs": 76.50492900006611,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1084.3199999999595,
+          "currentFirefoxRssBytes": 2834321408
+        }
+      },
+      {
+        "elapsedSeconds": 1570.902847667,
+        "queryMs": 80.79029100008484,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1111.9799999999584,
+          "currentFirefoxRssBytes": 2856865792
+        }
+      },
+      {
+        "elapsedSeconds": 1631.643564027,
+        "queryMs": 78.13202899978933,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1136.2299999999566,
+          "currentFirefoxRssBytes": 2802892800
+        }
+      },
+      {
+        "elapsedSeconds": 1701.388660983,
+        "queryMs": 81.45238999986759,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1160.9599999999557,
+          "currentFirefoxRssBytes": 2832744448
+        }
+      },
+      {
+        "elapsedSeconds": 1762.121244095,
+        "queryMs": 76.22124699992128,
+        "paused": false,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1185.3599999999542,
+          "currentFirefoxRssBytes": 2809085952
+        }
+      },
+      {
+        "elapsedSeconds": 1823.395482998,
+        "queryMs": 72.58170700015398,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1215.0399999999538,
+          "currentFirefoxRssBytes": 2891972608
+        }
+      },
+      {
+        "elapsedSeconds": 1893.3051986520002,
+        "queryMs": 72.88175400026375,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1234.3399999999524,
+          "currentFirefoxRssBytes": 2858180608
+        }
+      },
+      {
+        "elapsedSeconds": 1963.1756502810001,
+        "queryMs": 76.26163399982033,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1253.4599999999505,
+          "currentFirefoxRssBytes": 2837467136
+        }
+      },
+      {
+        "elapsedSeconds": 2023.1791695640002,
+        "queryMs": 72.89951899974767,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1272.7699999999484,
+          "currentFirefoxRssBytes": 2839855104
+        }
+      },
+      {
+        "elapsedSeconds": 2092.958727064,
+        "queryMs": 74.95959499965466,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1291.7499999999468,
+          "currentFirefoxRssBytes": 2810843136
+        }
+      },
+      {
+        "elapsedSeconds": 2162.7709613449997,
+        "queryMs": 72.83460799999375,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1311.509999999945,
+          "currentFirefoxRssBytes": 2831671296
+        }
+      },
+      {
+        "elapsedSeconds": 2232.7662478519997,
+        "queryMs": 78.71391199978461,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1330.949999999943,
+          "currentFirefoxRssBytes": 2854625280
+        }
+      },
+      {
+        "elapsedSeconds": 2292.8849958879996,
+        "queryMs": 82.4792459998207,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1351.3199999999404,
+          "currentFirefoxRssBytes": 2828972032
+        }
+      },
+      {
+        "elapsedSeconds": 2353.364864927,
+        "queryMs": 72.22971400005918,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1370.869999999938,
+          "currentFirefoxRssBytes": 2839281664
+        }
+      },
+      {
+        "elapsedSeconds": 2413.452672134,
+        "queryMs": 71.61598399989089,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1390.6699999999353,
+          "currentFirefoxRssBytes": 2874748928
+        }
+      },
+      {
+        "elapsedSeconds": 2473.662777321,
+        "queryMs": 76.90923400014071,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1410.9199999999332,
+          "currentFirefoxRssBytes": 2838294528
+        }
+      },
+      {
+        "elapsedSeconds": 2534.3697023219997,
+        "queryMs": 77.08426499993948,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1431.2399999999311,
+          "currentFirefoxRssBytes": 2835636224
+        }
+      },
+      {
+        "elapsedSeconds": 2595.142552751,
+        "queryMs": 82.45523100003993,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1455.8999999999287,
+          "currentFirefoxRssBytes": 2859315200
+        }
+      },
+      {
+        "elapsedSeconds": 2659.303343109,
+        "queryMs": 80.5529179997393,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1477.759999999927,
+          "currentFirefoxRssBytes": 2854416384
+        }
+      },
+      {
+        "elapsedSeconds": 2720.81989793,
+        "queryMs": 81.00439000008919,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1498.5999999999242,
+          "currentFirefoxRssBytes": 2856669184
+        }
+      },
+      {
+        "elapsedSeconds": 2782.109549751,
+        "queryMs": 76.83461000033276,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1520.9799999999211,
+          "currentFirefoxRssBytes": 2819682304
+        }
+      },
+      {
+        "elapsedSeconds": 2844.590195591,
+        "queryMs": 78.49382899985358,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1543.4599999999189,
+          "currentFirefoxRssBytes": 2853834752
+        }
+      },
+      {
+        "elapsedSeconds": 2907.089367394,
+        "queryMs": 74.15633100026753,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1563.989999999916,
+          "currentFirefoxRssBytes": 2860220416
+        }
+      },
+      {
+        "elapsedSeconds": 2967.6034855159996,
+        "queryMs": 82.86638500021581,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1587.1099999999135,
+          "currentFirefoxRssBytes": 2975502336
+        }
+      },
+      {
+        "elapsedSeconds": 3030.7156342089997,
+        "queryMs": 73.71853900031056,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1607.5599999999113,
+          "currentFirefoxRssBytes": 2898771968
+        }
+      },
+      {
+        "elapsedSeconds": 3091.1574422529998,
+        "queryMs": 76.42896900006235,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1628.0599999999097,
+          "currentFirefoxRssBytes": 2870796288
+        }
+      },
+      {
+        "elapsedSeconds": 3151.936678087,
+        "queryMs": 81.58322600002066,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1649.7999999999072,
+          "currentFirefoxRssBytes": 2921508864
+        }
+      },
+      {
+        "elapsedSeconds": 3213.1465870909997,
+        "queryMs": 90.2957719999904,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1675.8699999999044,
+          "currentFirefoxRssBytes": 2840600576
+        }
+      },
+      {
+        "elapsedSeconds": 3278.097602433,
+        "queryMs": 91.39297000001534,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1700.8499999999021,
+          "currentFirefoxRssBytes": 2847227904
+        }
+      },
+      {
+        "elapsedSeconds": 3342.981958349,
+        "queryMs": 76.22907099994336,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1720.3899999998998,
+          "currentFirefoxRssBytes": 2902294528
+        }
+      },
+      {
+        "elapsedSeconds": 3403.0688283329996,
+        "queryMs": 74.95521999999255,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1740.8199999998983,
+          "currentFirefoxRssBytes": 2934599680
+        }
+      },
+      {
+        "elapsedSeconds": 3463.7134934309997,
+        "queryMs": 80.84792799991192,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1765.0099999998963,
+          "currentFirefoxRssBytes": 2995453952
+        }
+      },
+      {
+        "elapsedSeconds": 3527.642402401,
+        "queryMs": 80.16538600031708,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1787.8099999998942,
+          "currentFirefoxRssBytes": 2909782016
+        }
+      },
+      {
+        "elapsedSeconds": 3589.423405733,
+        "queryMs": 78.47440700015795,
+        "paused": true,
+        "resources": {
+          "aggregateFirefoxRssPeakBytes": 3557781504,
+          "sampledFirefoxCpuSeconds": 1811.6899999998918,
+          "currentFirefoxRssBytes": 3010224128
+        }
+      }
+    ]
+  },
+  "probeLatencyMs": {
+    "min": 71.61598399989089,
+    "median": 78.40235900005155,
+    "max": 99.0626399999428,
+    "samples": 58
+  },
+  "runId": 42226606447,
+  "jobId": 127921582631,
+  "fixtureCommit": "ca8bd9af437c6dd19ebd4f962aa58afd9836298a",
+  "fixtureTree": "bad9d003886368a90a85ba6462e08ac3ffd3f49f",
+  "artifact": {
+    "id": 13512250853,
+    "sha256": "c398acbe9b118758cadadf17fe3678a97370c5b141a6978e07f0bc6da8e45ae0",
+    "bytes": 13644,
+    "zipEntries": 4
+  },
+  "exactCandidate": {
+    "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+    "candidateRunId": 42220618849,
+    "candidateArtifactId": 13503441570,
+    "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+    "preflight": "PASS",
+    "runtimeChanged": false
+  },
+  "rawArchiveCustody": "Runner independently reopened private production ZIPs from actual Firefox Downloads. Public artifact contains only synthetic JSON receipts and driver log."
+}

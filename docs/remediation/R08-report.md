@@ -1,6 +1,6 @@
 # R08 — integrated exact-artifact gate
 
-Status: **BLOCKED / in progress. No operator-ready candidate or release XPI is delivered.**
+**Status. All pre-operator fixture, disk, scale and visual gates pass for the exact run 365 XPI. Real P42–P49 remain NOT TESTED.**
 
 The R08 plan was committed before integration changes (`fd545fc`, based on remote R07 `bef12ba9db4a68b37b439400dfc98379bd3e041e`, tree `514f1c894c564db1681f5e739ba3890a44cb1d47`). Main remains `a3a084dcdb52cb51ff1ef82d1287d18fa7661129`; PR45 is draft and unmerged. No live Perchance/native/content-repository operation was performed. Publication writes are scoped to this authorized implementation repository and non-forced branch/PR operations.
 
@@ -252,3 +252,13 @@ Original 364 completed restore, narrow full-page capture `backup-real-restore-co
 Standalone DEVELOP, Git, Discover, Creator, DEPLOY, Refresher, route recovery, default Journal, shared UI, startup and standalone restore passed on Firefox 155.0, build 20260817142839, multiprocess sandbox level 6. The one-profile chain passed all nine checks through the real Backup, DRAIN hold, preservation of all four exact contexts, same-job Check and two validated fresh destination mappings. Independent disk and provider-fixture receipts preserve binary, Unicode, previous-good and root bytes. [Integrated evidence](evidence/R08-run365-integrated.json). [Route and causal disk evidence](evidence/R03-run365-route.json).
 
 The installed job failed during the capacity test. Both representative archives reopened with 50 accounts, 1,001 generators, 90,000 synthetic events over 90 days and a verified 32 MiB binary. The fixture then tried the hidden Confirm control in the post-restart identity hold. The next visible action was Complete login. The corrected test clicks it, waits for the new login job, signs in within the same protected context, confirms and checks the original principal and route. The retry uses the same downloaded XPI with independent hash and preflight. The timed hour did not start in run 365. [Capacity retry](https://github.com/Neb963/PCMS/actions/runs/42226606447).
+
+## Qualification decision
+
+The same-XPI run 367 passed the representative backups, failure and restart cases, and 3,626.40 s of unaltered production scheduling. The two automatic 30-minute exports cover adjacent ranges 1–93,734 and 93,735–95,821 with all 58 correlated probes. The second completes while globally paused. [Capacity and duration evidence](R07-report.md).
+
+Final V passes on the same bytes. It includes original PNG hashes, 150 keyboard audits, the actual terminal page of 1,005 rows and native Gecko accessibility at three widths. The controlled P41 reply-loss comparison reproduces one installed search stall and proves retryable recovery on the candidate. The exact historical operator query and cause remain unknown. [V](R06-final-vision.md). [Search](R05-report.md).
+
+The unsigned candidate is PCMS 0.49.0, Gecko ID `persona-route-manager@local`. Exact XPI SHA-256 `609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd`, 911,159 bytes. Manifest SHA-256 `f85c9762d4fc805e32c212d0a755b82de8fc3baca0a3411debfc378e2147027f`. Bundled registry SHA-256 `972e8e09a4c6c59f35696099c1d812e9f838e6a2f1c24a1ec4d7351c7537ede4`. All seven module ZIP hashes are in the [candidate receipt](evidence/R08-run365-completed.json). All known P0/P1 pre-operator regressions have closure evidence or an explicitly documented historical evidence limit. [Consolidated defect closure](DEFECT-CLOSURE.md).
+
+Qualification covers the exact local fixture XPI. Live donor, Git, provider, native AI, directory, restore portability and real route capacity require the named P42–P49 authorizations and independent live evidence. All remain NOT TESTED.
