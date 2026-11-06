@@ -3,6 +3,7 @@ All provider/bridge/session data is synthetic, local and disposable.
 """
 from installed_backup_sessions import backup_page,coverage,manage,configure_auth,inspect_paused
 from installed_accounts import account_session,add,settle,login
+from installed_account_lifecycle import visible
 from installed_lifecycle import permission_choice
 from installed_journal import set_input,close_dashboard
 from installed_packages import *
@@ -44,7 +45,7 @@ def main(after_checks=None):
    script(sid,"Components.classes['@mozilla.org/security/x509certdb;1'].getService(Components.interfaces.nsIX509CertDB).addCertFromBase64(arguments[0],'C,,');Services.prefs.setStringPref('browser.download.dir',arguments[1]);Services.prefs.setIntPref('browser.download.folderList',2);Services.prefs.setBoolPref('browser.download.useDownloadDir',true);return true;",[base64.b64encode(fixture.ca).decode(),str(disk)]);prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content')
    assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid);settings(sid);wait(lambda:script(sid,"return !!document.getElementById('allow-userscripts')"));click(sid,'#allow-userscripts');permission_choice(sid,True);wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"));ids=[]
    for label,email in [('Backup source one','backup1@fixture.test'),('Backup source two','backup2@fixture.test')]:
-    id=add(sid,label);settle(sid,id,'LOGIN_REQUIRED');login(sid,id,email);click(sid,'#account-confirm');settle(sid,id,'READY');ids.append(id)
+    id=add(sid,label);settle(sid,id,'LOGIN_REQUIRED');login(sid,id,email);visible(sid,'#account-confirm');click(sid,'#account-confirm');settle(sid,id,'READY');ids.append(id)
    for index,id in enumerate(ids):configure_auth(sid,id,'synthetic-token-'+str(index)+'\0雪\r\n')
    model=setup_model(sid,ids)
    with zipfile.ZipFile(xpi) as outer:
@@ -89,8 +90,10 @@ def main(after_checks=None):
    click(sid,'#pause-core');wait(lambda:not inspect_paused(sid))
    from installed_accounts import account as account_status,page as account_page
    for index,id in enumerate(ids):
-    account_page(sid,id);before_open=account_status(sid,id)['flow']['jobId'];wait(lambda:script(sid,"return !document.getElementById('account-open').disabled"));click(sid,'#account-open');dashboard(sid);wait(lambda:account_status(sid,id)['flow']['jobId']!=before_open)
-    settle(sid,id,'HELD','ACCOUNT_LOGIN_REQUIRED');login(sid,id,'backup'+str(index+1)+'@fixture.test');configure_auth(sid,id,fixture.logins[account_status(sid,id)['routeId']]['sessionToken']);click(sid,'#account-confirm');settle(sid,id,'READY');dashboard(sid)
+    account_page(sid,id);before_open=account_status(sid,id)['flow']['jobId'];visible(sid,'#account-open');click(sid,'#account-open');dashboard(sid);wait(lambda:account_status(sid,id)['flow']['jobId']!=before_open)
+    held=settle(sid,id,'HELD','ACCOUNT_LOGIN_REQUIRED');account_page(sid,id);visible(sid,'#account-login');click(sid,'#account-login');dashboard(sid)
+    awaiting=settle(sid,id,'LOGIN_REQUIRED');assert awaiting['flow']['purpose']=='LOGIN' and awaiting['flow']['jobId']!=held['flow']['jobId']
+    login(sid,id,'backup'+str(index+1)+'@fixture.test');configure_auth(sid,id,fixture.logins[account_status(sid,id)['routeId']]['sessionToken']);visible(sid,'#account-confirm');click(sid,'#account-confirm');ready=settle(sid,id,'READY');assert ready['expectedPrincipal']==held['expectedPrincipal'] and ready['routeId']==held['routeId'];dashboard(sid)
    click(sid,'#pause-core');wait(lambda:inspect_paused(sid));backup_page(sid)
    # Force actual Downloads cancellation at its returned ID, then restore the
    # API. The production receipt must report interruption and retain good files.
