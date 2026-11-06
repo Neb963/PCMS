@@ -2,7 +2,7 @@
 
 **Status. All pre-operator fixture, disk, scale and visual gates pass for the exact run 365 XPI. Real P42–P49 remain NOT TESTED.**
 
-The R08 plan was committed before integration changes (`fd545fc`, based on remote R07 `bef12ba9db4a68b37b439400dfc98379bd3e041e`, tree `514f1c894c564db1681f5e739ba3890a44cb1d47`). Main remains `a3a084dcdb52cb51ff1ef82d1287d18fa7661129`; PR45 is draft and unmerged. No live Perchance/native/content-repository operation was performed. Publication writes are scoped to this authorized implementation repository and non-forced branch/PR operations.
+The R08 plan was committed before integration changes (`fd545fc`, based on remote R07 `bef12ba9db4a68b37b439400dfc98379bd3e041e`, tree `514f1c894c564db1681f5e739ba3890a44cb1d47`). The initial main base was `a3a084dcdb52cb51ff1ef82d1287d18fa7661129`. PR45 stayed draft during qualification. No live Perchance/native/content-repository operation was performed. Publication writes are scoped to this authorized implementation repository and non-forced branch/PR operations.
 
 ## Current364 exact-artifact gate
 
@@ -262,3 +262,9 @@ Final V passes on the same bytes. It includes original PNG hashes, 150 keyboard 
 The unsigned candidate is PCMS 0.49.0, Gecko ID `persona-route-manager@local`. Exact XPI SHA-256 `609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd`, 911,159 bytes. Manifest SHA-256 `f85c9762d4fc805e32c212d0a755b82de8fc3baca0a3411debfc378e2147027f`. Bundled registry SHA-256 `972e8e09a4c6c59f35696099c1d812e9f838e6a2f1c24a1ec4d7351c7537ede4`. All seven module ZIP hashes are in the [candidate receipt](evidence/R08-run365-completed.json). All known P0/P1 pre-operator regressions have closure evidence or an explicitly documented historical evidence limit. [Consolidated defect closure](DEFECT-CLOSURE.md).
 
 Qualification covers the exact local fixture XPI. Live donor, Git, provider, native AI, directory, restore portability and real route capacity require the named P42–P49 authorizations and independent live evidence. All remain NOT TESTED.
+
+## Published handoff
+
+[PR #45](https://github.com/Neb963/PCMS/pull/45) merged as `a0ba171b35f8cb860e30768f912e6a348a65cf39` after qualification. The fetched merge tree equals the tested source tree `2f862d4ece13f052bdfb3ba3fc2031a58e7f455a` and retains the tested source as a parent. The supplied XPI is the original run 365 file under the name `PCMS-R08-Qualified-0.49.0.xpi`. The concise `OPERATOR-LIVE-TEST-GUIDE.md` accompanies it.
+
+[PR #48](https://github.com/Neb963/PCMS/pull/48) merged as `cf5eefee8a1bcaceada805bc8af3a6ebe9aab894`. The fetched tree `a000c815eb8290213798b2fb7158be8c3951d39b` differs from the verified source only in `todo.md` and `tests/installed_backup_export.py`. The test file is byte-identical to the corrected driver executed in run 367. The application source, package inputs and delivered XPI match the tested candidate. The two evidence-only draft PRs were closed after their original run receipts were retained.
