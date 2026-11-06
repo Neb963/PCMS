@@ -1,0 +1,48 @@
+{
+  "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+  "tree": "2f862d4ece13f052bdfb3ba3fc2031a58e7f455a",
+  "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+  "xpiBytes": 911159,
+  "runId": 42220618849,
+  "focused": {
+    "jobId": 127901449643,
+    "pass": 295,
+    "fail": 0,
+    "ms": 85619.019594
+  },
+  "sourceTests": {
+    "command": "npm run build; npm test",
+    "node": "v24.22.1",
+    "pass": 531,
+    "fail": 0,
+    "ms": 183016.714548,
+    "logSha256": "805df6dcb5a6c9c75c961f4a95abf7bc8f2b50248811c4317755df1db8040381"
+  },
+  "candidate": {
+    "id": 13503441570,
+    "zipSha256": "912866b68f6f322226756ce42ed88daf0a1d21776afe4721ed6bec9676471f46",
+    "entries": 2,
+    "localByteMatch": true,
+    "preflight": "PASS",
+    "preflightLogSha256": "ec9f737f0498a105b88c94f3b24e93f83fecf5a5a0fceb69aa2b0b43d05a06bd"
+  },
+  "develop": {
+    "id": 13503337509,
+    "zipSha256": "4572f0256b3f2951c31e4258183667f3a44e9c75e635c2aee0399c0b760ad14a",
+    "entries": 2,
+    "result": "PASS",
+    "receiptSha256": "a91be0c416755caa51e3a86e6fb83a719db198f4c8131c118860dcdd38b2dd6f",
+    "driverLogSha256": "45f2cd44cc4fdf23231259e011cd9a7d9160e8f8d48a0027215af99f314c0146",
+    "checks": 3,
+    "providerSaves": 8,
+    "newChats": 2,
+    "promptSends": 2,
+    "gitOperations": 4,
+    "screenshots": 12,
+    "keyboardAudits": 4,
+    "browser": "155.0",
+    "buildId": "20260817142839",
+    "sandbox": 6
+  },
+  "qualification": "OPEN pending remaining B/DSK, V, capacity and timed rounds. Real P42–P49 NOT TESTED."
+}

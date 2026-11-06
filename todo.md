@@ -1,26 +1,12 @@
-# R01–R08 current integration gate
+# R08 active qualification
 
-Accepted v42/design revision2, PHASES, AGENTS and CI-GUIDELINES are unchanged. Full authority/remediation/I-A–I-F package was reread in this continuation. Continue R08 autonomously; no operator logs or piecemeal reproductions requested. No live Perchance/Mullvad/native/content-repository mutations. Real P42–P49 remain NOT TESTED. No release, merge or operator guide until every pre-operator gate passes.
+The accepted v42, design revision 2, PHASES, AGENTS, CI guidelines and full remediation/I-A–I-F package were reviewed. Continue draft PR #45.
 
-## Active364 candidate
+Candidate `1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69`, XPI `609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd`. Clean local/CI byte match and preflight pass. Source 531/0 and CI focused 295/0 pass. Standalone DEVELOP first and update pass on the exact candidate. The reproduced read-only Creator CAS mechanism is fixed and tested. The original 364 hidden exception remains unproved. [Early receipt](docs/remediation/evidence/R08-run365-early.json).
 
-| Identity | Value |
-|---|---|
-| PR45 source | `41b5af74923815c84c080f271702239a94e40184` |
-| Tree | `241cd18950beb11c58836e1968de7c759bff6866` |
-| Exact local XPI | `acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2` /909884bytes |
-| CI | [Run364](https://github.com/Neb963/PCMS/actions/runs/41661871922) |
+1. Verify the integrated, route, visual and final installed artifacts on this exact XPI, including fresh restore, no uncertain replay, full byte preservation and default disk diagnostics.
+2. Inspect actual pixels across the required pages, states and three CSS widths and correlate interaction audits. Bind findings to original hashes.
+3. Verify representative capacity and two actual 30-minute Journal exports with the second globally paused. Prior hour evidence belongs to its original artifact.
+4. Complete the phase reports and defect closure. Keep PR45 draft and frozen until the required gates pass. Deliver the exact tested XPI and concise operator guide after qualification. Real P42–P49 remain NOT TESTED.
 
-Clean build/preflight PASS; all248 shipping entries equal the exact362 CI artifact except build-identity.json. Source/runtime/scripts/vendor/package and donor/TTL/effect/source/restore guards are unchanged. Reuse [source509+15 coverage](docs/remediation/evidence/T-run362-source.json) with original0b978844 identity; no fabricated single524-case green invocation.363 focused288/75.063s and artifact equality are retained in R08. 364 focused288/91.194s PASS. Candidate13243286521/ZIPd1d300afb0957901918f57c1781f683985d21d7201b445a544351fd2903647f2 independently CRC-reopens to identical local XPI; isolated exact-source preflight PASS. Integrated full-chain PASS/all9 checks on exact364; original immediate13243791347/ZIPb9789878b744fe319852377996068a62da69d3e4708bf97dce676987d10b2944/receiptca9dc49a1d439ba2bbb92bbf2437f725a6648cf363bb9223b7917a2331537895 is independently reopened. All4 known held contexts preserved before close; same-job Check completes2 fresh mappings/validated login/routes, exact source/history/effects/old roots/sentinel,7 enabled/Pause. Independent route all7/default disk PASS independently reopened (R03). Completed installed job FAILS standalone DEVELOP before AI activity: Creator initial SCAN is HELD/MODULE_STEP_FAILED with no effects; original hidden exception was discarded. Other independent stages including production restore pass; capacity/hour skipped. Full V remains open; no failure waived. See [completed checkpoint](docs/remediation/evidence/R08-run364-completed.json).
-
-## Current blocker and immediate next work
-
-The restored workspace retained the original edits. The actual Core/Creator/opaque sandbox-host regression passed with the initial fix. Tighten the retry to a parent-observed typed CAS failure during Creator’s initial read-only scan, bind its recovery transaction to the active dataset/package/generation/revision, and preserve newer progress and any possible or prior write. Reuse the existing guarded Core mutation and event projection. Preserve only typed, safe causal diagnostics across the opaque frame. The completed logs prove a separate missing fixture read log; they do not prove the discarded raw Creator cause.
-
-1. Extend the recovered regression across the real host and sandbox. Verify trusted parent-issued same-step/frame references, safe error redaction, matching dataset/generation/package/revision, same-job read-only retry, no replay for POSSIBLE/history writes and no overwrite of newer progress. Add counterfactuals before publishing a runtime change.
-2. Original standalone DEVELOP and final installed artifact13246936901 are retained. The 482-entry ZIP independently reopens with digest8d0ff557a2a94f4c2cbb8f24cc480f28a415c3be42ec837edc1887f526353437 and all4 standalone restore checks pass. Improve failure diagnostics with default disk Journal, structured account/module/job state and unique driver log. Run standalone DEVELOP first with immediate receipt upload, then all independent journeys. Build generated sources before full source tests. New shipping host changes require new exact-artifact qualification; old248-entry equivalence does not cover them.
-3. Complete same-artifact V: primary/Settings/module/normal/empty/Preparing/Sleep/error/Unknown/held/review/complete/restore states at1280/560/~392 CSS widths, full/viewport originals, actual controls/Tab/hidden-focus checks. Directly inspect pixels and retain severity/correction/reinspection. [Iterations10–12](docs/remediation/R06-report.md) remain partial predecessor reviews; capture success is not V.
-4. Finish representative installed capacity and actual two30-minute Journal rounds, including globally paused second round; independently reopen produced disk archives. Prior356 actual3639s/two rounds stays attributed to its original source/XPI in R07; no unfinished later hour is claimed.
-5. Update closure/phase reports from actual final evidence. Historical operator search query/root remains UNKNOWN; no live P42–P49 acceptance. Only after all pre-operator gates pass, merge/deliver the actual tested XPI and concise guide.
-
-Do not weaken donor-first/no Direct/original15-minute TTL, same-operation/no uncertain replay, source/previous-good/manual/binary/path/root-instruction preservation or unknown/dirty context holds. PR45 stays draft and main is not changed before qualification. Keep evidence checkpoints separate from the frozen candidate; use isolated exact-source checkout for artifact preflight. Do not rebuild from an evidence-only child for delivery.
+Preserve donor-first fail-closed routing, original 15-minute TTL, no Direct fallback, same-operation recovery, all seven enabled modules and current/previous-good/manual/binary/path/root-instruction preservation. Use independent fixtures for provider, route and content-repository effects.
