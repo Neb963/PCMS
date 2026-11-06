@@ -1,4 +1,4 @@
-name: R08 exact XPI visual supplement
+name: R08 settled account and installed search comparison
 on:
   pull_request:
     branches: [remediation/r06-ui]
@@ -22,6 +22,14 @@ jobs:
           run-id: 42220618849
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: tested/build
+      - uses: actions/download-artifact@v4
+        with:
+          name: pcms-candidate-decd5e84d3546ccd11686c577b95cf94ba0cb0b6
+          run-id: 41456369462
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: baseline
+      - name: Verify the original P41 baseline
+        run: printf '%s  %s\n' 'ba8c844dafc72afb44aea1ca7d9d00940e8b021471086995283dd9c6aca7d127' baseline/pcms-dev.xpi | sha256sum -c -
       - name: Verify the original installed candidate
         working-directory: tested
         run: |
@@ -42,12 +50,17 @@ jobs:
         env:
           PCMS_VISUAL_SUPPLEMENT: '1'
         run: python3 tests/installed_visual.py tested/build/pcms-dev.xpi
+      - name: Compare real Firefox search after one lost Core response
+        if: ${{ !cancelled() }}
+        run: python3 tests/installed_search_reply_loss.py baseline/pcms-dev.xpi tested/build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: visual-supplement-365
+          name: settled-visual-search-365
           path: |
             test-results/installed-visual.json
             test-results/visual-driver.log
             test-results/visual/journey-account-archived/
             test-results/visual/journey-home-directory-measured/
+            test-results/search-reply-loss-*.json
+            test-results/search-reply-loss-*.log

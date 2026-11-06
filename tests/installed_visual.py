@@ -62,7 +62,7 @@ def main():
     receipt['checks'].append('Home real directory observation: separate Top 50, Top 100 and full-list counts at all widths')
    account_page(sid,owner);click(sid,'#account-archive');settle(sid,owner,'ARCHIVED')
    def archived():
-    return script(sid,"const s=document.getElementById('account-state'),b=document.getElementById('account-reactivate');return s?.textContent==='Archived'&&b&&!b.hidden&&!b.disabled&&!document.getElementById('account-open')?.getClientRects().length;")
+    return script(sid,"const s=document.getElementById('account-state'),b=document.getElementById('account-reactivate'),row=document.querySelector('#account-list a[href=\"#accounts/'+arguments[0]+'\"]');return s?.textContent==='Archived'&&b&&!b.hidden&&!b.disabled&&!document.getElementById('account-open')?.getClientRects().length&&row?.textContent.includes(' · Archived · ')&&!row.textContent.includes(' · Ready · ');",[owner])
    state_matrix(sid,'account-archived',receipt,prepare=lambda:wait(archived,30))
    receipt['checks'].append('settled archived projection and enabled Reactivate at each viewport')
    receipt['result']='CAPTURED — VISION REVIEW REQUIRED'
