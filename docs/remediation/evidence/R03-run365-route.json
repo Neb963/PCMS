@@ -1,0 +1,37 @@
+{
+  "tier": "B/DSK-R03-native-outage-DNS-isolation-and-principal",
+  "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+  "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+  "result": "PASS",
+  "checks": [
+    "two-real-UI-enrollments/post-Confirm-distinct-principals-containers-exits/real-process-restart/native-outage/fail-closed-typed-holds/automatic-deadline-recovery/no-Repair-Verify-click/no-new-Persona-or-route",
+    "second-real-process-restart/one-route-DNS-rejection/other-account-verified/unchanged-tuple/explicit-DNS-hold/contextual-Repair-fresh-proof/no-Direct",
+    "real-process-restart/unknown-DNS/DNS_LEAK_DETECTED/other-account-fresh/unchanged-tuple/no-new-container/no-silent-adoption/contextual-Repair-fresh-proof",
+    "real-process-restart/unknown-IPv6/ACCOUNT_IPV6_UNVERIFIED/other-account-fresh/unchanged-tuple/no-new-container/no-silent-adoption/contextual-Repair-fresh-proof",
+    "real-process-restart/changed-duplicate-exit/ACCOUNT_EXIT_CHANGED/other-account-fresh/unchanged-tuple/no-new-container/no-silent-adoption/contextual-Repair-fresh-proof",
+    "real-human-login-change/actual-Open-identity-check/principal-mismatch-held/no-silent-rebind/other-account-usable/remote-source-unchanged",
+    "default-Journal/actual-Export/independent-disk-CRC-range-hashes/original-native-DNS-principal-causes/no-session-token"
+  ],
+  "journal": {
+    "sha256": "a860f451191a2e2b60ccd6f4d207af1a89dca09066062483f1d03fbfc33a2d61",
+    "first": 1,
+    "last": 579,
+    "faultCodes": [
+      "ACCOUNT_EXIT_CHANGED",
+      "ACCOUNT_IPV6_UNVERIFIED",
+      "ACCOUNT_PRINCIPAL_CHANGED",
+      "DNS_LEAK_DETECTED",
+      "MULLVAD_LOCAL_SERVICE_UNAVAILABLE",
+      "SUPERSEDED_BY_RECHECK"
+    ]
+  },
+  "nativeOutageCodes": [
+    "MULLVAD_LOCAL_SERVICE_UNAVAILABLE"
+  ],
+  "artifactId": 13504033165,
+  "artifactZipSha256": "c2c0637e6596f3009d9704b4d6cad02ec53d1c1f7482167dedce669433a0ca2c",
+  "originalReceiptSha256": "f3063da80b38d98c81fbcd17154c37cdb0248838cf312b6c4657442fa0bf13a0",
+  "screenshots": 18,
+  "keyboardAudits": 6,
+  "dnsRejectCount": 6
+}

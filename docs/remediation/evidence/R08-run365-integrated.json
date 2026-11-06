@@ -1,0 +1,73 @@
+{
+  "tier": "B/DSK-one-profile-seven-module-rehearsal",
+  "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+  "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+  "result": "PASS",
+  "checks": [
+    "one-persistent-clean-profile/two-real-UI-Confirm/distinct-principals-containers-routes/seven-enabled",
+    "actual-Discover-Available-Taken-Unknown/marker-only-Git-preparation/automatic-Creator/one-private-create-and-rename/unlisted-stable-identity/no-negative-folder-or-provider-write",
+    "same-profile/separate-DEPLOY-folder/unlist-full-PJS-HTML-binary-Unicode-source/publication-pool-DONE/independent-bytes/writer-release",
+    "same-generator-DEVELOP-update/distinct-src-instructions/exact-native-prompt/real-human-review-Finish/full-source-Git-SOURCE/publication-pool-DONE/preserved-cycle-and-root-instructions",
+    "same-profile/actual-rendered-directory/fixed-pin-filter-scope/automatic-Refresher/both-markers/full-byte-neutrality/measured-response",
+    "R05-real-IDB/Unicode-case/duplicate-label-distinct-ID/folder-job-exact-navigation/no-match/out-of-order-valid-Core-replies/stale-result-fence/actual-IDB-boundary-failure/explicit-error-preserved-input/retry/default-causal-record",
+    "actual-IDB-query-fault/default-causal-Journal/real-Export/independent-disk-CRC-hashes/no-missing-sequence",
+    "real-DRAIN/editor-inspection-hold/unchanged-dataset-source-effects/no-allocation/preserve-clean-fixture-source-chat/explicit-scoped-human-close/unrelated-context-preserved",
+    "same-profile/full-production-Backup/all-entry-disk-hashes/real-File-Confirm/complete-restore/fresh-containers/validated-distinct-logins-routes/seven-enabled/Pause/unrelated-preserved"
+  ],
+  "backup": {
+    "sha256": "632adefb22c9fe570530043830277fe6e412271b11ceab9541755162884968c6",
+    "bytes": 718154,
+    "freshMappings": 2,
+    "enabledModules": 7
+  },
+  "journal": {
+    "sha256": "92fe1a98b098779123acdef2bf22a5750c179436b5d29cf43e3275e82664c563",
+    "first": 1,
+    "last": 2624,
+    "count": 2624
+  },
+  "restoreContextHold": {
+    "restoreId": "95e90446-6d9a-4b1d-b123-98c1cf3ce7de",
+    "jobId": "c8daa024-3b17-4b20-b2d9-c540a1991c45",
+    "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+    "contexts": [
+      {
+        "accountId": "76d52b4b-f724-4143-89ee-346a02567682",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-6",
+        "tabId": 5
+      },
+      {
+        "accountId": "76d52b4b-f724-4143-89ee-346a02567682",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-6",
+        "tabId": 7
+      },
+      {
+        "accountId": "76d52b4b-f724-4143-89ee-346a02567682",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-6",
+        "tabId": 8
+      },
+      {
+        "accountId": "b18e4286-4b65-4cd3-adbe-f31e5560cb03",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-7",
+        "tabId": 6
+      }
+    ],
+    "datasetUnchanged": true,
+    "allocationStarted": false,
+    "effectsUnchanged": true
+  },
+  "restoreContextPreservationFile": {
+    "filename": "installed-integrated-contexts.json",
+    "bytes": 121582,
+    "sha256": "39e2a89d408b0a9af3c89e547f4c847191b5f83a4c353e09a3e0182d1275c7ce"
+  },
+  "artifactId": 13503883161,
+  "artifactZipSha256": "89c516d40c57d51bf46e9c39e3cd322253f9d8b1878520c8872059330d9d26c7",
+  "originalReceiptSha256": "7a03d1a6c6ee4886b551e69e6487d7bfa1726529c37ab3558283e9d7adc13774",
+  "screenshots": 48,
+  "keyboardAudits": 16
+}
