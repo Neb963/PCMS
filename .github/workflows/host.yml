@@ -62,5 +62,6 @@ jobs:
             test-results/visual-driver.log
             test-results/visual/journey-account-archived/
             test-results/visual/journey-home-directory-measured/
+            test-results/visual/journey-generators-final-page/
             test-results/search-reply-loss-*.json
             test-results/search-reply-loss-*.log

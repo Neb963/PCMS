@@ -29,6 +29,44 @@ def real_sleep(sid,provider,owner,expected,receipt):
  started=time.monotonic();row=wait(sleeping,90);cycle=row['cycle'];assert cycle['activeUsedMs']==cycle['activeDurationMs']==30000 and cycle['sleepDurationMs']==180000 and cycle['sleepUntil']>cycle['sleptAt'];assert stored(provider)==expected and provider.save_requests==[]
  refresh_page(sid);wait(lambda:script(sid,"return document.getElementById('refresher-counts')?.textContent.includes('1 Sleep')"));state_matrix(sid,'refresher-real-sleep',receipt);assert stored(provider)==expected and provider.save_requests==[];receipt['sleep']={'cycleId':cycle['cycleId'],'activeUsedMs':cycle['activeUsedMs'],'sleepDurationMs':cycle['sleepDurationMs'],'waitSeconds':time.monotonic()-started,'sourceManifest':source['generator']['sourceManifest']};receipt['checks'].append('actual-protected-source-readback/qualified-P22-pool/real-Settings/directory/30s-adjacent-eligible-Active/actual-Sleep/no-clock-edit/no-provider-save/full-byte-preservation')
 
+def final_catalog_page(sid,owner,receipt):
+ count=1005
+ assert asyncjs(sid,"""const {openCore}=await import(browser.runtime.getURL('core/records.mjs'));
+  const c=await openCore();try{const [n,accountId]=arguments;
+  await c.mutate(Array.from({length:n},(_,i)=>{const id='paging-example-'+String(i).padStart(4,'0');
+   return {table:'generators',id,value:{slug:id,folder:'generators/'+id,folderPresent:'YES',
+    accountId,listing:'PUBLIC',state:'OWNED'}};}),{step:'VISUAL_FIXTURE_PAGING',result:'COMPLETE'});
+  return true;}finally{c.close();}""",[count,owner])
+ click(sid,'nav a[href="#generators"]')
+ wait(lambda:script(sid,"return !!document.getElementById('catalog-search')"))
+ set_input(sid,'#catalog-search','paging-example-')
+ def page():
+  return script(sid,"""const l=document.getElementById('generator-list'),b=document.getElementById('catalog-next');
+   return l?.getAttribute('aria-busy')==='false'&&b&&!b.disabled?
+    {ids:[...l.querySelectorAll('input.row-select')].map(e=>e.dataset.generator),next:!b.hidden}:null;""")
+ expected=['paging-example-'+str(i).zfill(4) for i in range(count)]
+ seen=[];pages=0
+ for start in range(0,count,50):
+  ids=expected[start:start+50]
+  result=wait(lambda:(lambda p:p if p and p['ids'] and p['ids'][0]==ids[0] else None)(page()),30)
+  assert result=={'ids':ids,'next':start+50<count},result
+  seen.extend(result['ids']);pages+=1
+  if start==0:click(sid,'#generator-list input.row-select')
+  if result['next']:click(sid,'#catalog-next')
+ assert seen==expected and pages==21
+ click(sid,'#generator-list input[data-generator="paging-example-1004"]')
+ click(sid,'nav a[href="#work"]')
+ wait(lambda:script(sid,"return document.getElementById('records').dataset.routeReady==='work'"))
+ click(sid,'nav a[href="#generators"]')
+ def final():
+  return page()=={'ids':expected[-5:],'next':False} and script(sid,"""return document.getElementById('catalog-selection-count').textContent==='2 selected'
+    &&document.querySelector('input[data-generator="paging-example-1004"]')?.checked
+    &&document.getElementById('catalog-search').value==='paging-example-';""")
+ state_matrix(sid,'generators-final-page',receipt,prepare=lambda:wait(final,30))
+ receipt['catalogPaging']={'records':count,'pages':pages,'first':seen[0],'last':seen[-1],
+                           'finalPage':seen[-5:],'selected':['paging-example-0000','paging-example-1004']}
+ receipt['checks'].append('1,005 persisted records through 21 visible pages with no gaps or duplicates, cross-page selection and navigation continuity')
+
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k)
  receipt={'tier':'B/pixel-capture-NOT-vision-verdict','visualSuite':'visual-only','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]};assert receipt['xpiSha256']==identity['xpiSha256']
@@ -60,6 +98,7 @@ def main():
      return script(sid,r"const s=document.getElementById('home-directory')?.textContent;return /^Directory measured · Top 50: \d+ · Top 100: \d+ · Full list: \d+ · \d+ displayed$/.test(s);")
     state_matrix(sid,'home-directory-measured',receipt,prepare=lambda:wait(measured_home,30))
     receipt['checks'].append('Home real directory observation: separate Top 50, Top 100 and full-list counts at all widths')
+    final_catalog_page(sid,owner,receipt)
    account_page(sid,owner);click(sid,'#account-archive');settle(sid,owner,'ARCHIVED')
    def archived():
     return script(sid,"const s=document.getElementById('account-state'),b=document.getElementById('account-reactivate'),row=document.querySelector('#account-list a[href=\"#accounts/'+arguments[0]+'\"]');return s?.textContent==='Archived'&&b&&!b.hidden&&!b.disabled&&!document.getElementById('account-open')?.getClientRects().length&&row?.textContent.includes(' · Archived · ')&&!row.textContent.includes(' · Ready · ');",[owner])
