@@ -35,7 +35,7 @@ def final_catalog_page(sid,owner,receipt):
   const c=await openCore();try{const [n,accountId]=arguments;
   await c.mutate(Array.from({length:n},(_,i)=>{const id='paging-example-'+String(i).padStart(4,'0');
    return {table:'generators',id,value:{slug:id,folder:'generators/'+id,folderPresent:'YES',
-    accountId,listing:'PUBLIC',state:'OWNED'}};}),{step:'VISUAL_FIXTURE_PAGING',result:'COMPLETE'});
+    allocationAccountId:accountId,creatorState:'RESERVED',state:'FOLDER_ONLY'}};}),{step:'VISUAL_FIXTURE_PAGING',result:'COMPLETE'});
   return true;}finally{c.close();}""",[count,owner])
  click(sid,'nav a[href="#generators"]')
  wait(lambda:script(sid,"return !!document.getElementById('catalog-search')"))
