@@ -1,5 +1,7 @@
-import {project,publicError} from '../core/records.mjs';
+import {CoreError,project,publicError} from '../core/records.mjs';
 import {CAPABILITIES,bindingAllows,validateStep} from '../modules/bindings.mjs';
+import {failureDetails} from '../core/diagnostics.mjs';
+const exceptionTypes=new Set(['TYPE_ERROR','RANGE_ERROR','ABORT_ERROR','TIMEOUT_ERROR','QUOTA_EXCEEDED_ERROR','OTHER_ERROR']);
 export function sanitizeMarkup(html,document) {
  const parsed=new DOMParser().parseFromString(html,'text/html');
  const allowed=new Set(['P','DIV','SECTION','H1','H2','H3','LABEL','INPUT','TEXTAREA','BUTTON','SELECT','OPTION','UL','OL','LI','SPAN','STRONG','SMALL','BR','A','IMG']);
@@ -16,7 +18,7 @@ export function sanitizeMarkup(html,document) {
  return parsed.body.innerHTML;
 }
 export function sanitizeStyle(css){return /@import|url\s*\(|expression\s*\(|-moz-binding|\\/i.test(css)?'':css;}
-export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},journalEffect=null,accountEffect=null,gitEffect=null,discoverEffect=null,discoverPage=null,creatorEffect=null,sourceEffect=null,directoryEffect=null,backupEffect=null}) {
+export function createModuleHost({core,api,document=globalThis.document,window=globalThis.window,onDue=async()=>{},notify=()=>{},clock=Date.now,journalEffect=null,accountEffect=null,gitEffect=null,discoverEffect=null,discoverPage=null,creatorEffect=null,sourceEffect=null,directoryEffect=null,backupEffect=null}) {
  const frames=new Set(),backgrounds=new Map(),pageBindings=new Map(),bootId=crypto.randomUUID();let running=null,activeDataset=null;const reconciled=new Set();
  const manifestCap=(m,group)=>m.manifest?.capabilities?.find(c=>c.startsWith(group+'.'));
  async function current(binding){return core.read('modules',binding.moduleId);}
@@ -114,20 +116,41 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   const binding=[...frames].find(b=>event.source===b.window);if(!binding||event.data?.channel!==binding.channel)return;
   const m=event.data;
   if(m.type==='RPC'){
+   const stepFailures=binding.stepFailures;
    try{const result=await rpc(binding,m);binding.window.postMessage({channel:binding.channel,type:'RPC_RESULT',requestId:m.requestId,ok:true,result},'*');}
-   catch(error){binding.window.postMessage({channel:binding.channel,type:'RPC_RESULT',requestId:m.requestId,ok:false,code:/^[A-Z_]+$/.test(error.message)?error.message:publicError(error)},'*');}return;
+   catch(error){
+    const code=publicError(error);
+    let failureId;
+    if(stepFailures&&binding.stepFailures===stepFailures){
+     failureId=crypto.randomUUID();
+     stepFailures.set(failureId,{code,diagnostics:failureDetails(error),
+      staleCreatorStep:error instanceof CoreError&&code==='STALE_REVISION'&&m.operation==='action'&&m.args?.name==='creator.step'});
+    }
+    const rpcCode=typeof error?.message==='string'&&/^[A-Z_]+$/.test(error.message)?error.message:code;
+    binding.window.postMessage({channel:binding.channel,type:'RPC_RESULT',requestId:m.requestId,ok:false,code:rpcCode,failureId},'*');
+   }
+   return;
   }
   if(m.type==='READY'){binding.ready.resolve();return;}
   if(m.type==='FAILED'){binding.ready.reject(Error('MODULE_START_FAILED'));return;}
   const pending=binding.pending.get(m.callId);if(!pending)return;
   binding.pending.delete(m.callId);clearTimeout(pending.timer);
-  if(m.type==='STEP_RESULT'||m.type==='STOPPED')pending.resolve(m.result??m.receipt);else pending.reject(Error('MODULE_STEP_FAILED'));
+  if(pending.type==='STEP'&&m.type==='STEP_RESULT')pending.resolve(m.result);
+  else if(pending.type==='STOP'&&m.type==='STOPPED')pending.resolve(m.receipt);
+  else {
+   const failure=pending.type==='STEP'&&m.type==='STEP_FAILED'?binding.stepFailures?.get(m.failureId):null;
+   const error=new CoreError(failure?.code??'MODULE_STEP_FAILED',failure?.diagnostics??{
+    exceptionType:exceptionTypes.has(m.exceptionType)?m.exceptionType:'OTHER_ERROR'
+   });
+   error.staleCreatorStep=failure?.staleCreatorStep===true;
+   pending.reject(error);
+  }
  }
  window.addEventListener('message',message);
  function request(binding,type,value={}){
   const callId=crypto.randomUUID();return new Promise((resolve,reject)=>{
-   const timer=setTimeout(()=>{binding.pending.delete(callId);reject(Error('MODULE_STEP_TIMEOUT'));},type==='STEP'&&binding.moduleId==='pcms-accounts'?90000:type==='STEP'&&['pcms-creator','pcms-deployer','pcms-backup'].includes(binding.moduleId)?120000:30000);
-   binding.pending.set(callId,{resolve,reject,timer});binding.window.postMessage({channel:binding.channel,type,callId,...value},'*');
+   const timer=setTimeout(()=>{binding.pending.delete(callId);reject(new CoreError('MODULE_STEP_TIMEOUT'));},type==='STEP'&&binding.moduleId==='pcms-accounts'?90000:type==='STEP'&&['pcms-creator','pcms-deployer','pcms-backup'].includes(binding.moduleId)?120000:30000);
+   binding.pending.set(callId,{resolve,reject,timer,type});binding.window.postMessage({channel:binding.channel,type,callId,...value},'*');
   });
  }
  async function frame(module,mode,pageId='background',container=document.body){
@@ -153,7 +176,7 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
   running=(async()=>{
    await start();const reconcileJobs=await core.queue.reconciliation();const recovery=reconcileJobs.find(j=>!reconciled.has(j.id));const job=recovery??await core.queue.next();if(!job)return;if(recovery)reconciled.add(job.id);
    const runner=backgrounds.get(job.moduleId);if(!runner){if(recovery)return;await core.queue.transition(job.id,job.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'RUNNER_UNAVAILABLE'}});return;}
-   runner.targetId=job.targetId;runner.accountId=job.accountId;runner.reconciling=!!recovery;runner.jobId=job.id;runner.expectedRevision=job.rev;
+   runner.targetId=job.targetId;runner.accountId=job.accountId;runner.reconciling=!!recovery;runner.jobId=job.id;runner.expectedRevision=job.rev;runner.stepFailures=new Map();
    try{const result=validateStep(await request(runner,'STEP',{job,reconcile:!!recovery}));
     const latestModule=await current(runner);if(!bindingAllows(runner,{source:runner.window,channel:runner.channel,current:latestModule,operation:'ui.view'}))throw Error('STALE_GENERATION');
     const patch={checkpoint:result.checkpoint??null,state:result.kind==='complete'?'COMPLETE':result.kind==='hold'?'HELD':'WAITING',step:result.kind==='complete'?'COMPLETE':'CHECKPOINT'};
@@ -161,8 +184,33 @@ export function createModuleHost({core,api,document=globalThis.document,window=g
     const latest=await core.read('jobs',job.id);if(latest.rev!==runner.expectedRevision||latest.state==='FAILED')return;
     if(latest.runtimeInvalidated&&latest.effect?.boundary!=='POSSIBLE'){patch.state='HELD';patch.recovery={action:'OPEN_BACKUP',code:latest.kind==='DEVELOP'?'RESTORE_SAME_CHAT_INSPECTION_REQUIRED':'RESTORED_WORK_REVIEW_REQUIRED'};}
     if(latest.effect?.boundary==='POSSIBLE')await core.queue.reconciliationCheckpoint(job.id,latest.rev,result.checkpoint??null);else await core.queue.transition(job.id,latest.rev,patch);
-   }catch(error){const latest=await core.read('jobs',job.id),m=await core.read('modules',job.moduleId);if(error.message!=='STALE_REVISION'&&m?.enabled&&!m.lifecycle&&latest?.generation===runner.generation&&latest?.effect?.boundary!=='POSSIBLE'&&!['FAILED','COMPLETE'].includes(latest?.state))await core.queue.transition(job.id,latest.rev,{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}});}
-   finally{runner.targetId=null;runner.accountId=null;runner.reconciling=false;runner.jobId=null;await onDue();}
+   }catch(error){
+    const latest=await core.read('jobs',job.id),m=await current(runner);
+    if(latest?.dataset!==job.dataset||latest.generation!==runner.generation||
+       !bindingAllows(runner,{source:runner.window,channel:runner.channel,current:m,operation:'ui.view'}))return;
+
+    const possible=latest.effect?.boundary==='POSSIBLE';
+    const priorWrite=!!latest.effect&&latest.effect.write!==false||latest.effects?.some(effect=>effect.write!==false)===true;
+    const canHold=latest.rev===runner.expectedRevision&&latest.state==='RUNNING'&&!possible;
+    // The initial Creator scan only snapshots the account cohort. A rejected
+    // CAS at this point has not admitted a native observation or write.
+    const initialScan=job.moduleId==='pcms-creator'&&job.kind==='CREATE'&&job.creator?.phase==='SCAN'&&job.creator.accounts===null;
+    const retry=canHold&&initialScan&&error.staleCreatorStep&&latest.rev===job.rev&&!latest.runtimeInvalidated&&!priorWrite;
+    const patch=retry?{state:'WAITING',dueAt:clock()+1000,recovery:null}:
+     canHold?{state:'HELD',recovery:{action:'OPEN_MODULES',code:'MODULE_STEP_FAILED'}}:null;
+    const code=error instanceof CoreError?error.code:'MODULE_STEP_FAILED';
+    const decision=retry?'RETRY_READ_ONLY':possible?'READBACK_ONLY':canHold?'HOLD_STEP':'PRESERVE_PROGRESS';
+    const event={moduleId:job.moduleId,jobId:job.id,targetId:job.targetId,step:'MODULE_STEP',
+     result:patch?.state??(possible?'UNKNOWN':'FAILED'),code,
+     diagnostics:failureDetails(error,{causeCode:code,failedCheck:'MODULE_STEP',decision,noReplay:possible||priorWrite,generation:runner.generation,revision:latest.rev})};
+    const changes=patch?[{table:'jobs',id:job.id,expectedRev:latest.rev,refs:latest.refs,value:{...latest,...patch}}]:[];
+    try{
+     await core.mutate(changes,event,null,{dataset:job.dataset,moduleId:job.moduleId,packageHash:runner.hash,generation:runner.generation,jobId:job.id,jobRevision:latest.rev});
+    }catch(conflict){
+     if(!['STALE_REVISION','STALE_GENERATION'].includes(conflict.code))throw conflict;
+    }
+   }
+   finally{runner.stepFailures=null;runner.targetId=null;runner.accountId=null;runner.reconciling=false;runner.jobId=null;await onDue();}
   })().finally(()=>{running=null;});return running;
  }
  async function openPage(moduleId,pageId,container){const module=await core.read('modules',moduleId);return frame(module,'page',pageId,container);}

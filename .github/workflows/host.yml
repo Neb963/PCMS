@@ -55,6 +55,18 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: python3 scripts/release-preflight.py build/pcms-dev.xpi
+      - name: R08 native DEVELOP review Finish and source preservation
+        if: ${{ !cancelled() }}
+        run: python3 tests/installed_develop_complete.py build/pcms-dev.xpi
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: develop-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            test-results/installed-develop-complete.json
+            test-results/develop-complete-driver.log
+            test-results/develop-failure-journal.zip
+            test-results/p27-failure.png
       - name: R08 one-profile seven-module local rehearsal
         if: ${{ !cancelled() }}
         run: python3 tests/installed_integrated.py build/pcms-dev.xpi
@@ -89,9 +101,6 @@ jobs:
       - name: R08 full DEPLOY publication pool and DONE
         if: ${{ !cancelled() }}
         run: python3 tests/installed_deploy_complete.py build/pcms-dev.xpi
-      - name: R08 native DEVELOP review Finish and source preservation
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_develop_complete.py build/pcms-dev.xpi
       - name: R08 Refresher full-source negative and restart journey
         if: ${{ !cancelled() }}
         run: python3 tests/installed_refresh_markers.py build/pcms-dev.xpi

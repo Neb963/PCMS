@@ -228,7 +228,22 @@
       "expiresAt": "2027-02-01T15:14:48Z"
     }
   ],
-  "finalArchiveVerification": "GitHub API metadata retained; final13246936901 ZIP has not been independently downloaded or reopened. Do not infer CRC/content verification.",
+  "finalArchiveVerification": {
+    "result": "PASS_ARCHIVE_REOPEN",
+    "artifactId": 13246936901,
+    "entries": 482,
+    "zipSha256": "8d0ff557a2a94f4c2cbb8f24cc480f28a415c3be42ec837edc1887f526353437",
+    "standaloneRestore": {
+      "result": "PASS",
+      "checks": 4,
+      "receiptSha256": "59cc67a79281f4946521af1bcf1b168769b56b1db84e82de76f9905f846afd06"
+    },
+    "standaloneDevelop": {
+      "result": "FAIL",
+      "receiptSha256": "a06d78c9f48c04f5b4d7a4bea815bbf1d254caaa75a131e8d3c35b174b136b02"
+    },
+    "capacity": "SKIPPED"
+  },
   "logReceiptSummaries": [
     {
       "lineZeroBased": 203,
@@ -433,7 +448,7 @@
     {
       "lineZeroBased": 1035,
       "tier": "B/pixel-capture-NOT-vision-verdict",
-      "result": "CAPTURED — VISION REVIEW REQUIRED",
+      "result": "CAPTURED \u2014 VISION REVIEW REQUIRED",
       "source": "41b5af74923815c84c080f271702239a94e40184",
       "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
       "checks": [

@@ -132,7 +132,17 @@ export async function openCore({indexedDB=globalThis.indexedDB,name=DATABASE,clo
   };
   await transact(['events'],'readwrite',async s=>{const r=await root(s);if(!r.profileId){r.profileId=crypto.randomUUID();await append(s,r,{step:'PROFILE_IDENTITY',result:'COMPLETE'});r.revision++;await req(s('meta').put({...r,updatedAt:clock()}));}});
   async function assertGuard(s,r,guard){
-    if(guard){requireCore(id(guard.moduleId)&&Number.isSafeInteger(guard.generation)&&id(guard.jobId)&&Number.isSafeInteger(guard.jobRevision),'INVALID_GUARD');const m=await req(s('modules').get([r.dataset,guard.moduleId])),job=await req(s('jobs').get([r.dataset,guard.jobId]));requireCore(m?.enabled&&!m.lifecycle&&m.generation===guard.generation,'STALE_GENERATION');requireCore(job?.rev===guard.jobRevision&&job.moduleId===guard.moduleId&&job.generation===guard.generation,'STALE_REVISION');if(guard.accountId!=null){requireCore(id(guard.accountId)&&Number.isSafeInteger(guard.accountRevision)&&typeof guard.principalFingerprint==='string','INVALID_GUARD');const a=await req(s('accounts').get([r.dataset,guard.accountId]));requireCore(a?.rev===guard.accountRevision&&a.state==='READY'&&!a.admission&&a.expectedPrincipal===guard.principalFingerprint,'STALE_ACCOUNT');}}
+    if(!guard)return;
+    requireCore(id(guard.moduleId)&&Number.isSafeInteger(guard.generation)&&id(guard.jobId)&&Number.isSafeInteger(guard.jobRevision),'INVALID_GUARD');
+    requireCore(guard.dataset==null||guard.dataset===r.dataset,'STALE_GENERATION');
+    const m=await req(s('modules').get([r.dataset,guard.moduleId])),job=await req(s('jobs').get([r.dataset,guard.jobId]));
+    requireCore(m?.enabled&&!m.lifecycle&&m.generation===guard.generation&&(guard.packageHash==null||m.packageHash===guard.packageHash),'STALE_GENERATION');
+    requireCore(job?.rev===guard.jobRevision&&job.moduleId===guard.moduleId&&job.generation===guard.generation,'STALE_REVISION');
+    if(guard.accountId!=null){
+      requireCore(id(guard.accountId)&&Number.isSafeInteger(guard.accountRevision)&&typeof guard.principalFingerprint==='string','INVALID_GUARD');
+      const a=await req(s('accounts').get([r.dataset,guard.accountId]));
+      requireCore(a?.rev===guard.accountRevision&&a.state==='READY'&&!a.admission&&a.expectedPrincipal===guard.principalFingerprint,'STALE_ACCOUNT');
+    }
   }
   const core={
     close:()=>db.close(),

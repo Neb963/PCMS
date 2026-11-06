@@ -1,5 +1,9 @@
 // This script runs only in the opaque manifest sandbox. It has no extension API.
 let channel=null,mode=null,module=null,sequence=0,documentId=null,stopped=false,stopping=false,moduleStopped=false,disposedCount=0,stopResult=null;const pending=new Map(),disposers=[];
+// A step may relay only the parent's opaque failure reference, never a module
+// supplied exception message, stack or claimed Core error code.
+const rpcFailures=new WeakMap();
+const exceptionTypes={TypeError:'TYPE_ERROR',RangeError:'RANGE_ERROR',AbortError:'ABORT_ERROR',TimeoutError:'TIMEOUT_ERROR',QuotaExceededError:'QUOTA_EXCEEDED_ERROR'};
 const send=message=>parent.postMessage({channel,...message},'*');
 function rpc(operation,args={}) {
  if(stopped)return Promise.reject(Error('MODULE_STOPPED'));
@@ -26,12 +30,16 @@ addEventListener('message',async event=>{
  if(m.channel!==channel)return;
  if(m.type==='RPC_RESULT'){
   const waiter=pending.get(m.requestId);if(!waiter)return;pending.delete(m.requestId);
-  if(m.ok)waiter.resolve(m.result);else waiter.reject(Error(m.code));return;
+  if(m.ok)waiter.resolve(m.result);else{const error=Error(m.code);if(typeof m.failureId==='string')rpcFailures.set(error,m.failureId);waiter.reject(error);}return;
  }
  if(m.type==='STEP'&&mode==='background'){
   if(stopped){send({type:'STEP_FAILED',callId:m.callId});return;}
   try{const result=await module[m.reconcile?'reconcile':'runStep'](m.job,api);send({type:'STEP_RESULT',callId:m.callId,result});}
-  catch{send({type:'STEP_FAILED',callId:m.callId,code:'MODULE_STEP_FAILED'});}return;
+  catch(error){
+   let exceptionType='OTHER_ERROR';
+   try{const name=error?.name;if(typeof name==='string'&&Object.hasOwn(exceptionTypes,name))exceptionType=exceptionTypes[name];}catch{}
+   send({type:'STEP_FAILED',callId:m.callId,failureId:rpcFailures.get(error),exceptionType});
+  }return;
  }
  if(m.type==='STOP'){
   try{if(!stopResult){stopping=true;if(module&&!moduleStopped){await module.stop(api);moduleStopped=true;}while(disposers.length){await disposers[0]();disposers.shift();disposedCount++;}stopped=true;stopResult={generation:m.generation,document:documentId,instance:channel,disposedResources:disposedCount,unresolvedEffectIds:[]};for(const waiter of pending.values())waiter.reject(Error('MODULE_STOPPED'));pending.clear();}send({type:'STOPPED',callId:m.callId,receipt:stopResult});}catch{send({type:'STOP_FAILED',callId:m.callId});}
