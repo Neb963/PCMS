@@ -72,10 +72,10 @@ def run(binary, driver, xpi, baseline):
                     };
                   });return true;""", [QUERY])
                 call('POST', f'/session/{sid}/refresh', {})
-                wait(lambda: script(sid, "return !!document.getElementById('global-search')"))
-                set_input(sid, '#global-search', QUERY)
+                wait(lambda: script(sid, "return document.querySelector('[data-count=generators]')?.textContent==='1 Generators';"))
+                set_input(sid, '#global-search', '')
                 start = time.monotonic()
-                click(sid, '#global-search-form button[type="submit"]')
+                type_text(sid, '#global-search', QUERY+'\ue007')
 
                 def observed():
                     return script(sid, """const status=document.getElementById('global-search-status');
@@ -106,6 +106,12 @@ def run(binary, driver, xpi, baseline):
                 receipt['result'] = 'REPRODUCED' if baseline else 'PASS'
             except Exception as error:
                 receipt['error'] = str(error)
+                if sid:
+                    try:
+                        receipt['trace'] = asyncjs(sid, "return (await browser.runtime.getBackgroundPage()).__replyLoss??null;")
+                        receipt['page'] = script(sid, "return {route:location.hash,input:document.getElementById('global-search')?.value,text:document.getElementById('global-search-status')?.textContent};")
+                    except Exception as diagnostic:
+                        receipt['diagnosticError'] = str(diagnostic)
                 raise
             finally:
                 (OUT / ('search-reply-loss-' + label + '.json')).write_text(json.dumps(receipt, indent=2) + '\n')
