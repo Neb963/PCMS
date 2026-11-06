@@ -232,6 +232,11 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
  async function checkBinding(scope,{operationId,stage,identity=false}={}){
   if(stage==='PREREQUISITES')return prerequisites();await initialize();const found=await bound(scope);if(found.code)return fail(found.code);const p=found.profile;
   if(stage==='CREATE')return p.personaUid===scope.accountId?{ok:true,operationId,stage,...tuple(p)}:fail('ACCOUNT_CONTEXT_CHANGED');
+  if(stage==='PROTECTION'){
+   const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);
+   const proof=currentTest(protectedNow.state,protectedNow.profile.containerId),observedAt=Date.parse(proof?.checkedAt);
+   return Number.isFinite(observedAt)?{ok:true,observedAt}:{ok:false,code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'};
+  }
   if(stage==='DOCUMENT_READY'){try{const tab=await api.tabs.get(scope.tabId);if(tab.cookieStoreId!==scope.containerId)return fail('ACCOUNT_CONTEXT_CHANGED');if(tab.status==='loading'||!ownOrigin(tab.url)&&['about:blank','about:newtab'].includes(tab.url))return fail('ACCOUNT_DOCUMENT_LOADING',{pending:true});return ownOrigin(tab.url)?{ok:true}:fail('ACCOUNT_CONTEXT_CHANGED');}catch{return fail('ACCOUNT_LOGIN_TAB_MISSING');}}
   if(identity){
    const protectedNow=await protectedProfile(scope);if(protectedNow.code)return fail(protectedNow.code);let tab;try{tab=await api.tabs.get(scope.tabId);}catch{const owned=await ownedTabs(scope);if(owned.length!==1)return fail(owned.length?'ACCOUNT_TAB_AMBIGUOUS':'ACCOUNT_LOGIN_TAB_MISSING');tab=owned[0].tab;}if(tab.cookieStoreId!==scope.containerId||!ownOrigin(tab.url))return fail('ACCOUNT_CONTEXT_CHANGED');
@@ -250,7 +255,16 @@ async function pcmsProbeExitsWithinDeadline({routeId,profileId=null,reconcileOnl
    if(await nativeSettled(scope.routeId))return settle(scope,operationId,stage,fail('ACCOUNT_ROUTE_RECHECK_REQUIRED',{resolved:true}));return fail('ACCOUNT_OUTCOME_UNKNOWN');
   }
   if(stage==='OPEN'){
-   const matches=(await ownedTabs(scope)).filter(x=>x.tag.operationId===operationId);if(matches.length!==1)return fail('ACCOUNT_TAB_OPEN_UNKNOWN');return {ok:true,operationId,stage,...tuple(p),tabId:matches[0].tab.id};
+   // The browser may return the exact newly tagged tab before its first
+   // navigation commits. Observe that local OPEN; IDENTITY still waits for a
+   // loaded Perchance document and checks its principal independently.
+   const matches=[];for(const tab of await api.tabs.query({cookieStoreId:scope.containerId})){
+    const tag=await api.sessions.getTabValue(tab.id,'pcmsAccountTab');
+    if(tag?.accountId!==scope.accountId||tag.personaUid!==scope.personaUid||tag.operationId!==operationId||tab.cookieStoreId!==scope.containerId)continue;
+    const opening=tab.status==='loading'&&['about:blank','about:newtab'].includes(tab.url)&&(!tab.pendingUrl||ownOrigin(tab.pendingUrl));
+    if(ownOrigin(tab.url)||opening)matches.push(tab);
+   }
+   if(matches.length!==1)return fail('ACCOUNT_TAB_OPEN_UNKNOWN');return {ok:true,operationId,stage,...tuple(p),tabId:matches[0].id};
   }
   return fail('ACCOUNT_OUTCOME_UNKNOWN');
  }

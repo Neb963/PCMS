@@ -102,3 +102,8 @@ test('packaged RPC exposes no raw record, credential, mutation or module checkpo
  assert.equal((await service.handle({operation:'view.get'})).result.journalFilter,'MATCH');
  const denied=await service.handle({operation:'view.save',requestId:'bad',value:{journalFilter:'MATCH',route:'settings',scroll:0,token:'no'}});assert.equal(denied.code,'INVALID_VIEW');
 });
+
+test('R07: identical view writes preserve sequence/revision; changed drafts remain durable and recorded',async t=>{
+ const {core}=await fixture(t);await core.saveView('shell-view',{draft:'exact'},'first-view');const before=await core.status();const r=await core.saveView('shell-view',{draft:'exact'},'same-view');assert.equal(r.unchanged,true);assert.deepEqual(await core.status(),before);assert.equal((await core.list({table:'events',search:'SAVE_VIEW'})).rows.length,1);
+ await core.saveView('shell-view',{draft:'changed'},'new-view');assert.equal((await core.view('shell-view')).draft,'changed');assert.equal((await core.list({table:'events',search:'SAVE_VIEW'})).rows.length,2);
+});

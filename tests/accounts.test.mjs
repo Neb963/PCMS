@@ -13,7 +13,7 @@ async function fixture(t){
  const service=()=>createAccounts({core,donor,clock:()=>now});let accounts=service();
  async function step(){const job=await core.queue.next();if(!job)return null;const result=await accounts.effect(job),latest=await core.read('jobs',job.id);if(latest.effect?.boundary!=='POSSIBLE'&&latest.state!=='FAILED')await core.queue.transition(job.id,result.jobRevision,{state:result.value.state==='COMPLETE'?'COMPLETE':result.value.state==='CONTINUE'?'WAITING':'HELD',dueAt:now,recovery:result.value.state==='HELD'?{action:'RECHECK',code:result.value.code}:null});return result.value;}
  async function drain(){for(let i=0;i<20;i++){const value=await step();if(!value||['COMPLETE','HELD'].includes(value.state))return value;}throw Error('fixture finite bound exceeded');}
- return {get core(){return core;},get accounts(){return accounts;},people,calls,step,drain,id:()=>crypto.randomUUID(),advance:()=>now++,identities:()=>identityCalls,hide:()=>visible=false,show:()=>visible=true,lose:()=>lost=true,stale:()=>stale=true,wrong:()=>wrong=true,permission:value=>permission=value,principal:value=>identityPrincipal=value,hook:fn=>preflightHook=fn,identityHook:fn=>identityHook=fn,failStage:stage=>rejectedStage=stage,identityCode:code=>identityCode=code,restart:async()=>{core.close();core=await openCore({name,clock:()=>now});await core.queue.boot();accounts=service();await accounts.initialize();}};
+ return {get core(){return core;},get accounts(){return accounts;},people,calls,donor,step,drain,id:()=>crypto.randomUUID(),advance:(ms=1)=>now+=ms,identities:()=>identityCalls,hide:()=>visible=false,show:()=>visible=true,lose:()=>lost=true,stale:()=>stale=true,wrong:()=>wrong=true,permission:value=>permission=value,principal:value=>identityPrincipal=value,hook:fn=>preflightHook=fn,identityHook:fn=>identityHook=fn,failStage:stage=>rejectedStage=stage,identityCode:code=>identityCode=code,restart:async()=>{core.close();core=await openCore({name,clock:()=>now});await core.queue.boot();accounts=service();await accounts.initialize();}};
 }
 test('durable Add Account precedes donor work; enrollment cannot be Ready before post-Confirm route and authenticated identity',async t=>{
  const f=await fixture(t),id=f.id();await Promise.all([f.accounts.add({requestId:id,label:'First'}),f.accounts.add({requestId:id,label:'First'})]);assert.equal((await f.core.list({table:'accounts'})).rows.length,1);assert.equal((await f.core.list({table:'jobs'})).rows.length,1);assert.equal(f.calls.length,0);assert.equal((await f.drain()).state,'COMPLETE');let a=await f.accounts.get(id);assert.equal(a.state,'LOGIN_REQUIRED');assert.equal(a.confirmedAt,null);assert.equal(f.identities(),0);assert.deepEqual(f.calls,['CREATE','SELECT','CREATE_ROUTE','ASSIGN','VERIFY','OPEN']);
@@ -85,4 +85,46 @@ test('Archive/Reactivate preserves an existing manual review hold and its exact 
 
 test('Open verifies route, opens its protected context and only then confirms fresh identity, without a preexisting tab',async t=>{
  const f=await fixture(t),id=f.id();await f.accounts.add({requestId:id,label:'Closed tabs'});await f.drain();await f.accounts.command({id,kind:'CONFIRM',requestId:f.id()});await f.drain();const reads=f.identities(),opens=f.calls.filter(x=>x==='OPEN').length;await f.accounts.command({id,kind:'OPEN',requestId:f.id()});await f.step();assert.equal((await f.accounts.get(id)).stage,'OPEN');assert.equal(f.identities(),reads);await f.step();assert.equal((await f.accounts.get(id)).stage,'IDENTITY');assert.equal((await f.accounts.get(id)).state,'PREPARING');assert.equal(f.calls.filter(x=>x==='OPEN').length,opens+1);await f.drain();assert.equal(f.identities(),reads+1);assert.equal((await f.accounts.get(id)).state,'READY');
+});
+
+test('R03: expired/cold protection renews the existing tuple once without another Persona, route or login tab',async t=>{
+ const f=await fixture(t),id=f.id();await f.accounts.add({requestId:id,label:'Renewal'});await f.drain();await f.accounts.command({id,kind:'CONFIRM',requestId:f.id()});await f.drain();
+ const before=await f.accounts.get(id),calls=f.calls.length,identityReads=f.identities();
+ const original=f.donor.checkBinding;let live=false;
+ f.donor.checkBinding=async(a,args)=>args.stage==='PROTECTION'?live?{ok:true,observedAt:(await f.core.read('accounts',id)).routeObservedAt}:{ok:false,code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'}:original(a,args);
+ f.advance(901000);await Promise.all([f.accounts.ensureProtection(id),f.accounts.ensureProtection(id)]);const pending=await f.accounts.get(id);assert.equal(pending.stage,'VERIFY');assert.equal(pending.state,'PREPARING');
+ const jobs=(await f.core.list({table:'jobs'})).rows;assert.equal(jobs.filter(j=>j.kind==='RENEW').length,1);await f.drain();live=true;assert.equal((await f.accounts.ensureProtection(id)).ready,true);
+ const after=await f.accounts.get(id);assert.equal(after.state,'READY');assert.equal(after.containerId,before.containerId);assert.equal(after.routeId,before.routeId);assert.deepEqual(f.calls.slice(calls),['VERIFY']);assert.equal(f.identities(),identityReads);assert.equal(after.identityObservedAt,before.identityObservedAt);assert.equal((await f.accounts.list()).rows[0].routeStatus,'Route verified');
+ await f.restart();live=false;await f.accounts.maintain();await f.drain();assert.equal(f.calls.filter(x=>x==='CREATE').length,1);assert.equal(f.calls.filter(x=>x==='CREATE_ROUTE').length,1);assert.equal(f.calls.filter(x=>x==='OPEN').length,1);
+});
+test('R03: known renewal failure backs off; uncertain renewal reads only its original operation',async t=>{
+ const f=await fixture(t),id=f.id();await f.accounts.add({requestId:id,label:'Outage'});await f.drain();await f.accounts.command({id,kind:'CONFIRM',requestId:f.id()});await f.drain();
+ await f.accounts.ensureProtection(id);f.failStage('VERIFY');await f.drain();const count=f.calls.length;await f.accounts.maintain();assert.equal(f.calls.length,count);f.advance(121000);f.failStage(null);await f.accounts.maintain();await f.drain();assert.equal((await f.accounts.get(id)).state,'READY');
+ await f.accounts.ensureProtection(id);f.hide();f.lose();await f.drain();const pending=await f.accounts.get(id),job=await f.core.read('jobs',pending.jobId);assert.equal(job.effect.boundary,'POSSIBLE');const calls=f.calls.length;f.advance(121000);await f.accounts.maintain();assert.equal(f.calls.length,calls);assert.equal((await f.core.read('jobs',job.id)).effect.operationId,job.effect.operationId);
+});
+test('R08: current route with no live context queues one original OPEN/identity flow, never another Persona or route',async t=>{
+ const f=await fixture(t),id=f.id();await f.accounts.add({requestId:id,label:'Cold context'});await f.drain();await f.accounts.command({id,kind:'CONFIRM',requestId:f.id()});await f.drain();
+ const original=f.donor.checkBinding;let context=false;f.donor.checkBinding=async(a,args)=>args.stage==='PROTECTION'?{ok:true,observedAt:(await f.core.read('accounts',id)).routeObservedAt}:args.stage==='DOCUMENT_READY'&&!context?{ok:false,code:'ACCOUNT_LOGIN_TAB_MISSING'}:original(a,args);
+ const count=f.calls.length,reads=f.identities(),before=await f.core.read('accounts',id);
+ const outcomes=await Promise.all([f.accounts.ensureProtection(id,{context:true}),f.accounts.ensureProtection(id,{context:true})]);assert.ok(outcomes.every(x=>!x.ready));
+ const pending=await f.core.read('accounts',id),jobs=(await f.core.list({table:'jobs'})).rows;assert.equal(pending.flow.purpose,'OPEN');assert.equal(jobs.filter(j=>j.kind==='OPEN').length,1);assert.equal(f.calls.length,count);
+ context=true;await f.drain();assert.equal((await f.accounts.ensureProtection(id,{context:true})).ready,true);const after=await f.core.read('accounts',id);assert.equal(after.state,'READY');assert.equal(after.expectedPrincipal,before.expectedPrincipal);assert.equal(after.personaUid,before.personaUid);assert.equal(after.routeId,before.routeId);assert.deepEqual(f.calls.slice(count),['VERIFY','OPEN']);assert.equal(f.identities(),reads+1);
+ context=false;await f.accounts.ensureProtection(id,{context:true});context=true;f.principal('b'.repeat(64));await f.drain();assert.equal((await f.core.read('accounts',id)).holdCode,'ACCOUNT_PRINCIPAL_CHANGED');assert.equal((await f.core.read('accounts',id)).expectedPrincipal,before.expectedPrincipal);
+});
+test('R03: contextual Repair after a cold DNS hold opens the protected document before fresh identity and refuses a changed principal',async t=>{
+ for(const documentCode of ['ACCOUNT_LOGIN_TAB_MISSING','ACCOUNT_CONTEXT_CHANGED'])for(const changed of [false,true]){
+  const f=await fixture(t),id=f.id();await f.accounts.add({requestId:id,label:'Cold DNS repair'});await f.drain();await f.accounts.command({id,kind:'CONFIRM',requestId:f.id()});await f.drain();
+  const before=await f.core.read('accounts',id),prepare=f.donor.preparePersona,checkBinding=f.donor.checkBinding,open=f.donor.openProtectedTab;
+  let leaking=true,document=false;
+  f.donor.preparePersona=async(a,args)=>leaking&&args.stage==='VERIFY'?{ok:false,noDispatch:true,code:'DNS_LEAK_DETECTED',stage:args.stage,operationId:args.operationId}:prepare(a,args);
+  f.donor.checkBinding=async(a,args)=>args.stage==='PROTECTION'?{ok:false,code:'ACCOUNT_ROUTE_RECHECK_REQUIRED'}:args.stage==='DOCUMENT_READY'&&!document?{ok:false,code:documentCode}:checkBinding(a,args);
+  f.donor.openProtectedTab=async(a,args)=>{const value=await open(a,args);document=true;return value;};
+  await f.restart();await f.accounts.maintain();assert.equal((await f.drain()).code,'DNS_LEAK_DETECTED');assert.equal((await f.accounts.get(id)).state,'HELD');
+  leaking=false;f.advance();if(changed)f.principal('b'.repeat(64));const calls=f.calls.length,reads=f.identities();
+  await f.accounts.command({id,kind:'REPAIR',requestId:f.id()});const outcome=await f.drain(),after=await f.core.read('accounts',id);
+  assert.equal(outcome.state,changed?'HELD':'COMPLETE',JSON.stringify({code:outcome.code,calls:f.calls.slice(calls)}));assert.equal(after.state,changed?'HELD':'READY');if(changed)assert.equal(after.holdCode,'ACCOUNT_PRINCIPAL_CHANGED');
+  assert.deepEqual(f.calls.slice(calls),['VERIFY','OPEN']);assert.equal(f.identities(),reads+1);
+  for(const key of ['personaUid','containerId','routeId','exitAddresses','expectedPrincipal'])assert.deepEqual(after[key],before[key]);
+  assert.equal(f.calls.filter(x=>x==='CREATE').length,1);assert.equal(f.calls.filter(x=>x==='CREATE_ROUTE').length,1);
+ }
 });

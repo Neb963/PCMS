@@ -1,4 +1,5 @@
 import {requireCore as check,publicError} from '../core/records.mjs';
+import {currentRows} from '../core/current-rows.mjs';
 import {eligibleAccount} from './creator-allocation.mjs';
 import {accountCycle,HEARTBEAT} from './refresh-clock.mjs';
 const ID='pcms-refresher',KEY='refresher-clock',HOUR=3600000;
@@ -11,7 +12,7 @@ export function cycleEligibility(g,a,m,r,observed,now){
 export function createRefresher({core,observe=async()=>({}),sessionNonce=async()=>null,clock=Date.now,directory=async()=>null,monotonic=()=>performance.now()}){
  let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
  const module=()=>core.read('modules',ID),capable=m=>m?.manifest?.capabilities?.includes('records.refresher');
- async function rows(table){const out=[];let cursor=null;do{const p=await core.list({table,cursor,limit:200});for(const r of p.rows)out.push(await core.read(table,r.id));cursor=p.cursor;}while(cursor);return out;}
+ const rows=table=>currentRows(core,table);
  async function initialize(){let m=await module();if(capable(m)&&!m.refresher){await core.mutate([{table:'modules',id:ID,expectedRev:m.rev,refs:m.refs,value:{...m,refresher:{schema:1,activeHours:24,sleepHours:72,paused:false}}}],{moduleId:ID,step:'REFRESHER_INITIALIZE',result:'COMPLETE'});m=await module();}return m;}
  async function tick(force=false,invalidate=false){
   let m=await initialize();if(!capable(m))return;const old=await core.view(KEY),now=clock(),boot=(await core.queue.status()).bootId;let nonce=null;try{nonce=await sessionNonce();}catch{}

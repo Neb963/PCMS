@@ -5,6 +5,15 @@ import {openCore} from '../src/core/records.mjs';
 import {bindingObservation} from '../src/modules/account-observations.mjs';
 import {createDonorAccounts} from '../src/host/donor-accounts.mjs';
 import {accountRouteAllowed,closeAccountPins,refreshAccountPins} from '../src/host/account-pins.mjs';
+import {currentRouteTest,routeTestContext,ROUTE_TEST_MAX_AGE_MS} from '../vendor/personamonkey/extension/lib/persona-intelligence.js';
+test('R03: actual donor proof accepts14:59 and15:00, rejects15:01, future evidence and changed route/security context',()=>{
+ const checkedAt=1700000000000,profile={managed:true,containerId:'firefox-container-1',routeId:'one',killSwitch:true,blockLocalNetwork:true},route={id:'one',provider:'mullvad',enabled:true,host:'10.124.0.1',port:1080},security={ready:true,privacyRequired:true,privacySafe:true,proxyControl:'controlled_by_this_extension',strictProxyVerification:true},entry={context:routeTestContext(profile,route,security),result:{ok:true,checkedAt:new Date(checkedAt).toISOString(),data:{ip:'8.8.8.8'}}};
+ assert.equal(ROUTE_TEST_MAX_AGE_MS,900000);
+ for(const [age,valid] of [[899000,true],[900000,true],[901000,false],[-1,false]])assert.equal(currentRouteTest(profile,route,security,entry,checkedAt+age)?.ok===true,valid);
+ assert.equal(currentRouteTest(profile,{...route,host:'10.124.0.2'},security,entry,checkedAt),null);
+ assert.equal(currentRouteTest(profile,route,{...security,privacySafe:false},entry,checkedAt),null);
+ assert.equal(currentRouteTest(profile,route,security,null,checkedAt),null);
+});
 async function fixture(t){
  closeAccountPins();t.after(closeAccountPins);const core=await openCore({name:'donor-'+crypto.randomUUID()});t.after(()=>core.close());const state={global:{strictProxyVerification:true},profiles:{},routes:{one:{id:'one',provider:'mullvad',host:'10.124.0.1',port:1080,enabled:true}}},verified=new Map(),tabs=new Map(),tags=new Map(),stored=new Map(),effects=[];let permitted=true,changedDocument=false;
  const api={permissions:{contains:async()=>permitted},storage:{local:{get:async k=>({[k]:stored.get(k)})}},contextualIdentities:{query:async()=>Object.keys(state.profiles).map(cookieStoreId=>({cookieStoreId})),get:async id=>{if(!state.profiles[id])throw Error('absent');return {cookieStoreId:id};}},tabs:{remove:async ids=>{effects.push('close-tabs');for(const id of ids)tabs.delete(id);},query:async({cookieStoreId})=>[...tabs.values()].filter(x=>x.cookieStoreId===cookieStoreId),get:async id=>{if(!tabs.has(id))throw Error('absent');return {...tabs.get(id)};},update:async(id,patch)=>{Object.assign(tabs.get(id),patch);return {...tabs.get(id)};}},windows:{update:async()=>({})},sessions:{getTabValue:async id=>tags.get(id),setTabValue:async(id,key,value)=>tags.set(id,value)},scripting:{executeScript:async({target,world,func,args=[]})=>{assert.equal(world,'ISOLATED');assert.deepEqual(target.frameIds,[0]);return [{frameId:0,result:changedDocument&&func.name==='accountDocumentWitness'?'new-document':await func(...args)}];}}};
@@ -25,6 +34,19 @@ test('fixed identity observer checks exact container and isolated document befor
  const old={location:globalThis.location,document:globalThis.document,localStorage:globalThis.localStorage,fetch:globalThis.fetch};t.after(()=>Object.assign(globalThis,old));Object.assign(globalThis,{location:{origin:'https://perchance.org'},document:{querySelector:()=>null},localStorage:{getItem:k=>k==='app-storage'?JSON.stringify({user:{loggedIn:true,email:'fixture@example.test',sessionToken:'fixture-private'}}):'one'},fetch:async()=>({status:200,headers:{get:()=> 'application/json'},json:async()=>({status:'success',generators:[],generatorFolderMap:{}})})});
  const identity=await f.donor.checkBinding(f.scope,{stage:'IDENTITY',identity:true});assert.equal(identity.ok,true);assert.ok(!JSON.stringify(identity).includes('fixture-private'));f.scope.tabId=999;const restored=await f.donor.checkBinding(f.scope,{stage:'IDENTITY',identity:true});assert.equal(restored.ok,true);assert.equal(restored.tabId,10);f.scope.tabId=10;f.tabs.get(10).cookieStoreId='firefox-container-999';assert.equal((await f.donor.checkBinding(f.scope,{stage:'IDENTITY',identity:true})).code,'ACCOUNT_CONTEXT_CHANGED');f.tabs.get(10).cookieStoreId=f.scope.containerId;globalThis.fetch=async()=>{f.rotateDocument();return {status:200,headers:{get:()=> 'application/json'},json:async()=>({status:'success',generators:[],generatorFolderMap:{}})};};assert.equal((await f.donor.checkBinding(f.scope,{stage:'IDENTITY',identity:true})).code,'ACCOUNT_DOCUMENT_CHANGED');
  f.permit(false);const before=f.effects.length;assert.equal((await f.donor.openProtectedTab(f.scope,{operationId:crypto.randomUUID()+'-OPEN'})).code,'USERSCRIPTS_PERMISSION_REQUIRED');assert.equal(f.effects.length,before);
+});
+
+test('exact tagged OPEN observes a loading initial tab without admitting a provider read or replay',async t=>{
+ const f=await fixture(t);for(const stage of ['CREATE','SELECT','CREATE_ROUTE','ASSIGN'])await f.step(stage);
+ const binding=await bindingObservation((await f.step('VERIFY')).binding);await f.core.mutate([{table:'accounts',id:f.scope.accountId,value:{...binding,state:'PREPARING',flow:{stage:'OPEN'}}}],{step:'FIXTURE_OPEN',result:'COMPLETE'});await refreshAccountPins(f.core);
+ const operationId=crypto.randomUUID()+'-OPEN';await f.donor.openProtectedTab(f.scope,{operationId});f.scope.tabId=10;
+ const tab=f.tabs.get(10);Object.assign(tab,{url:'about:blank',pendingUrl:'https://perchance.org/',status:'loading'});
+ const observed=await f.donor.checkBinding(f.scope,{operationId,stage:'OPEN'});assert.equal(observed.ok,true);assert.equal(observed.tabId,10);
+ assert.equal((await f.donor.checkBinding(f.scope,{stage:'DOCUMENT_READY'})).pending,true);
+ assert.equal((await f.donor.checkBinding(f.scope,{stage:'IDENTITY',identity:true})).code,'ACCOUNT_CONTEXT_CHANGED');
+ assert.equal((await f.donor.openProtectedTab(f.scope,{operationId})).tabId,10);assert.equal(f.effects.filter(x=>x==='open').length,1);
+ tab.pendingUrl='https://unrelated.example/';assert.equal((await f.donor.checkBinding(f.scope,{operationId,stage:'OPEN'})).code,'ACCOUNT_TAB_OPEN_UNKNOWN');
+ tab.pendingUrl='https://perchance.org/';f.tags.set(10,{...f.tags.get(10),operationId:'wrong-operation'});assert.equal((await f.donor.checkBinding(f.scope,{operationId,stage:'OPEN'})).code,'ACCOUNT_TAB_OPEN_UNKNOWN');
 });
 
 test('route re-verification withdraws Core pins until fresh unique binding observation is committed',async t=>{

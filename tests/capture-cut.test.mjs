@@ -35,3 +35,17 @@ test('scoped cut excludes inactive restore datasets from every bulk section',asy
  const j=await selected(c),cut=await c.captureCut({captureId:'scoped',guard:{moduleId:j.moduleId,generation:j.generation,jobId:j.id,jobRevision:j.rev}}),raw=await c.credentials.get(cut.credentialId),data=JSON.parse(raw);
  assert.ok(!raw.includes('FOREIGN_DATASET_SENTINEL'));assert.equal(data.core.records.accounts.length,0);assert.ok(data.core.versions.every(v=>v.dataset===root.dataset));assert.equal(data.core.root.dataset,root.dataset);
 });
+test('consecutive cuts retain Blob-backed immutable payloads, exclude derived bytes, and read legacy string cuts',async t=>{
+ const {c,name}=await seeded(t),j=await selected(c),guard={moduleId:j.moduleId,generation:j.generation,jobId:j.id,jobRevision:j.rev};
+ await c.saveView('large-draft',{text:'retained draft 雪\0'.repeat(100000)},crypto.randomUUID());
+ const first=await c.captureCut({captureId:'first',guard}),original=await c.credentials.get(first.credentialId);
+ assert.equal(typeof original,'string');assert.equal(JSON.parse(original).core.views.find(v=>v.key[1]==='large-draft').value.text,'retained draft 雪\0'.repeat(100000));
+ const db=await new Promise(resolve=>{const q=indexedDB.open(name);q.onsuccess=()=>resolve(q.result);});t.after(()=>db.close());
+ const root=await c.status(),read=db.transaction('credentials').objectStore('credentials').get([root.dataset,first.credentialId]);
+ const stored=await new Promise(resolve=>read.onsuccess=()=>resolve(read.result));assert.ok(stored.value instanceof Blob);assert.equal(stored.value.type,'application/json');
+ const legacy='legacy immutable capture 雪';const tx=db.transaction('credentials','readwrite'),done=new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});
+ tx.objectStore('credentials').put({key:[root.dataset,'capture-cut-legacy'],value:legacy,captureData:true});await done;assert.equal(await c.credentials.get('capture-cut-legacy'),legacy);
+ const second=await c.captureCut({captureId:'second',guard}),data=JSON.parse(await c.credentials.get(second.credentialId));
+ assert.ok(data.disclosures.derivedCuts.includes(first.credentialId));assert.ok(data.disclosures.derivedCuts.includes('capture-cut-legacy'));assert.ok(data.core.credentials.every(row=>!row.captureData));
+ assert.equal(await c.credentials.get(first.credentialId),original);assert.ok(first.barrierMs<=5000&&second.barrierMs<=5000);
+});

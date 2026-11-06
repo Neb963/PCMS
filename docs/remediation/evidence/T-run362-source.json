@@ -1,0 +1,38 @@
+{
+  "tier": "T/source+exact-generated-packages",
+  "source": "0b978844d3fcb2968143f24ccbbde7e8e304ff34",
+  "tree": "aa6604e88fef40104be25dd1abfe6913e51db648",
+  "node": "v24.22.1",
+  "xpiSha256": "e33afe09fe868b9619afb055734c01f43764d7ee53e8f975bd02b5085f826b9d",
+  "clean": true,
+  "coverage": {
+    "unchangedPassingCases": 509,
+    "resolvedGeneratedPackageCases": 15,
+    "distinctCaseTotal": 524,
+    "noOverlappingNames": true,
+    "caseNamesSha256": "f91d36d5410a1aea907bb4f8b08904f18a21a98693ab5ca3663fcfae86b5a47d"
+  },
+  "initialCleanInvocation": {
+    "command": "npm test",
+    "result": "FAIL",
+    "pass": 509,
+    "fileLoadFailures": 3,
+    "durationMs": 359575.582252,
+    "logSha256": "c538e77419784ef4ecffeb136e272793046f13846d45e20220a71878964d9c7d",
+    "cause": "Fresh checkout lacked generated build/xpi-root; backup-restore, restore-donor and restore-scripts could not load. No individual case failure in other509."
+  },
+  "correction": {
+    "command": "npm run build && python scripts/release-preflight.py build/pcms-dev.xpi",
+    "result": "PASS",
+    "artifactEqualsDownloadedCI": true
+  },
+  "affectedRerun": {
+    "command": "node --test tests/backup-restore.test.mjs tests/restore-donor.test.mjs tests/restore-scripts.test.mjs",
+    "result": "PASS",
+    "pass": 15,
+    "fail": 0,
+    "durationMs": 13522.336686,
+    "logSha256": "8bc5afaaf95142366f5ba18f0184bbb02e9096362a7558712b5e4345e0eb6d7f"
+  },
+  "qualification": "All524 distinct source cases covered after correcting the build prerequisite; not a single524-case green invocation. Prior untracked-dependency setup attempt is not clean-source evidence. Installed B/final V/capacity/hour remain independent open gates."
+}

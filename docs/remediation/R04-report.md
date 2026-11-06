@@ -1,0 +1,45 @@
+# R04 — Creator protection dependencies and truthful Deployer waits
+
+Date: 2026-11-02. Base R03 `50f28e1c8f7a8aa4617df92ec4070611ce5cf820` / tree `3c87bcc287328775d504e2ba7cccccfc371faf22`. Authority unchanged. Plan entered in todo before edits.
+
+**Status: FIXED_PENDING_B / PARTIAL.**
+
+## Root causes and changes
+
+| IDs / original grade | Cause | Change and scope |
+|---|---|---|
+| IE-01/03, confirmed liveness | Creator allocated READY history, then held permanently after stale PREPARE; repair did not wake its job | Production Creator now asks Accounts for current proof before preparation/mutation. Safe route-dependent holds resume the same job after actual proof returns, without another owner scan. Read-only preparation cache gets a new cycle; confirmed creation remains attributed and cannot replay. |
+| IE-04, confirmed | Override changed allocation but not protection | The new owner must pass the same protection dependency; override grants no route or effect bypass. |
+| IE-05 / IB-04 / IF-04, confirmed | WAIT_CREATOR hid actual upstream cause | Deployer records and projects current upstream job/account/state/code; Work shows Creator's reason and a successful check reports that it is still waiting. No source claim before owner proof. |
+| IE-06, source risk | Identical WAIT_CREATOR checkpoints rewritten | Persist dependency only when its identity/revision/state changes. Queue execution/wait transitions still record meaningful checks. Broader idle scheduling is R07. |
+| IE-07, reproduced | Truthiness accepted catalog NO | Intake/allocation and final create preflight now require exact YES. Fixtures now use real catalog values; explicit NO/unknown/bool/malformed negatives retained. |
+
+The exact historical PREPARE code/template contract remains unproved; no new live evidence is inferred. Fresh availability, authenticated ownership, immutable effects, private template, unlisted stable identity and final rename/source guards are retained.
+
+## Verification
+
+84 focused actual production-code Creator/allocation/creation/Deployer tests PASS (about76s, including full source/Git/public/pool/DONE and AI fault cases). Added same RESERVED job → protected hold → repaired proof → one create/rename, with unchanged ownership observations; no write before proof. Added strict catalog YES/NO/malformed oracles. Existing lost CREATE/RENAME replies, restart/override fences, unrelated owners, WAIT_CREATOR writer ordering and protected full-source/publication/Git tests pass. The later narrowed Creator refinement is checked separately in the next checkpoint.
+
+Required matching installed native-fixture TTL/Creator/Deployer/Work and final visual tests are NOT TESTED. Local Firefox sandbox remains blocked; CI will exercise the integrated artifact. R01's actual installed CI41506387916 passed; independently downloaded receipt: Firefox155.0/build20260817142839, sandbox6, XPI40111aec89f9227f96afed31f825fc8aa027a46132bef7952aef9ae7911470d1, actual100001-event/90-day one-row export107ms,5 tail cursor reads. This is earlier R01 evidence, not an R04 PASS.
+
+## Safety / remaining work
+
+No Direct, duplicate route/create/rename, uncertain replay, source overwrite, premature writer/publication or forced Git. Jobs and original effect IDs remain; prior-good source and root instructions remain protected. R05 must complete joined filters/selection/search and installed diagnosis. R06 must inspect actual screenshot pixels and accessibility. R07 must measure persistent waiting/query load. Real G/H/P42–P49 stays NOT TESTED. Checkpoint SHA/tree and installed results must be appended when independently observed; no release qualification yet.
+
+Integrated B result: CI41512200622/sourcebef12ba9 actual Creator reached one applied CREATE with lost body, then timed out after restart/Check before rename. Its old helper lost the replacement session handle on exception, so its final state receipt was absent and browser cleanup incomplete; fixed handle tracking and automatic-proof wait. Root of that exact B timeout remains unproved pending the improved receipt. A separate source regression reproduced protection metadata changing account revision after READ_CREATE but before rename. Creator now synchronizes protection **before** readback, even for reconcile/POSSIBLE, retaining the same original effect while proof is unavailable. It records a safe correlated READBACK_ONLY wait.16 focused Creator tests PASS including one-create/one-rename and absent-proof no-replay. Matching installed rerun required; not closed from source alone.
+
+## R08 same-effect dependency wake
+
+Run41516312430 failed lost-CREATE restart recovery after successful route renewal. Creator now asks Accounts for a usable protected context and records a bounded protection dependency while its CREATE/RENAME remains POSSIBLE. A changed eligible account revision wakes only that original readback; unchanged initialization adds no duplicate checkpoint. Original operation/cycle/reservation remain intact. Production regression verifies one create/rename, no extra ownership scan, and no synthetic retry permission. Context completion, duplicate wake and changed identity tests pass; installed recovery remains pending on matching XPI.
+
+Run353/source6e20c48 exact XPIe27dd12c79b7c90c0442aa240f1f1e7dae83fe3d9715ffa18e07b1781faa1d06 supplies the previously pending local B: lost-CREATE and lost-RENAME process restart recover the original jobs and effects without another create/rename. Ambiguous inventory retains the reservation and allows an unrelated Reserved target to progress without a write. Full DEPLOY and DEVELOP independently pass source/Git/public/pool/DONE and cold recovery. Default Creator Journal ZIP independently reopens with the typed cause and original correlation (R08 records its hash). These local passes do not establish the unobserved historical PREPARE cause, real provider contract or final artifact acceptance. Run354 onfcf4c587 reports Creator/DEPLOY failures; diagnosis awaits exact failure receipts and does not replace either original result.
+
+## Completed356 and bounded applied-Git restart correction
+
+Creator stopped before login-state pixels: Core enrollment is LOGIN_REQUIRED/COMPLETE while its dashboard remained hidden behind the native login tab; bring the real dashboard to the foreground before its visible-state wait. No Creator mutation was reached in356; older353 no-replay evidence keeps its original scope. DEPLOY independently applied publication and one DONE ref, then held at Git VERIFY when object readback was hidden. On second restart the ref is already OBSERVED/APPLIED; the old recovery selector only selected POSSIBLE or unfinished source saves, so no automatic verification occurred. Add one read-only verification per boot/original Git operation at this exact boundary; verify all identities/trees as before and queue only a verified continuation. Failed reads retain the hold; no new object/ref or provider write is authorized. Production regression covers DONE and DEVELOP source verification across two restarts, failed read boundedness and zero duplicated effects.356 full DEVELOP separately PASS. Integrated chain reaches full DEPLOY and DEVELOP completion, then fails an oracle that omitted its own explicit native STOP; expected exact sequence is NEW_CHAT/SEND/STOP, not two events. Current corrected installed results remain pending.
+
+## 357 evidence and next bounded correction
+
+357 exact installed receipts onf2770c2/XPI913a3ef2 PASS: Creator lost-CREATE/lost-RENAME/ambiguity/ordinary causal ZIP (receipt4edf62de3a74ee49b0b8617d55dd09a9f008fa1f4643ae0922e4bb6b871d8c22); full DEPLOY/two-restart/DONE no-replay (a4655f9bfc3b48404ca6dfc3ead31460c819ab6f5786bc3884ef6145bdb8e586); DEVELOP first/update (a00bc67aa74108231a1fd68d4cd7a9b43c004d4854fecedfa3fc7df37c9ac758). All independently reopened from early artifact13223103600/ZIPb4d3c407300c3e1136e4b128735e9b6a28fc30ff732c7343295cf11db956630e. Refresher full negative/restart also PASS (26f5df26ca58f34e1257a339276d4559681f86c9a4dc368441150f91713b0058). The helper now waits for independent rendered demand; the old356 third-save failure remains historical cause UNKNOWN. No product controller/source guard was weakened. Final release/route/search/V gates remain.
+
+359/sourcecd638db8/XPId24e4d3f retains Creator/DEPLOY/DEVELOP/Refresher standalone PASS and full route-negative PASS. The integrated chain independently completes Unicode DEPLOY/DEVELOP/STOP/Git, then correctly refuses its plain-text human-review PJS with MARKER_PJS_SYNTAX_UNSUPPORTED. The actual recipe reproduces that rejection; a valid output-list PJS passes with exact LF/CRLF marker-only and Unicode binary neutrality. Prepared positive fixture uses output\n  Integrated accepted 雪 and explicit LF marker expectation; standalone CRLF remains unchanged. No recipe/admission/source/effect guard is relaxed. Matching complete one-profile B remains pending.

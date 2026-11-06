@@ -1,7 +1,7 @@
 """P37 B: real Refresher controls -> shared source writer -> independent native/server.
 No live provider operations; only disposable protected native/HTTPS fixtures.
 """
-from installed_directory import Provider,FRAME,state,page,visibility,measured,check,native_filter
+from installed_directory import Provider,FRAME,ORDER,state,page,visibility,measured,check,native_filter,directory_cut,observer_tabs
 from installed_refresh_clock import settings_clock,pause
 from installed_source_save import configure,editor,dashboard,stored,SLUG,hard_stop
 from installed_source import completed_source
@@ -9,27 +9,54 @@ from installed_accounts import add,settle,login,account,account_session
 from installed_lifecycle import permission_choice
 from installed_journal import set_input,close_dashboard
 from installed_packages import *
+from visual_capture import state_matrix
 from account_fixture import Fixture
 import account_fixture
 account_fixture.Provider=Provider
-def refresh_cut(sid):
- return asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),g=await c.read('generators',arguments[0]),j=g.sourceSaveJobId?await c.read('jobs',g.sourceSaveJobId):null;c.close();return {g,j};",[SLUG])
-def refresh(sid):
- page(sid);selector='button[data-refresh="'+SLUG+'"]';wait(lambda:script(sid,"return !!document.querySelector(arguments[0])&&!document.querySelector(arguments[0]).disabled",[selector]),70);click(sid,selector)
-def verified(sid,counter):
+def refresh_cut(sid,target_id=SLUG):
+ return asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),g=await c.read('generators',arguments[0]);if(!g)throw Error('FIXTURE_GENERATOR_ID_MISSING');const j=g.sourceSaveJobId?await c.read('jobs',g.sourceSaveJobId):null;c.close();return {g,j};",[target_id])
+def refresh(sid,provider,target_id=SLUG):
+ # Real competitor movement creates demand; the production controller alone
+ # selects and dispatches the next Refresh. No hidden/manual control bypass.
+ before=len(provider.save_requests)
+ with provider.lock:
+  order=[('competitor-replacement-'+str(i)) if slug==SLUG else slug for i,slug in enumerate(provider.marker_order)];provider.marker_demand={'before':before,'order':order}
+ # The fixture polls its independent server every500ms. Observe that real
+ # rendered revision before asking PCMS to measure it; a completed snapshot
+ # of the preceding revision is not the new competitor movement.
+ tabs=observer_tabs(sid);assert len(tabs)==1,('FIXTURE_DIRECTORY_OBSERVER_COUNT',len(tabs))
+ selected=None
+ for handle in call('GET',f'/session/{sid}/window/handles'):
+  call('POST',f'/session/{sid}/window',{'handle':handle})
+  if script(sid,"return location.href")=='https://perchance.org/generators':selected=handle;break
+ assert selected,'FIXTURE_DIRECTORY_DOCUMENT_MISSING'
+ frame=call('POST',f'/session/{sid}/element',{'using':'css selector','value':'iframe'})['element-6066-11e4-a52e-4f735466cecf'];call('POST',f'/session/{sid}/frame',{'id':{'element-6066-11e4-a52e-4f735466cecf':frame}})
+ try:wait(lambda:len(provider.save_requests)>before or script(sid,"return document.getElementById('generatorList')?.getAttribute('data-revision')==='fixture-filtered-'+JSON.stringify(arguments[0]);",[order]),100)
+ finally:call('POST',f'/session/{sid}/frame',{'id':None});dashboard(sid)
+ check(sid)
+ # The rendered frame applies competitor movement asynchronously. Establish
+ # that independent demand before waiting for a save, or accept an already
+ # applied next save; a stale prior measurement is not the new demand oracle.
+ wait(lambda:len(provider.save_requests)>before or (lambda v:v['fresh'] and v['positions'].get(target_id,{}).get('state')=='NOT_SEEN')(visibility(sid)),100)
+def measured_response(sid,cut):
  def get():
-  cut=refresh_cut(sid)
+  c=state(sid)['controller'];last=c.get('last') or {}
+  return last if not c.get('pending') and last.get('jobId')==cut['j']['id'] and last.get('responded') is True and last.get('observedAt',0)>=cut['g']['refreshLast']['verifiedAt']+5000 else None
+ return wait(get,100)
+def verified(sid,counter,target_id=SLUG):
+ def get():
+  cut=refresh_cut(sid,target_id)
   if cut['g'].get('refreshMarker',{}).get('counter')==counter and cut['g'].get('refreshLast',{}).get('state')=='VERIFIED':return cut
   return None
  return wait(get,100)
-def assert_bytes(provider,initial,marker,counter):
- files=stored(provider);pjs='// pcms-refresh:'+marker+':'+str(counter)+'\r\n';html='<!-- pcms-refresh:'+marker+':'+str(counter)+' -->';assert files['main.pjs'].count(pjs.encode())==1 and files['index.html'].count(html.encode())==1
+def assert_bytes(provider,initial,marker,counter,pjs_newline='\r\n'):
+ files=stored(provider);pjs='// pcms-refresh:'+marker+':'+str(counter)+pjs_newline;html='<!-- pcms-refresh:'+marker+':'+str(counter)+' -->';assert files['main.pjs'].count(pjs.encode())==1 and files['index.html'].count(html.encode())==1
  assert files['main.pjs'].replace(pjs.encode(),b'')==initial['main.pjs'] and files['index.html'].replace(html.encode(),b'')==initial['index.html']
  for path,expected in initial.items():
   if path.startswith('src/'):assert files[path]==expected,(path,files[path],expected)
  assert provider.generator['isPrivate'] is False
  return files
-def reopen_account(sid,owner,previous_job):
+def reopen_account(sid,owner,previous_job,automatic=False):
  script(sid,"location.hash='#accounts/'+arguments[0]",[owner])
  # Cold startup can automatically finish Accounts OPEN/route re-verification.
  # Do not insist on a second Open when that real operation is already done,
@@ -37,16 +64,16 @@ def reopen_account(sid,owner,previous_job):
  def fresh_ready(a):
   f=a.get('flow') or {};w=a.get('work') or {}
   started=f.get('startedAt') or 0
-  return (a.get('state')=='READY' and f.get('purpose')=='OPEN'
+  return (a.get('state')=='READY' and f.get('purpose') in ['OPEN','RENEW']
    and f.get('jobId')!=previous_job and w.get('id')==f.get('jobId')
    and w.get('state')=='COMPLETE' and w.get('effect',{}).get('boundary')=='OBSERVED'
    and started>0 and (a.get('routeObservedAt') or 0)>=started
-   and (a.get('identityObservedAt') or 0)>=(a.get('routeObservedAt') or 0))
+   and ((f.get('purpose')=='RENEW' and a.get('protection',{}).get('state')=='VERIFIED' and (a.get('identityObservedAt') or 0)>0) or (a.get('identityObservedAt') or 0)>=(a.get('routeObservedAt') or 0)))
  def admission():
   a=account(sid,owner)
-  if fresh_ready(a):return 'AUTO_OPEN_VERIFIED'
+  if fresh_ready(a):return 'AUTO_RENEW_VERIFIED' if a.get('flow',{}).get('purpose')=='RENEW' else 'AUTO_OPEN_VERIFIED'
   b=script(sid,"const b=document.getElementById('account-open');return !!b&&!b.hidden&&!b.disabled")
-  return 'MANUAL_OPEN_AVAILABLE' if b else None
+  return 'MANUAL_OPEN_AVAILABLE' if b and not automatic else None
  try:choice=wait(admission,60)
  except AssertionError:
   a=account(sid,owner);detail=script(sid,"return {hash:location.hash,state:document.getElementById('account-state')?.textContent,button:(b=>b?{disabled:b.disabled,hidden:b.hidden}:null)(document.getElementById('account-open'))}")
@@ -64,20 +91,20 @@ def reopen_account(sid,owner,previous_job):
 def main():
  binary=pathlib.Path(os.environ['FIREFOX_BINARY']);driver=pathlib.Path(os.environ['GECKODRIVER_BINARY']);xpi=pathlib.Path(sys.argv[1]).resolve();identity=json.loads((xpi.parent/'identity.json').read_text());assert not identity['dirty'];assert not any(v for k,v in os.environ.items() if k.startswith('MOZ_DISABLE_') and 'SANDBOX' in k);receipt={'tier':'B/P37/both-markers','source':identity['source'],'xpiSha256':hashlib.sha256(xpi.read_bytes()).hexdigest(),'checks':[]};assert receipt['xpiSha256']==identity['xpiSha256']
  with tempfile.TemporaryDirectory(prefix='pcms-p37-') as tmp:
-  root=pathlib.Path(tmp);profile=root/'profile';profile.mkdir();home=root/'home';home.mkdir();provider=Fixture(root,extra_hosts=['user.uploads.dev',FRAME]);expected=configure(provider);expected['main.pjs']=b'output\r\n  Hello [animal]\r\nanimal\r\n  cat\r\n  dog';provider.generator['modelText']=expected['main.pjs'].decode();provider.directory_mode='complete';provider.directory_reads=[];provider.directory_advances=[];provider.generator['isPrivate']=False;original=json.loads(json.dumps(provider.generator));provider.start_catalog();provider.install_bridge(home,root);env={**os.environ,'HOME':str(home),'XDG_CONFIG_HOME':str(home/'.config'),'XDG_DATA_HOME':str(home/'.local/share'),'MOZ_REMOTE_ALLOW_SYSTEM_ACCESS':'1'};log=open(OUT/'driver.log','w');proc=subprocess.Popen([str(driver),'--port','44448','--allow-system-access'],env=env,stdout=log,stderr=subprocess.STDOUT);sid=None
+  root=pathlib.Path(tmp);profile=root/'profile';profile.mkdir();home=root/'home';home.mkdir();provider=Fixture(root,extra_hosts=['user.uploads.dev',FRAME]);expected=configure(provider);expected['main.pjs']=b'output\r\n  Hello [animal]\r\nanimal\r\n  cat\r\n  dog';provider.generator['modelText']=expected['main.pjs'].decode();provider.directory_mode='complete';provider.directory_reads=[];provider.directory_advances=[];provider.marker_order=(['pinned-other','pinned-second',SLUG]+[s for s in ORDER if s not in ['pinned-other',SLUG]])[:-1];assert len(provider.marker_order)==125;provider.generator['isPrivate']=False;original=json.loads(json.dumps(provider.generator));provider.start_catalog();provider.install_bridge(home,root);env={**os.environ,'HOME':str(home),'XDG_CONFIG_HOME':str(home/'.config'),'XDG_DATA_HOME':str(home/'.local/share'),'MOZ_REMOTE_ALLOW_SYSTEM_ACCESS':'1'};log=open(OUT/'driver.log','w');proc=subprocess.Popen([str(driver),'--port','44448','--allow-system-access'],env=env,stdout=log,stderr=subprocess.STDOUT);sid=None
   try:
    wait(driver_ready,15);sid,caps=account_session(binary,profile);receipt.update(browserVersion=caps['browserVersion'],buildId=caps.get('moz:buildID'));assert int(caps['browserVersion'].split('.')[0])>=155 and caps['acceptInsecureCerts'] is False;context(sid,'chrome');script(sid,"Components.classes['@mozilla.org/security/x509certdb;1'].getService(Components.interfaces.nsIX509CertDB).addCertFromBase64(arguments[0],'C,,');return true;",[base64.b64encode(provider.ca).decode()]);prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content');assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid);settings(sid);wait(lambda:script(sid,"return !!document.getElementById('allow-userscripts')"));click(sid,'#allow-userscripts');permission_choice(sid,True);wait(lambda:script(sid,"return !document.getElementById('allow-userscripts')"));initial=state(sid);assert initial['settings']['activeHours']==24 and initial['settings']['sleepHours']==72
    owner=add(sid,'Clock owner');settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'source@fixture.test');click(sid,'#account-confirm');settle(sid,owner,'READY');settings_clock(sid,1,1);asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),a=await c.read('accounts',arguments[0]);await c.mutate([{table:'generators',id:'existing-sentinel',value:{slug:'existing-sentinel',remoteId:'public_source-stable-18',accountId:a.id,ownerPrincipal:a.expectedPrincipal,creatorState:'OWNED',listing:'PUBLIC',state:'OWNED'}}],{step:'FIXTURE_PREVIOUS_OWNED',result:'COMPLETE'});c.close();location.hash='#generators/existing-sentinel';return true;",[owner]);wait(lambda:script(sid,"return !!document.getElementById('source-open')&&!document.getElementById('source-open').disabled"));click(sid,'#source-open');editor_handle=editor(sid);dashboard(sid);script(sid,"location.hash='#generators/existing-sentinel'");wait(lambda:script(sid,"return !!document.getElementById('source-inspect')&&!document.getElementById('source-inspect').disabled"));click(sid,'#source-inspect');source=wait(lambda:completed_source(sid),90);assert source['generator']['sourceState']=='VERIFIED' and source['generator']['listing']=='PUBLIC';assert {p:base64.b64decode(v) for p,v in source['bytes'].items()}==expected
    asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),g=await c.read('generators','existing-sentinel');await c.mutate([{table:'generators',id:g.id,expectedRev:g.rev,refs:g.refs,value:{...g,poolMember:true,pool:{schema:1,member:true,sourceManifest:g.sourceManifest,addedAt:Date.now()},refreshCycle:{schema:1,cycleId:crypto.randomUUID(),phase:'PENDING',activeUsedMs:0}}}],{step:'FIXTURE_QUALIFIED_P22_POOL',result:'COMPLETE'});c.close();return true;");page(sid)
-   check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');baseline=source['generator']['sourceManifest'];refresh(sid);one=verified(sid,1);marker=one['g']['refreshMarker']['id'];assert one['g']['previousGood']==baseline and one['j']['kind']=='REFRESH' and one['j']['effect']['disposition']=='APPLIED';assert_bytes(provider,expected,marker,1);assert len(provider.save_requests)==1 and provider.save_requests[0]['valid'] and not provider.save_requests[0]['forced']
-   refresh(sid);two=verified(sid,2);assert two['g']['previousGood']==one['g']['sourceManifest'];assert_bytes(provider,expected,marker,2);assert len(provider.save_requests)==2
-   wait(lambda:'Source save verified:' in script(sid,"return document.getElementById('refresher-list').textContent"));receipt['checks'].append('actual-Refresher-Refresh-control/shared-native-guarded-save/both-markers-counter1-then2/no-duplicates/full-independent-root-and-binary-bytes/public-state/previous-good/receipt-separate-from-position')
+   check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');baseline=source['generator']['sourceManifest'];refresh(sid,provider);one=verified(sid,1);marker=one['g']['refreshMarker']['id'];assert one['g']['previousGood']==baseline and one['j']['kind']=='REFRESH' and one['j']['effect']['disposition']=='APPLIED';assert_bytes(provider,expected,marker,1);assert len(provider.save_requests)==1 and provider.save_requests[0]['valid'] and not provider.save_requests[0]['forced']
+   receipt['firstMeasuredResponse']=measured_response(sid,one);refresh(sid,provider);two=verified(sid,2);assert two['g']['previousGood']==one['g']['sourceManifest'];assert_bytes(provider,expected,marker,2);assert len(provider.save_requests)==2;receipt['secondMeasuredResponse']=measured_response(sid,two)
+   wait(lambda:'Source save verified:' in script(sid,"return document.getElementById('refresher-list').textContent"));state_matrix(sid,'refresher-active-measured',receipt);receipt['checks'].append('actual-rendered-directory-demand/automatic-controller/shared-native-guarded-save/both-markers-counter1-then2/no-duplicates/full-independent-root-and-binary-bytes/public-state/previous-good/receipt-separate-from-position')
    call('POST',f'/session/{sid}/window',{'handle':editor_handle});set_input(sid,'#fixture-source-model','Human unsaved text must stay');dashboard(sid);page(sid)
    # The real backend immediately rechecks dirty state even before its next heartbeat.
-   script(sid,"document.querySelector('button[data-refresh=\"'+arguments[0]+'\"]').click();return true;",[SLUG]);wait(lambda:'EDITOR_DIRTY' in script(sid,"return document.getElementById('refresher-result').textContent") or state(sid)['rows'][0]['holdCode']=='EDITOR_DIRTY',45);assert len(provider.save_requests)==2;call('POST',f'/session/{sid}/window',{'handle':editor_handle});assert script(sid,"return document.getElementById('fixture-source-model').value")=='Human unsaved text must stay';script(sid,"modelTextEditor.getDoc().text=arguments[0];modelTextEditor.getDoc().clean=true;menuBar.saveState='saved';document.getElementById('fixture-source-model').value=arguments[0];return true;",[provider.generator['modelText']]);dashboard(sid);page(sid);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher')
+   refresh(sid,provider);wait(lambda:'EDITOR_DIRTY' in script(sid,"return document.getElementById('refresher-result').textContent") or state(sid)['rows'][0]['holdCode']=='EDITOR_DIRTY',45);assert len(provider.save_requests)==2;provider.marker_demand=None;call('POST',f'/session/{sid}/window',{'handle':editor_handle});assert script(sid,"return document.getElementById('fixture-source-model').value")=='Human unsaved text must stay';script(sid,"modelTextEditor.getDoc().text=arguments[0];modelTextEditor.getDoc().clean=true;menuBar.saveState='saved';document.getElementById('fixture-source-model').value=arguments[0];return true;",[provider.generator['modelText']]);dashboard(sid);page(sid);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher')
    receipt['checks'].append('actual-dirty-human-editor/zero-stage-or-save/preserved-human-text/normal-undo-and-Pause-Resume-recheck')
    # Lose the third save acknowledgement after independent server application.
-   provider.delay_after_apply=True;provider.delay_save_number=3;refresh(sid);assert provider.applied.wait(30),'THIRD_SAVE_NOT_APPLIED';provider.readback_outage=True;possible=refresh_cut(sid);assert possible['j']['effect']['boundary']=='POSSIBLE';op=possible['j']['effect']['operationId'];assert_bytes(provider,expected,marker,3);previous_account_job=account(sid,owner)['flow']['jobId'];close_dashboard(sid);old=hard_stop(sid,profile);sid=None;provider.release_ack.set();provider.delay_after_apply=False
+   provider.delay_after_apply=True;provider.delay_save_number=3;refresh(sid,provider);assert provider.applied.wait(100),'THIRD_SAVE_NOT_APPLIED';provider.readback_outage=True;possible=refresh_cut(sid);assert possible['j']['effect']['boundary']=='POSSIBLE';op=possible['j']['effect']['operationId'];assert_bytes(provider,expected,marker,3);previous_account_job=account(sid,owner)['flow']['jobId'];close_dashboard(sid);old=hard_stop(sid,profile);sid=None;provider.release_ack.set();provider.delay_after_apply=False
    sid,_=account_session(binary,profile);assert not old.intersection(pids(profile));toolbar(sid);dashboard(sid);page(sid);cold=refresh_cut(sid);assert cold['j']['effect']['operationId']==op and cold['j']['effect']['boundary']=='POSSIBLE' and cold['g']['refreshMarker']['counter']==2;assert len(provider.save_requests)==3
    receipt['accountRecovery']=reopen_account(sid,owner,previous_account_job);page(sid);wait(lambda:script(sid,"return !!document.querySelector('button[data-refresh=\"'+arguments[0]+'\"]').closest('li')",[SLUG]));selector='[data-refresher="'+SLUG+'"]';button=script(sid,"return [...document.querySelector(arguments[0]).querySelectorAll('button')].find(b=>b.textContent==='Check Refresh result')?.hidden===false",[selector]);assert button;check_button=call('POST',f'/session/{sid}/element',{'using':'xpath','value':'//li[@data-refresher="'+SLUG+'"]//button[text()="Check Refresh result"]'})['element-6066-11e4-a52e-4f735466cecf'];before_check=refresh_cut(sid)['j']['rev'];call('POST',f'/session/{sid}/element/{check_button}/click',{});wait(lambda:refresh_cut(sid)['j']['rev']>before_check,30);assert refresh_cut(sid)['j']['effect']['boundary']=='POSSIBLE';provider.readback_outage=False;page(sid)
    # A scheduler wake can reconcile the original POSSIBLE operation as soon
@@ -105,14 +132,17 @@ def main():
      call('POST',f'/session/{sid}/window',{'handle':handle})
      receipt['openDiagnostic']['urls'].append(script(sid,"return location.href"))
     raise AssertionError(('REFRESHER_EDITOR_OPEN_FAILED',receipt['openDiagnostic']))
-   dashboard(sid);page(sid);check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');provider.race=True;refresh(sid);held=wait(lambda:refresh_cut(sid) if refresh_cut(sid)['g'].get('sourceSaveCode')=='SOURCE_STALE' else None,100);assert held['j']['effect']['disposition']=='REJECTED' and held['g']['refreshMarker']['counter']==3;assert len(provider.save_requests)==4;assert provider.generator['modelText']=='Independent external editor changed source\n';assert held['g']['previousGood'] is not None
+   dashboard(sid);page(sid);check(sid);wait(lambda:measured(sid),100);pause(sid,'Pause Refresher');pause(sid,'Resume Refresher');provider.race=True;refresh(sid,provider);held=wait(lambda:refresh_cut(sid) if refresh_cut(sid)['g'].get('sourceSaveCode')=='SOURCE_STALE' else None,100);assert held['j']['effect']['disposition']=='REJECTED' and held['g']['refreshMarker']['counter']==3;assert len(provider.save_requests)==4;assert provider.generator['modelText']=='Independent external editor changed source\n';assert held['g']['previousGood'] is not None
    native_filter(sid,'all');wait(lambda:visibility(sid)['fresh'] and visibility(sid)['size']==127,100);assert provider.generator['modelText']=='Independent external editor changed source\n' and len(provider.save_requests)==4 and provider.unexpected==[]
    receipt['checks'].append('real-Open-protected-editor-after-cold-start/external-version-race/stale-rejection-no-repair/marker-counter-not-advanced/previous-good-and-user-base-preserved/independent-directory-work-continues-on-same-account')
-   receipt['markerId']=marker;receipt['operationId']=op;receipt['saves']=provider.save_requests;receipt['final']=refresh_cut(sid);receipt['result']='PASS'
+   state_matrix(sid,'refresher-stale-source-held',receipt);receipt['markerId']=marker;receipt['operationId']=op;receipt['saves']=provider.save_requests;receipt['final']=refresh_cut(sid);receipt['result']='PASS'
   except Exception as error:
    receipt['error']=str(error)
    if sid:
-    try:toolbar(sid);dashboard(sid);page(sid);receipt['status']=state(sid);receipt['cut']=refresh_cut(sid);receipt['body']=script(sid,"return document.body.innerText")
+    try:
+     toolbar(sid);dashboard(sid);page(sid);receipt['status']=state(sid);receipt['cut']=refresh_cut(sid);receipt['body']=script(sid,"return document.body.innerText");receipt['directoryCut']=directory_cut(sid)
+     receipt['controllerCut']=asyncjs(sid,"const {openCore}=await import(browser.runtime.getURL('core/records.mjs')),c=await openCore(),v=await c.view('refresher-control');c.close();return v;")
+     with provider.lock:receipt['providerFailure']={'saves':provider.save_requests,'demand':provider.marker_demand,'directoryReads':len(provider.directory_reads),'directoryAdvances':provider.directory_advances[-6:]}
     except Exception:pass
    print(json.dumps(receipt),flush=True);raise
   finally:

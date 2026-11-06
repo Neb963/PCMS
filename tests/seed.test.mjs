@@ -5,7 +5,13 @@ import {openCore,sha256} from '../src/core/records.mjs';
 import {FIRST_PARTY,bundledPackage} from '../scripts/bundled.mjs';
 import {validatePackage,PackageError} from '../src/modules/package.mjs';
 import {seedBundled,bundledIds} from '../src/modules/seed.mjs';
+import {execFileSync} from 'node:child_process';
 const encoder=new TextEncoder();
+test('all seven bundled ZIP bytes and registry identities are identical across build timezones',()=>{
+ const code="import {FIRST_PARTY,bundledPackage} from './scripts/bundled.mjs';console.log(JSON.stringify(FIRST_PARTY.map(([id,name])=>{const p=bundledPackage(id,name);return {id,packageHash:p.packageHash,manifestHash:p.manifestHash};})));";
+ const values=['UTC','Europe/Warsaw','America/Los_Angeles','Asia/Tokyo'].map(TZ=>JSON.parse(execFileSync(process.execPath,['--input-type=module','-e',code],{cwd:new URL('..',import.meta.url),env:{...process.env,TZ},encoding:'utf8'})));
+ assert.equal(values[0].length,7);for(const value of values.slice(1))assert.deepEqual(value,values[0]);
+});
 function assets(){
  const packages=FIRST_PARTY.map(([id,name])=>bundledPackage(id,name));
  const registry=encoder.encode(JSON.stringify({schema:1,packages:packages.map(({id,packageHash,manifestHash})=>({id,packageHash,manifestHash}))}));

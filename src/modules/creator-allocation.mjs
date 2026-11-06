@@ -4,7 +4,7 @@ import {nativeSlug} from './slug-observations.mjs';
 // Creator owns policy; Core supplies one atomic snapshot/commit on its stores.
 export const eligibleAccount=a=>a?.state==='READY'&&!a.admission&&/^[a-f0-9]{64}$/.test(a.expectedPrincipal??'')&&/^[a-f0-9-]{36}$/i.test(a.personaUid??'')&&/^firefox-container-[1-9][0-9]*$/.test(a.containerId??'')&&typeof a.routeId==='string'&&!['','direct','block','__direct__','__block__'].includes(a.routeId);
 export const creationDispatched=job=>job.effect?.boundary==='POSSIBLE'||job.creator?.dispatched===true||job.effects?.some(e=>['PERCHANCE_CREATE','PERCHANCE_RENAME'].includes(e.kind)&&e.disposition!=='REJECTED');
-export function validCreatorTarget(g){return !!g?.folderPresent&&!!g.markerVersion&&!g.gitHoldCode&&!g.ownerMissing;}
+export function validCreatorTarget(g){return g?.folderPresent==='YES'&&!!g.markerVersion&&!g.gitHoldCode&&!g.ownerMissing;}
 function target(c){
  const {job,generator:g,connection}=c;
  check(nativeSlug(g.slug)===g.slug,'CREATOR_SLUG_INVALID');

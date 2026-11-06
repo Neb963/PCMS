@@ -17,18 +17,20 @@ export async function decodeGitBlob(body,sha){
  try{bytes=Uint8Array.from(atob(body.content.replace(/\s/g,'')),c=>c.charCodeAt(0));}catch{throw new CoreError('GIT_BLOB_INVALID');}
  check(bytes.length===body.size&&await gitBlob(bytes)===sha,'GIT_BLOB_INVALID');return bytes;
 }
-export function createGitReader({transport=globalThis.fetch,clock=Date.now}){
- return async({repository,token,path='',etag=null})=>{
+export function createGitReader({transport=globalThis.fetch,clock=Date.now,record=null}){
+ return async({repository,token,path='',etag=null,operationId=null})=>{
   check(validRepository(repository),'GIT_REPOSITORY_INVALID');check(typeof token==='string'&&token.length>=12&&/^[\x21-\x7e]+$/.test(token),'GIT_CREDENTIAL_REQUIRED');
   check(path===''||/^\/compare\/[a-f0-9]{40}\.\.\.[a-f0-9]{40}$/.test(path)||/^\/git\/(ref\/heads\/main|commits\/[a-f0-9]{40}|trees\/[a-f0-9]{40}(\?recursive=1)?|blobs\/[a-f0-9]{40})$/.test(path),'GIT_READ_SCOPE_DENIED');
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10000);let response;
   try{try{response=await transport('https://api.github.com/repos/'+repository+path,{method:'GET',credentials:'omit',cache:'no-store',redirect:'error',signal:controller.signal,headers:{Accept:'application/vnd.github+json',Authorization:'Bearer '+token,'X-GitHub-Api-Version':'2022-11-28',...etag?{'If-None-Match':etag}:{}}});}
-  catch{throw new CoreError('GIT_CONNECTION_UNAVAILABLE');}
+  catch(error){throw new CoreError('GIT_CONNECTION_UNAVAILABLE',{family:'TRANSPORT',method:'GET',exceptionType:error?.name==='AbortError'?'ABORT_ERROR':'OTHER_ERROR',decision:'READBACK_ONLY'});}
+  const diagnostics={family:'GIT',method:'GET',httpStatus:response.status,endpoint:path.startsWith('/git/commits/')?'GIT_COMMIT':path.startsWith('/git/trees/')?'GIT_TREE':path.startsWith('/git/blobs/')?'GIT_BLOB':path.startsWith('/compare/')?'GIT_COMPARE':'GIT_REF'};
+  if(record)await record({operationId,diagnostics,result:response.status<400?'OBSERVED':'FAILED'});
   const get=name=>response.headers?.get(name),retry=get('retry-after'),reset=Number(get('x-ratelimit-reset'))*1000,remaining=get('x-ratelimit-remaining');
-  if(response.status===429||response.status===403&&(retry!=null||remaining==='0')){const seconds=Number(retry),date=Date.parse(retry);const at=retry!=null?(Number.isFinite(seconds)?clock()+Math.max(0,seconds)*1000:date):reset;throw Object.assign(new CoreError('GIT_RATE_LIMIT'),{retryAt:Math.max(clock()+1000,Number.isFinite(at)&&at>clock()?at:clock()+60000)});}
+  if(response.status===429||response.status===403&&(retry!=null||remaining==='0')){const seconds=Number(retry),date=Date.parse(retry);const at=retry!=null?(Number.isFinite(seconds)?clock()+Math.max(0,seconds)*1000:date):reset;throw Object.assign(new CoreError('GIT_RATE_LIMIT',diagnostics),{retryAt:Math.max(clock()+1000,Number.isFinite(at)&&at>clock()?at:clock()+60000)});}
   if(response.status===304){check(path==='/git/ref/heads/main'&&etag,'GIT_RESPONSE_INVALID');return {status:304,etag:get('etag')??etag};}
-  if(response.status===401||response.status===403)throw new CoreError('GIT_ACCESS_DENIED');
-  if(response.status===404||response.status===409)throw new CoreError(path==='/git/ref/heads/main'?'GIT_MAIN_MISSING':'GIT_OBJECT_UNAVAILABLE');
-  check(response.status===200,'GIT_CONNECTION_UNAVAILABLE');let body;try{body=await response.json();}catch{throw new CoreError('GIT_RESPONSE_INVALID');}return {status:200,body,etag:get('etag')??null};}finally{clearTimeout(timer);}
+  if(response.status===401||response.status===403)throw new CoreError('GIT_ACCESS_DENIED',diagnostics);
+  if(response.status===404||response.status===409)throw new CoreError(path==='/git/ref/heads/main'?'GIT_MAIN_MISSING':'GIT_OBJECT_UNAVAILABLE',diagnostics);
+  check(response.status===200,'GIT_CONNECTION_UNAVAILABLE',diagnostics);let body;try{body=await response.json();}catch{throw new CoreError('GIT_RESPONSE_INVALID');}return {status:200,body,etag:get('etag')??null};}finally{clearTimeout(timer);}
  };
 }

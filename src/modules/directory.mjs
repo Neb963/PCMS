@@ -1,11 +1,12 @@
 import {requireCore as check,publicError} from '../core/records.mjs';
+import {currentRows} from '../core/current-rows.mjs';
 import {eligibleAccount} from './creator-allocation.mjs';
 import {collectDirectory,applyDirectory,directoryProjection,DIRECTORY_CADENCE,DIRECTORY_AFTER_SAVE} from './directory-observations.mjs';
 const ID='pcms-refresher',KEY='refresher-directory';
 export function createDirectory({core,donor,clock=Date.now}){
  let serial=Promise.resolve();const run=fn=>{const p=serial.then(fn,fn);serial=p.catch(()=>{});return p;};
  const capable=m=>m?.manifest?.capabilities?.includes('perchance.directory'),scope=a=>({accountId:a.id,personaUid:a.personaUid,containerId:a.containerId,routeId:a.routeId,expectedPrincipal:a.expectedPrincipal});
- async function rows(table){const out=[];let cursor=null;do{const p=await core.list({table,cursor,limit:200});for(const row of p.rows)out.push(await core.read(table,row.id));cursor=p.cursor;}while(cursor);return out;}
+ const rows=table=>currentRows(core,table);
  const state=async()=>await core.view(KEY)??{schema:1,current:null,lastGood:null,history:[],invalidation:0,nextDue:0,jobId:null,accountId:null};
  async function enabled(){const m=await core.read('modules',ID),r=await core.status();return {m,r,ok:capable(m)&&m.enabled&&!m.lifecycle&&!m.refresher?.paused&&!r.paused&&!r.restoreHold};}
  async function persist(s){await core.saveView(KEY,s,crypto.randomUUID());}

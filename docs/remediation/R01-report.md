@@ -1,0 +1,66 @@
+# R01 — default causal diagnostics and bounded exports
+
+Date: 2026-11-02. Base: `a3a084dcdb52cb51ff1ef82d1287d18fa7661129` / tree `9fa5ffa20dd70ef2c4570541ee49255eacd2f6d0`. Authority: accepted v42, design revision 2, AGENTS.md, CI-GUIDELINES.md; unchanged.
+
+**Status: PARTIAL — default installed export and bounded suffix evidence PASS; broader diagnostic matrix remains open. No operator testing.**
+
+## Actual state and plan
+
+No open PRs or remediation branches existed at inspection. Main matched the package lock. All 29 package files verified. The phase plan was committed before code and published at `470c8756284e2407bb4b66341dba9cce02542afc`, tree `4b397822b1b49be0b0ba797079db8dabcd09ef77`. Prior P41 CI is historical, not remediation acceptance.
+
+## Root causes and changes
+
+| Defect | Prior grade | Root cause / change | Status |
+|---|---|---|---|
+| IA-01 / IA-02 / IA-05 / IB-08 / IF-01 | Confirmed | Eight-field event format and untyped queue catch lost causes. Typed allowlisted diagnostics now accompany transactional state changes and preserve original exception classification, immutable operation, safe comparison metadata, state/recovery and boot identity. | Source verified; B/DSK pending |
+| ID-03 / IE-09 | Confirmed | Hold codes were private state only. Changes project codes and state/phase into events. Git comparison failure preserves individual field results; POST status is recorded. | Source verified; full adapter matrix pending |
+| IF-02 | Reproduced | Export scanned oldest prefix. Existing event primary key now seeks directly to explicit first/last range, bound into stable cursor identity. | Actual fake-IndexedDB 100k-prefix oracle passes; Firefox scale pending |
+| IF-01 support context | Confirmed omission | Default schema-2 ZIP adds hashed `diagnostics.json`: atomic redacted current inventory with its own cut. Selected event range and current checkpoint cut are explicitly different. Schema-1 read verification retained. | Source verified; actual downloaded ZIP pending |
+
+Changes: `diagnostics.mjs`, `records.mjs`, `queue.mjs`, `journal-archive.mjs`, `git-writer.mjs`, `core-service.mjs`. Generic exceptions now return INTERNAL_ERROR; actual quota/IDB error classes retain storage codes. Arbitrary exception messages, stack, cause payloads, source, tokens, private labels/principal/exit values and response bodies are excluded. Redacted fields/counts are explicit; only typed diagnostic scalars and digests pass.
+
+## Tests and measurements
+
+| Tier | Command / oracle | Actual result |
+|---|---|---|
+| T | `node --test tests/remediation-diagnostics.test.mjs tests/records.test.mjs tests/queue.test.mjs tests/journal.test.mjs tests/retention.test.mjs tests/git-writer.test.mjs` | 66 PASS. Actual production queue lost-reply/reopen, original Git comparison cause/no-replay; adversarial exception and ZIP-entry canary; range-bound cursor; quota/rollback; existing watermark/Pause/Disable/retention/no-replay checks. |
+| S/T | 100,001 actual fake-IndexedDB event rows, export only sequence 100001; instrument `IDBCursor.continue` | One exported row, zero gaps, <=3 cursor continuations (asserted). Includes fixture setup; ~17–19s for the whole new test file. This is not installed Firefox performance. |
+| T/build | `npm run build`; `python3 scripts/release-preflight.py build/pcms-dev.xpi` | Build produced a full-capability XPI; artifact preflight result recorded with subsequent CI. No delivery qualification. |
+| B/DSK local attempt | `FIREFOX_BINARY=/tmp/pcms-firefox/firefox/firefox GECKODRIVER_BINARY=/tmp/pcms-firefox/geckodriver python3 tests/installed_journal.py build/pcms-dev.xpi` | BLOCKED before session: Firefox155.0b1 content process uid_map EPERM/SIGSEGV; Marionette response cannot decode. Normal sandbox retained. Connector get-info/list-pages also returned internal server errors. |
+| B/DSK CI | Extended actual installed Journal UI/Downloads test + independent ZIP parser; original fault code/comparison, route age, current context; paused/closed dashboard/restart/Disable/interrupted download | Pending. Test uses explicitly synthetic local fault boundaries, not live native/provider behavior. |
+
+The new assertions would fail P41: no diagnostics section, no original cause/correlation, non-storage misclassification, and 100k-prefix cursor traversal.
+
+## Safety and compatibility
+
+Intent remains durable before effect. Lost replies stay POSSIBLE and readback-only; no lock clearing or external replay. Git comparison behavior is intentionally unchanged until R02. No donor/route/source permissions or native protocol changed. Core recording continues independently of Journal enablement. Existing 30m/90d schedules and completion-watermark rules remain. Old three-entry schema-1 archives remain verifiable; new required checkpoint bytes/hash must validate before COMPLETE acceptance. No operator captures or secrets were published.
+
+## Checkpoints / remaining work
+
+Source checkpoint `c6b96096a02728cbcd703375f2d5d7d94495a54f`, tree `dd678fdd1364b3b141c9d511b399d3801786f876`, independently matched to local source tree through GitHub API. Git CLI write authentication is unavailable; GitHub connector writes use compare-and-swap refs and verified trees, no force.
+
+R01 is not closed. Complete installed/disk fault semantics, real Firefox 90-day suffix measurement, remaining transport/Creator/route error matrix and subsequent integrated checks. R02–R08 remain unaccepted. Real P42–P49 G/H/P acceptance is NOT TESTED. No ready-for-operator claim or release artifact is authorized by these partial results.
+
+## Observed installed receipt (supersedes pending entries above)
+
+CI [41506387916](https://github.com/Neb963/PCMS/actions/runs/41506387916), source `f48a45228ba0fca83fd43c502a5113a072b68faf`, tree `cb1e1fe8467bec453e73a53a5a5db79863272297`: all configured focused/installed steps PASS. Installed artifact `13170544259` was downloaded and independently inspected. `installed-journal.json` reports Firefox155.0 / build20260817142839, sandbox6 / multiprocess enabled; XPI SHA-256 `40111aec89f9227f96afed31f825fc8aa027a46132bef7952aef9ae7911470d1`. Default ZIP/disk causal faults, private canary exclusion, interruption/restart/Pause/Disable checks PASS. Actual100001-event/90-day tail export: one row, five cursor reads,107ms; archive SHA-256 `7d697e143e00bbe8baed12410a944767fbaddfbf70724888d54779aa251a542c`. This is the executed synthetic local fault scope, not all provider failures.
+
+Later source `2c83d531`, CI41510668203, default installed Journal and Git-writer steps also PASS. Discover's final fixture provider-scope assertion failed; later steps skipped. Exact final R08 and comprehensive transport/Creator/route failure matrix remain open.
+
+## R08 causal-readback correction
+
+Run41516312430/source7c4f426b retained passing installed Journal/100001-event tail/disk evidence, but actual Creator readbacks still used causally empty SAVE_VIEW events. Added an optional explicit allowlisted event to the private view transaction; Creator ownership/PREPARE/ACK/readback now commits exact typed cause and immutable job/operation with its private receipt. Ordinary views keep their behavior; rejected event validation aborts both receipt and event. Raw receipt/source/session data never enters the event.
+
+33 focused records/Creator/diagnostics T checks PASS (17165ms), including three production Creator failure paths, support-ZIP content/secret scans, actual IndexedDB atomic rollback, cold same-operation and100001-row bounded range. Subsequent context/Creator/Deployer/source suite127 PASS (72026ms); final Accounts/Creator28 PASS. Matching real-Creator Journal→Downloads→independent ZIP assertion has been added to installed_creation.py and remains NOT TESTED until its next CI execution. This is additional coverage, not comprehensive R01 closure.
+
+## Host request failure gap
+
+Source inspection after checkpointfcf4c587 found that query failures were traced, but other Core/editor failures and early denials could return without a causal default event. The existing service now records those failures with a fixed operation vocabulary, a server-generated correlation ID, original safe typed code/family, duration and `REQUEST_FAILED`. This describes the request outcome; it does not assert that an already-admitted external effect failed or permit replay. Unknown operation names, request arguments, tokens, paths, source and arbitrary exception material are excluded. Existing transactional queue/effect and successful-command records remain authoritative. Successful read polling and unchanged view writes add no rejection event.
+
+**28 focused T PASS/1.82s** (host-request diagnostics, records, Git writer). Actual service denials, invalid views, generic exception, QuotaExceededError without mutation, and editor sender rejection survive production support-archive verification with complete chronology and private-request canary exclusion. Existing Git no-replay, package RPC and view-cache checks pass. Python syntax/whitespace checks pass. The installed Journal journey now submits an invalid folder through the actual settings button, requires unchanged settings and the exact original host failure in the independent disk ZIP. That added B/DSK assertion is pending, not promoted from T. Remaining route/provider matrix, real-duration automatic exports and final integrated evidence still gate R01 closure.
+
+Observed CI355/41544272023/source7f095bea: the expanded installed default Journal step **PASS**, including the actual rejected-settings button, unchanged prior settings, exact typed host cause/correlation, independent production disk ZIP and revised real-Tab probes. Focused CI also PASS. Clean candidate artifact13186879334/ZIP133348ffff90c42f5573bf604eab6e51eb86cf60403b03d4e102529b9d59e9f0 independently matches XPI0b35d801e814367c30149bf3a63423905baa967098b7b2ca29b0834219c282ef/907172bytes and local clean preflight. Final installed receipt equality and broader matrix remain open; subsequent Git/Creator failures prevent whole-candidate qualification.
+
+Final355 artifact13187667106 ZIP6b298a1559ffdbcba25ecfe19d38e4fd687be8c4eb1f379a86e6c0ccb40cee3f independently confirms installed/focused XPI equality, default Journal PASS and24 distinct real Tab controls at desktop/narrow validation states. The Accounts render regression left the ordinary Creator failure ZIP without a UI cause, exposing an additional default recording gap. A single existing-render boundary now emits a fixed alert/reload action, never marks a failed/stale view ready, and reports only fixed page/exception enums through trusted Core. UI_RENDER_FAILED retains original TYPE_ERROR/storage classification without exception messages/source; logger failure is explicit.24 relevantT PASS/1.71s covers actual host archive vocabulary/redaction, render failure/retry/stale-route/failed-logger behavior, queries and records; final unknown-name guard4T PASS. The added actual DOM-construction fault/Reload/full-Accounts recovery/default-disk assertion and matching error pixels remain pending B.
+
+Observed356/41546515392/source654ed3a3: focused and expanded installed Journal **PASS**. The real one-shot DOM-construction TypeError, fixed alert/unready state, actual Reload/full Accounts controls, safe original UI_RENDER cause and independent default disk ZIP now execute successfully. Candidate13188991945 ZIP6f1f42f34bdacae55711d71d6481d44fab9ef76c4ca2c7e3282d10a5c00ae125 independently matches clean source/tree and local preflight: XPIfa349bede1f178a2cc05cbf4b11586d6049de05dfde83e3e396f7a974609c2b7/908393bytes. Full installed identity receipt, other journeys, real-duration and final matrix remain open; this is a scoped B/DSK result, not R01/release closure.

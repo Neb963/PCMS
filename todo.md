@@ -1,43 +1,26 @@
-# Current implementation checkpoint
+# R01–R08 current integration gate
 
-## Complete candidate; external acceptance held
+Accepted v42/design revision2, PHASES, AGENTS and CI-GUIDELINES are unchanged. Full authority/remediation/I-A–I-F package was reread in this continuation. Continue R08 autonomously; no operator logs or piecemeal reproductions requested. No live Perchance/Mullvad/native/content-repository mutations. Real P42–P49 remain NOT TESTED. No release, merge or operator guide until every pre-operator gate passes.
 
-P01–P41 are implemented and verified at their required available fixture tiers. This execution completed P38–P41 sequentially. No safely eligible implementation work remains without the external resources below. All G/H/P1–P5 live cases remain **NOT TESTED**; no live provider mutation was performed.
+## Active364 candidate
 
-### Frozen acceptance artifact
-
-- Source `decd5e84d3546ccd11686c577b95cf94ba0cb0b6`; tree `1c8abd2a99b8c2bb1fbede6f75944b0debbc529f`.
-- [Qualified XPI and identity](https://github.com/Neb963/PCMS/actions/runs/41456369462/artifacts/13145834186),892656 XPI bytes. SHA-256 `ba8c844dafc72afb44aea1ca7d9d00940e8b021471086995283dd9c6aca7d127`. Keep this exact tested file for acceptance.
-- [Run41456369462](https://github.com/Neb963/PCMS/actions/runs/41456369462):73 focused T/build + artifact preflight and all three same-XPI installed B/DSK journeys PASS. Every installed receipt matches the artifact hash. [Installed receipts](https://github.com/Neb963/PCMS/actions/runs/41456369462/artifacts/13147920509). Firefox155.0/build20260817142839/normal sandbox6.
-- Real persistent/cold/blocked/wrong-profile startup; seven fresh enabled packages; actual Journal Disable retained across restart; exact user-registry hashes; full keyboard/narrow/search/later-page/focus/module install-update-disable-enable/source-draft/cold one-save journey; production disk backup and same/fresh-profile scoped restore; early auth/cookies/binary/history/draft/packages/Pause/Unknown preservation; valid/rejected synthetic login and explicit recovery all PASS. Same-device fresh profiles do not prove fresh-device or live login portability.
-- [PR42](https://github.com/Neb963/PCMS/pull/42) merged `71e672b9ca80e1d39022550fd2b420c976a127f1`; remote tree exactly equals tested source above. Postmerge [41457499428](https://github.com/Neb963/PCMS/actions/runs/41457499428) PASS (both focused and all installed steps). This handoff changes documentation only and retains the frozen artifact.
-
-### Completed phases and reused evidence
-
-| Phase | Verified checkpoint | Required evidence |
-|---|---|---|
-| P38 automatic Refresher control | [PR39](https://github.com/Neb963/PCMS/pull/39), merge5d9d9f58; testedf2226d6e | [41435567394](https://github.com/Neb963/PCMS/actions/runs/41435567394):117T/build+B PASS; automatic initial/repeat both-marker/full-binary saves, measured directory pressure, Pause/settings/closed-dashboard/restart. XPI46dade12363bb0a6d7af3ec48ca4eea623c5ce6079f918863d10cfa9631978b6. Postmerge41436091125 PASS. |
-| P39 shared UI and recovery | [PR40](https://github.com/Neb963/PCMS/pull/40), mergeb0df16b3; testedc45798cb | [41442868974](https://github.com/Neb963/PCMS/actions/runs/41442868974):78T/build+B PASS; cross-item search/grouped attention/Reviewed separation/late paging/focus/module lifecycle/durable selected-source one-save recovery. XPIe2b670e17297764aca25eff37d4acd7e23ba8e842cca22ff30139edbef1f36b8. Postmerge41443089685 PASS. |
-| P40 representative capacity | [PR41](https://github.com/Neb963/PCMS/pull/41), merge158ca1d5; testeda01a8e2b | [41454197903](https://github.com/Neb963/PCMS/actions/runs/41454197903):138S/T/build+full installed S/B/DSK PASS. XPI814ea942bcd066dd131cc97c6a832651c8a8fb18eac3b9d8a25cca14463bff52. Postmerge41455581307 PASS. |
-| P41 complete candidate | [PR42](https://github.com/Neb963/PCMS/pull/42), merge71e672b9; testeddecd5e84 | Exact artifact and73T+B/DSK above. Seven complete enabled fresh packages, retained user choices, safe installation guidance and unchanged donor-first/security contracts. |
-
-P40 used50 account records/1001 generators/90000 operations over90 days/32MiB retained binary,4 logical CPUs/16.76GB reported browser-runner memory. Actual4 global pages2395ms/exact late search227ms/21 Core pages1093ms. Installed archives35,775,596 and35,825,279 bytes independently passed CRC/every-entry/source/history hashes; captures48078/60525ms with atomic barriers3083/2506ms. Real staging stop/restart/Check same operation, native cancellation, destination failure, Backup Disable and exact previous/manual/unrelated preservation PASS. Peak aggregate Firefox RSS4,211,781,632 bytes includes shared pages. These are measured fixture sizes, not capacity ceilings or50 working routes.
-
-T/S independently verified1000 fair per-item reads across50 accounts/maintenance turn2/restart-preserved review checkpoints,1101 catalog folders/1105 initial requests/unchanged poll1 request and0 folder reads, and forced ZIP64/74,937,420 uncompressed bytes with independent disk hashes. Unchanged native retention B/DSK [41449213129](https://github.com/Neb963/PCMS/actions/runs/41449213129), sourcec9800711/XPI068ac8f1f7d83ff5d11fda473260b6dcab295d35ab312ec1262f9e810c620552, passed actual owned deletion/Pause/closed-dashboard/manual-unrelated-moved-history-loss preservation/restart/no-repeat. Its boundary did not change afterward.
-
-P41 changed only build version, trusted artifact checks, selected test wiring and docs, so P40 scale/large disk/retention evidence is reused with its original identity. Earlier unchanged creator/Git/source/AI/one-Discover/one-directory/parked-tab boundaries retain the actual receipts in PR history. Prior failed/partial runs are not PASS; their measured corrections and useful lessons remain in learned.md/history.
-
-### Exact remaining holds
-
-| Phase | Dependency/resource and remaining oracle |
+| Identity | Value |
 |---|---|
-| P42 H | DependencyP41 complete; needs named configured real host/existing bridge, two authorized isolated accounts/distinct exits, lifecycle/outage/repair and independent unchanged remote-generator observations. |
-| P43 G | Independent dependencyP41 complete; needs named disposable repository/main, suitable Contents token and Git-only clean profile; exact real history/tree/concurrent/lost-ACK/ruleset-denial observations. PCMS's implementation repository was not authorized as that disposable target. |
-| P44 P1 | NeedsP42+P43 and named authorized account/slug targets for current classification/ownership and once-only unlisted creation. |
-| P45 P2/G | NeedsP44 and disposable full source/publication targets for exact bytes/revisions/dirty-conflict/lost-ACK/listing/pool/DONE acceptance. |
-| P46 P3/G | NeedsP45 and authorized native AI instructions/chat/target for same-chat readiness, actual PCMS Finish and independent source/Git/publication completion. |
-| P47 P4 | NeedsP45 and authorized small directory/marker cases and existing pools; actual source/functional/rendered before-after positions and rate/propagation observations. |
-| P48 P5/H/DSK | NeedsP42 and authorized managed login contexts plus a configured fresh-device destination; actual principal/route/exit/Git access and rejected-session outcomes. |
-| P49 H/S/DSK/P4/P5 | NeedsP46+P47+P48 and representative50 real managed routes/exits and existing authorized pools; final host/fleet/90-day maintenance observations on the frozen candidate. |
+| PR45 source | `41b5af74923815c84c080f271702239a94e40184` |
+| Tree | `241cd18950beb11c58836e1968de7c759bff6866` |
+| Exact local XPI | `acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2` /909884bytes |
+| CI | [Run364](https://github.com/Neb963/PCMS/actions/runs/41661871922) |
 
-No dependency is bypassed, no external permission/credential is invented, and no deferred verification is marked passed. Overall readiness: **complete fixture-qualified unsigned acceptance candidate; live/provider/portability/fleet acceptance pending**. Follow [installation guidance](docs/DEVELOPMENT.md); preserve held jobs, human edits, previous-good/original source and the exact tested XPI.
+Clean build/preflight PASS; all248 shipping entries equal the exact362 CI artifact except build-identity.json. Source/runtime/scripts/vendor/package and donor/TTL/effect/source/restore guards are unchanged. Reuse [source509+15 coverage](docs/remediation/evidence/T-run362-source.json) with original0b978844 identity; no fabricated single524-case green invocation.363 focused288/75.063s and artifact equality are retained in R08. 364 focused288/91.194s PASS. Candidate13243286521/ZIPd1d300afb0957901918f57c1781f683985d21d7201b445a544351fd2903647f2 independently CRC-reopens to identical local XPI; isolated exact-source preflight PASS. Integrated full-chain PASS/all9 checks on exact364; original immediate13243791347/ZIPb9789878b744fe319852377996068a62da69d3e4708bf97dce676987d10b2944/receiptca9dc49a1d439ba2bbb92bbf2437f725a6648cf363bb9223b7917a2331537895 is independently reopened. All4 known held contexts preserved before close; same-job Check completes2 fresh mappings/validated login/routes, exact source/history/effects/old roots/sentinel,7 enabled/Pause. Independent route all7/default disk PASS independently reopened (R03). Completed installed job FAILS standalone DEVELOP before AI activity: Creator initial SCAN is HELD/MODULE_STEP_FAILED with no effects; original hidden exception was discarded. Other independent stages including production restore pass; capacity/hour skipped. Full V remains open; no failure waived. See [completed checkpoint](docs/remediation/evidence/R08-run364-completed.json).
+
+## Current blocker and immediate next work
+
+The restored workspace retained the original edits. The actual Core/Creator/opaque sandbox-host regression passed with the initial fix. Tighten the retry to a parent-observed typed CAS failure during Creator’s initial read-only scan, bind its recovery transaction to the active dataset/package/generation/revision, and preserve newer progress and any possible or prior write. Reuse the existing guarded Core mutation and event projection. Preserve only typed, safe causal diagnostics across the opaque frame. The completed logs prove a separate missing fixture read log; they do not prove the discarded raw Creator cause.
+
+1. Extend the recovered regression across the real host and sandbox. Verify trusted parent-issued same-step/frame references, safe error redaction, matching dataset/generation/package/revision, same-job read-only retry, no replay for POSSIBLE/history writes and no overwrite of newer progress. Add counterfactuals before publishing a runtime change.
+2. Original standalone DEVELOP and final installed artifact13246936901 are retained. The 482-entry ZIP independently reopens with digest8d0ff557a2a94f4c2cbb8f24cc480f28a415c3be42ec837edc1887f526353437 and all4 standalone restore checks pass. Improve failure diagnostics with default disk Journal, structured account/module/job state and unique driver log. Run standalone DEVELOP first with immediate receipt upload, then all independent journeys. Build generated sources before full source tests. New shipping host changes require new exact-artifact qualification; old248-entry equivalence does not cover them.
+3. Complete same-artifact V: primary/Settings/module/normal/empty/Preparing/Sleep/error/Unknown/held/review/complete/restore states at1280/560/~392 CSS widths, full/viewport originals, actual controls/Tab/hidden-focus checks. Directly inspect pixels and retain severity/correction/reinspection. [Iterations10–12](docs/remediation/R06-report.md) remain partial predecessor reviews; capture success is not V.
+4. Finish representative installed capacity and actual two30-minute Journal rounds, including globally paused second round; independently reopen produced disk archives. Prior356 actual3639s/two rounds stays attributed to its original source/XPI in R07; no unfinished later hour is claimed.
+5. Update closure/phase reports from actual final evidence. Historical operator search query/root remains UNKNOWN; no live P42–P49 acceptance. Only after all pre-operator gates pass, merge/deliver the actual tested XPI and concise guide.
+
+Do not weaken donor-first/no Direct/original15-minute TTL, same-operation/no uncertain replay, source/previous-good/manual/binary/path/root-instruction preservation or unknown/dirty context holds. PR45 stays draft and main is not changed before qualification. Keep evidence checkpoints separate from the frozen candidate; use isolated exact-source checkout for artifact preflight. Do not rebuild from an evidence-only child for delivery.

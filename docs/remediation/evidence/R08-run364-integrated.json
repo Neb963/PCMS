@@ -1,0 +1,112 @@
+{
+  "tier": "B/DSK-one-profile-seven-module-rehearsal",
+  "source": "41b5af74923815c84c080f271702239a94e40184",
+  "xpiSha256": "acb9d04f519e7550267a29ab3dd0ed8a5d757f30a47ee81a5bddddb3e26a30c2",
+  "result": "PASS",
+  "originalReceiptSha256": "ca9dc49a1d439ba2bbb92bbf2437f725a6648cf363bb9223b7917a2331537895",
+  "artifactId": 13243791347,
+  "artifactZipSha256": "b9789878b744fe319852377996068a62da69d3e4708bf97dce676987d10b2944",
+  "checks": [
+    "one-persistent-clean-profile/two-real-UI-Confirm/distinct-principals-containers-routes/seven-enabled",
+    "actual-Discover-Available-Taken-Unknown/marker-only-Git-preparation/automatic-Creator/one-private-create-and-rename/unlisted-stable-identity/no-negative-folder-or-provider-write",
+    "same-profile/separate-DEPLOY-folder/unlist-full-PJS-HTML-binary-Unicode-source/publication-pool-DONE/independent-bytes/writer-release",
+    "same-generator-DEVELOP-update/distinct-src-instructions/exact-native-prompt/real-human-review-Finish/full-source-Git-SOURCE/publication-pool-DONE/preserved-cycle-and-root-instructions",
+    "same-profile/actual-rendered-directory/fixed-pin-filter-scope/automatic-Refresher/both-markers/full-byte-neutrality/measured-response",
+    "R05-real-IDB/Unicode-case/duplicate-label-distinct-ID/folder-job-exact-navigation/no-match/out-of-order-valid-Core-replies/stale-result-fence/actual-IDB-boundary-failure/explicit-error-preserved-input/retry/default-causal-record",
+    "actual-IDB-query-fault/default-causal-Journal/real-Export/independent-disk-CRC-hashes/no-missing-sequence",
+    "real-DRAIN/editor-inspection-hold/unchanged-dataset-source-effects/no-allocation/preserve-clean-fixture-source-chat/explicit-scoped-human-close/unrelated-context-preserved",
+    "same-profile/full-production-Backup/all-entry-disk-hashes/real-File-Confirm/complete-restore/fresh-containers/validated-distinct-logins-routes/seven-enabled/Pause/unrelated-preserved"
+  ],
+  "backup": {
+    "sha256": "5637133e5b8f0264919599630633ca6e6c72817923e2cf4615ca5d213996b6c3",
+    "bytes": 718290,
+    "freshMappings": 2,
+    "enabledModules": 7
+  },
+  "journal": {
+    "sha256": "f8a259c3b879d6be57f1fd947c0982f81d41bc7e5d24a4fc7503a1717da9d213",
+    "first": 1,
+    "last": 2627,
+    "count": 2627
+  },
+  "restoreContextHold": {
+    "restoreId": "6ca57180-3f4d-4dfa-addb-7c16336d7b57",
+    "jobId": "d4843cb1-61a7-4871-8334-3ced8fbf5121",
+    "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+    "contexts": [
+      {
+        "accountId": "6c53abc8-de08-4957-b6a8-a3aff410166b",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-7",
+        "tabId": 7
+      },
+      {
+        "accountId": "6c53abc8-de08-4957-b6a8-a3aff410166b",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-7",
+        "tabId": 8
+      },
+      {
+        "accountId": "c86a6b9f-c87c-4b76-828d-0bf0ca6f764f",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-6",
+        "tabId": 5
+      },
+      {
+        "accountId": "c86a6b9f-c87c-4b76-828d-0bf0ca6f764f",
+        "code": "RESTORE_EDITOR_INSPECTION_REQUIRED",
+        "containerId": "firefox-container-6",
+        "tabId": 6
+      }
+    ],
+    "datasetUnchanged": true,
+    "allocationStarted": false,
+    "effectsUnchanged": true
+  },
+  "preservationFile": {
+    "filename": "installed-integrated-contexts.json",
+    "bytes": 121582,
+    "sha256": "3e828bf51ac4fa685196001b9691938d4bace3ab5b6509fc12f2b3d3f462c6de"
+  },
+  "contextInventory": [
+    {
+      "kind": "disposable-read-only-fixture-result",
+      "url": "https://perchance.org/chain-unknown-name",
+      "containerId": "firefox-container-6",
+      "heldGroupTabIds": [
+        5
+      ],
+      "frameRows": 0
+    },
+    {
+      "kind": "disposable-read-only-fixture-result",
+      "url": "https://perchance.org/chain-free-name",
+      "containerId": "firefox-container-6",
+      "heldGroupTabIds": [
+        6
+      ],
+      "frameRows": 0
+    },
+    {
+      "kind": "disposable-clean-native-fixture",
+      "url": "https://perchance.org/existing-sentinel#edit",
+      "containerId": "firefox-container-7",
+      "heldGroupTabIds": [
+        7
+      ],
+      "frameRows": 0
+    },
+    {
+      "kind": "disposable-read-only-fixture-directory",
+      "url": "https://perchance.org/generators",
+      "containerId": "firefox-container-7",
+      "heldGroupTabIds": [
+        8
+      ],
+      "frameRows": 125
+    }
+  ],
+  "screenshots": 48,
+  "keyboardAudits": 16,
+  "qualification": "Actual one-profile local native/HTTPS/Git fixture PASS. Final full V and remaining independent/capacity/hour gates open; no live P42\u2013P49 acceptance."
+}

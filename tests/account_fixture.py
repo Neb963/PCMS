@@ -18,7 +18,7 @@ class Fixture:
  def __init__(self,root,extra_hosts=()):
   self.extra_hosts=set(extra_hosts)
   assert all(host in ['user.uploads.dev','aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.perchance.org'] for host in self.extra_hosts)
-  self.lock=threading.RLock();self.tokens={};self.exits={};self.calls=[];self.logins={};self.reads=[];self.probes=[];self.unexpected=[];self.delay_next=False;self.duplicate_exit=False;self.inventory={'remote-sentinel':{'isPrivate':True,'files':{'main.pjs':'protected remote source\n','index.html':'<p>Remote sentinel</p>','src/data.bin':'AAH/'}}}
+  self.lock=threading.RLock();self.tokens={};self.exits={};self.calls=[];self.logins={};self.reads=[];self.probes=[];self.slug_reads=[];self.unexpected=[];self.delay_next=False;self.duplicate_exit=False;self.inventory={'remote-sentinel':{'isPrivate':True,'files':{'main.pjs':'protected remote source\n','index.html':'<p>Remote sentinel</p>','src/data.bin':'AAH/'}}}
   ca=root/'ca.pem';key=root/'server.key';csr=root/'server.csr';cert=root/'server.pem';ext=root/'extensions.cnf'
   ext.write_text('subjectAltName=DNS:perchance.org,DNS:api.mullvad.net,DNS:am.i.mullvad.net,DNS:*.am.i.mullvad.net,DNS:*.dnsleak.am.i.mullvad.net'+''.join(',DNS:'+host for host in sorted(self.extra_hosts))+'\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n')
   for args in [['req','-x509','-newkey','rsa:2048','-nodes','-days','2','-subj','/CN=PCMS disposable fixture CA','-keyout',str(root/'ca.key'),'-out',str(ca)],['req','-newkey','rsa:2048','-nodes','-subj','/CN=perchance.org','-keyout',str(key),'-out',str(csr)],['x509','-req','-days','2','-in',str(csr),'-CA',str(ca),'-CAkey',str(root/'ca.key'),'-CAcreateserial','-extfile',str(ext),'-out',str(cert)]]:subprocess.run(['openssl',*args],check=True,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -118,7 +118,7 @@ class Provider(Base):
    with f.lock:
     expected=f.logins.get(self.route);valid=expected and body.get('email')==expected['email'] and body.get('sessionToken')==expected['sessionToken'];f.reads.append({'routeId':self.route,'valid':bool(valid)})
    return self.send({'status':'success','generators':[{'name':'remote-sentinel','isPrivate':True}],'generatorFolderMap':{}} if valid else {'status':'session-token-error'})
-  with f.lock:f.unexpected.append('PROVIDER_OPERATION_REFUSED')
+  with f.lock:f.unexpected.append('PROVIDER_OPERATION_REFUSED:'+self.path)
   self.send({},status=404)
 
 def native_main(port):

@@ -25,7 +25,7 @@ class Provider(ReadProvider):
   if host=='perchance.org' and self.path=='/'+SLUG:
    with f.lock:
     g=json.loads(json.dumps(f.generator));version=dict(f.version);files={p:base64.b64encode(f.bytes[e['key']]).decode() for p,e in f.assets.items()};f.page_reads+=1
-   js='window.generatorLastSaveTime='+str(version['time'])+';window.generatorSaveCount='+str(version['saveCount'])+';const INITIAL_VERSION='+json.dumps(version)+';const INITIAL_GENERATOR='+json.dumps(g)+';const INITIAL_FILES='+json.dumps(files)+';'+NATIVE
+   js='window.__FIXTURE_UNICODE_PATHS='+json.dumps(getattr(f,'unicode_native_paths',False))+';window.generatorLastSaveTime='+str(version['time'])+';window.generatorSaveCount='+str(version['saveCount'])+';const INITIAL_VERSION='+json.dumps(version)+';const INITIAL_GENERATOR='+json.dumps(g)+';const INITIAL_FILES='+json.dumps(files)+';'+NATIVE
    return self.send(('<!doctype html><meta charset="utf-8"><title>Native source save fixture</title><h1>Protected native editor</h1><label>Model<textarea id="fixture-source-model"></textarea></label><a id="fixture-open-another" target="_blank" href="/'+SLUG+'#edit">Open another editor</a><script>'+js.replace('</',r'<\/')+'</script>').encode(),'text/html; charset=utf-8')
   return super().do_GET()
  def do_POST(self):
