@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R05 `fc4a2bcf0480fadf3f245c702a65c104e4a58a99` / tree `c6c03a5470b320fde6ec4469cb52eb58959f4966`. Authority unchanged; todo plan preceded code.
 
-**Status: PARTIAL / BLOCKED — historical defects and corrections retained below; final same-artifact pixel/interaction matrix remains open on361.**
+**Status. FIXED_AND_VERIFIED with final installed pixel, interaction and native accessibility evidence.**
 
 ## Baseline pixel review
 
@@ -69,3 +69,7 @@ Run360 new-state pixel review: [iteration10](R06-vision-iteration-10.md) directl
 
 
 [Iteration12](R06-vision-iteration-12.md) directly inspects the exact362 last-Unknown-result PNG: the entire row is now visible with real scrolling and no frame resize. Raw secondary classifier/preparation tokens remain a cosmetic P2. Integrated fixture safely refuses retained chain-free-name; known before/after fixture response handling needs next B. Final complete restore and full final V remain open.
+
+## Final exact candidate
+
+The final [vision review](R06-final-vision.md) passes for the exact run 365 XPI, with matching same-XPI supplemental states. It records original image hashes, concrete findings, actual keyboard and click journeys, independent native Gecko accessibility and the remaining P2 findings.

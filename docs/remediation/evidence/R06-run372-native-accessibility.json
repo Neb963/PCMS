@@ -1,0 +1,201 @@
+{
+  "source": "1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69",
+  "xpiSha256": "609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd",
+  "browserVersion": "155.0",
+  "buildId": "20260817142839",
+  "sandbox": {
+    "remote": true,
+    "sandbox": 6
+  },
+  "checks": [
+    "native Gecko accessibility tree at three widths/real global search and Work navigation/named search and recovery/hidden DEPLOY AI absent"
+  ],
+  "accessibility": [
+    {
+      "width": 1280,
+      "roles": [
+        {
+          "attestationText": false,
+          "id": "deployment-check",
+          "name": "Check recorded deployment",
+          "role": "pushbutton"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Check recorded deployment",
+          "role": "text leaf"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Open Creator work",
+          "role": "link"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Open Creator work",
+          "role": "text leaf"
+        },
+        {
+          "attestationText": false,
+          "id": "global-results",
+          "name": "Search results",
+          "role": "list"
+        },
+        {
+          "attestationText": false,
+          "id": "global-search",
+          "name": "Find anything",
+          "role": "searchbox"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Find anything",
+          "role": "label"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Find anything",
+          "role": "text leaf"
+        }
+      ],
+      "absentInapplicable": [
+        "ai-ready-attestation",
+        "deployment-review",
+        "deployment-ai-check",
+        "deployment-cancel"
+      ],
+      "remote": true
+    },
+    {
+      "width": 560,
+      "roles": [
+        {
+          "attestationText": false,
+          "id": "deployment-check",
+          "name": "Check recorded deployment",
+          "role": "pushbutton"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Check recorded deployment",
+          "role": "text leaf"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Open Creator work",
+          "role": "link"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Open Creator work",
+          "role": "text leaf"
+        },
+        {
+          "attestationText": false,
+          "id": "global-results",
+          "name": "Search results",
+          "role": "list"
+        },
+        {
+          "attestationText": false,
+          "id": "global-search",
+          "name": "Find anything",
+          "role": "searchbox"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Find anything",
+          "role": "label"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Find anything",
+          "role": "text leaf"
+        }
+      ],
+      "absentInapplicable": [
+        "ai-ready-attestation",
+        "deployment-review",
+        "deployment-ai-check",
+        "deployment-cancel"
+      ],
+      "remote": true
+    },
+    {
+      "width": 392,
+      "roles": [
+        {
+          "attestationText": false,
+          "id": "deployment-check",
+          "name": "Check recorded deployment",
+          "role": "pushbutton"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Check recorded deployment",
+          "role": "text leaf"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Open Creator work",
+          "role": "link"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Open Creator work",
+          "role": "text leaf"
+        },
+        {
+          "attestationText": false,
+          "id": "global-results",
+          "name": "Search results",
+          "role": "list"
+        },
+        {
+          "attestationText": false,
+          "id": "global-search",
+          "name": "Find anything",
+          "role": "searchbox"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Find anything",
+          "role": "label"
+        },
+        {
+          "attestationText": false,
+          "id": "",
+          "name": "Find anything",
+          "role": "text leaf"
+        }
+      ],
+      "absentInapplicable": [
+        "ai-ready-attestation",
+        "deployment-review",
+        "deployment-ai-check",
+        "deployment-cancel"
+      ],
+      "remote": true
+    }
+  ],
+  "result": "PASS",
+  "runId": 42230577492,
+  "artifactId": 13508480109,
+  "zipSha256": "061143acffc8e559f07ea2d853906abf13f9309dd6b432a2746f3cd83cf3eb3a",
+  "receiptSha256": "f3d31cd63eb38c58b883fa460dd51ba702f168917ece48166d19156e5b97a196",
+  "fixtureCommit": "06875962412a3128bc24b5374e6eb5216a2d1119"
+}

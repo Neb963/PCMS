@@ -2,7 +2,7 @@
 
 Date: 2026-11-02. Base R04 `fed3b34845fd194cd329acfc0e2dfadcdf9254f1` / tree `d992a74898785992bfea61bc074041cf947d6fd6`. Plan committed before code. Authority unchanged.
 
-**Status. Installed search regression passes on the exact candidate. The original operator query and cause remain unknown. Final Generator paging is being verified.**
+**Status. FIXED_AND_VERIFIED in the installed search and paging fixtures. The original operator query and cause remain unknown.**
 
 ## Root causes and changes
 
@@ -43,3 +43,5 @@ Run 365 passes shared and integrated search on source `1808671a6c5b4826dfc8c3ac1
 Run 369 independently compares the original P41 and run 365 XPIs in clean Firefox 155.0, build 20260817142839, sandbox level 6. Both execute the real packaged DOM, Port, Core and IndexedDB flow. A controlled delivery fault drops the first valid Core reply. The independently recorded reply contains the exact expected generator in each build. P41 remains on “Searching…” after 64.008 s. The candidate retains the input and gives “Search timed out. Try Search again.” with `CORE_REQUEST_TIMEOUT` at 60.090 s. The next visible Search and result click reach the exact generator. [Independently reopened comparison](evidence/R05-run369-reply-loss.json).
 
 This reproduces an installed failure in the common search control and verifies recovery under the same fault. The original operator query, profile and response are unavailable. Its exact cause remains unknown.
+
+Run 370 drove all 21 visible Generator pages over 1,005 independently named records. Each appeared once in expected order. The query, final five rows and both cross-page selections remained after navigating through Work and back. Receipt SHA-256 `b8745208367b74699c39d658ff2bec6a4ac9f0b5eef92505a509320cd4bdde1a`. The PNGs from that run displayed a contradictory fixture state because the synthetic rows had been marked Owned without a remote identity. The follow-up capture uses folder-only rows with an allocated account. [Run 370](https://github.com/Neb963/PCMS/actions/runs/42228549967).
