@@ -24,3 +24,5 @@ The restored workspace retained the original edits. The actual Core/Creator/opaq
 5. Update closure/phase reports from actual final evidence. Historical operator search query/root remains UNKNOWN; no live P42–P49 acceptance. Only after all pre-operator gates pass, merge/deliver the actual tested XPI and concise guide.
 
 Do not weaken donor-first/no Direct/original15-minute TTL, same-operation/no uncertain replay, source/previous-good/manual/binary/path/root-instruction preservation or unknown/dirty context holds. PR45 stays draft and main is not changed before qualification. Keep evidence checkpoints separate from the frozen candidate; use isolated exact-source checkout for artifact preflight. Do not rebuild from an evidence-only child for delivery.
+
+Supplemental R06 capture: candidate365 desktop Archived shows the saving transition. Use the already tested CI XPI and an isolated Firefox fixture run. Verify the rendered Archived state and enabled Reactivate before each width, and capture Home after actual directory measurement. This supplemental branch is for evidence only.

@@ -1,46 +1,32 @@
-name: Core checkpoint
+name: R08 exact XPI visual supplement
 on:
-  push:
-    branches: [main]
-    paths-ignore: ["**/*.md"]
   pull_request:
-    paths-ignore: ["**/*.md"]
-  workflow_dispatch:
+    branches: [remediation/r06-ui]
 permissions:
   contents: read
-concurrency:
-  group: host-${{ github.ref }}
-  cancel-in-progress: true
+  actions: read
 jobs:
-  focused:
+  visual-supplement:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - run: npm ci --ignore-scripts
-      - run: npm run build
-      - run: python3 scripts/release-preflight.py build/pcms-dev.xpi
-      - run: node --test tests/host.test.mjs tests/seed.test.mjs tests/modules.test.mjs tests/queue.test.mjs tests/source-writer.test.mjs tests/source-save-native.test.mjs tests/capture-cut.test.mjs tests/records.test.mjs tests/journal.test.mjs tests/retention.test.mjs tests/git-writer.test.mjs tests/remediation-diagnostics.test.mjs tests/git-commit-identity.test.mjs tests/accounts.test.mjs tests/donor-accounts.test.mjs tests/creator-allocation.test.mjs tests/creator-creation.test.mjs tests/deployer.test.mjs tests/ui-queries.test.mjs tests/ui-render-boundary.test.mjs tests/current-rows.test.mjs tests/host-request-diagnostics.test.mjs tests/directory.test.mjs tests/refresher.test.mjs tests/refresh-controller.test.mjs
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pcms-candidate-${{ github.event.pull_request.head.sha || github.sha }}
-          path: |
-            build/pcms-dev.xpi
-            build/identity.json
-
-  installed:
-    runs-on: ubuntu-latest
-    steps:
+          ref: ${{ github.event.pull_request.head.sha }}
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
+          ref: 1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69
+          path: tested
+      - uses: actions/download-artifact@v4
         with:
-          node-version: '22'
+          name: pcms-candidate-1808671a6c5b4826dfc8c3ac1ef92bd8fdc8bc69
+          run-id: 42220618849
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: tested/build
+      - name: Verify the original installed candidate
+        working-directory: tested
+        run: |
+          printf '%s  %s\n' '609fae1d42378b6bab1666059d4048303c131b3b331659dd6d7f956f53d514bd' build/pcms-dev.xpi | sha256sum -c -
+          python3 scripts/release-preflight.py build/pcms-dev.xpi
       - uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/pcms-firefox
@@ -52,97 +38,16 @@ jobs:
           else
             bash scripts/setup-firefox.sh
           fi
-      - run: npm ci --ignore-scripts
-      - run: npm run build
-      - run: python3 scripts/release-preflight.py build/pcms-dev.xpi
-      - name: R08 native DEVELOP review Finish and source preservation
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_develop_complete.py build/pcms-dev.xpi
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: develop-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
-          path: |
-            test-results/installed-develop-complete.json
-            test-results/develop-complete-driver.log
-            test-results/develop-failure-journal.zip
-            test-results/p27-failure.png
-      - name: R08 one-profile seven-module local rehearsal
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_integrated.py build/pcms-dev.xpi
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: integrated-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
-          path: |
-            test-results/installed-integrated.json
-            test-results/integrated-driver.log
-      - name: R01 default diagnostic export, causal faults and disk continuity
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_journal.py build/pcms-dev.xpi
-      - name: R03 actual native outage DNS isolation and changed identity
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_route_recovery.py build/pcms-dev.xpi
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: route-diagnostics-${{ github.event.pull_request.head.sha || github.sha }}
-          path: |
-            test-results/installed-route-recovery.json
-            test-results/route-recovery-driver.log
-      - name: R02 independent Git writer and actual Discover caller
-        if: ${{ !cancelled() }}
-        run: |
-          python3 tests/installed_git_writer.py build/pcms-dev.xpi
-          python3 tests/installed_discover_preparation.py build/pcms-dev.xpi
-      - name: R03-R04 protected local Creator and no-replay integration
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_creation.py build/pcms-dev.xpi
-      - name: R08 full DEPLOY publication pool and DONE
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_deploy_complete.py build/pcms-dev.xpi
-      - name: R08 Refresher full-source negative and restart journey
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_refresh_markers.py build/pcms-dev.xpi
-      - name: Persistent complete-candidate startup and user registry
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_release.py build/pcms-dev.xpi
-      - name: Full shared UI, module lifecycle and source recovery
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_ui_continuity.py build/pcms-dev.xpi
-      - name: R06 independent actual installed pixel matrix
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_visual.py build/pcms-dev.xpi
-      - uses: actions/upload-artifact@v4
-        if: ${{ !cancelled() }}
-        with:
-          name: visual-${{ github.event.pull_request.head.sha || github.sha }}
-          path: |
-            test-results/visual/
-            test-results/installed-ui-continuity.json
-            test-results/installed-visual.json
-            test-results/installed-journal.json
-            test-results/installed-route-recovery.json
-            test-results/installed-git-writer.json
-            test-results/installed-discover-preparation.json
-            test-results/installed-creation.json
-            test-results/installed-deploy-complete.json
-            test-results/installed-develop-complete.json
-            test-results/installed-refresh-markers.json
-            test-results/installed-integrated.json
-      - name: Production disk backup and scoped restore activation
-        if: ${{ !cancelled() }}
-        run: python3 tests/installed_restore_activation.py build/pcms-dev.xpi
-      - name: R07 installed representative capacity and disk export
-        if: ${{ success() }}
+      - name: Capture settled Archived and measured Home
         env:
-          PCMS_REAL_JOURNAL_ROUNDS: '2'
-        run: python3 tests/installed_capacity.py build/pcms-dev.xpi
+          PCMS_VISUAL_SUPPLEMENT: '1'
+        run: python3 tests/installed_visual.py tested/build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: installed-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          name: visual-supplement-365
           path: |
-            test-results/
-            build/identity.json
-            build/pcms-dev.xpi
+            test-results/installed-visual.json
+            test-results/visual-driver.log
+            test-results/visual/journey-account-archived/
+            test-results/visual/journey-home-directory-measured/

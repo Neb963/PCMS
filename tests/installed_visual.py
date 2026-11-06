@@ -36,6 +36,7 @@ def main():
   root=pathlib.Path(tmp);profile=root/'profile';profile.mkdir();home=root/'home';home.mkdir();provider=VisualFixture(root,extra_hosts=['user.uploads.dev',FRAME]);expected=configure(provider);expected['main.pjs']=b'output\r\n  Hello [animal]\r\nanimal\r\n  cat\r\n  dog';provider.generator['modelText']=expected['main.pjs'].decode();provider.generator['isPrivate']=False;provider.directory_mode='complete';provider.directory_reads=[];provider.directory_advances=[];provider.marker_order=(['pinned-other','pinned-second',SLUG]+[s for s in ORDER if s not in ['pinned-other',SLUG]])[:-1];provider.start_catalog();provider.install_bridge(home,root)
   env={**os.environ,'HOME':str(home),'XDG_CONFIG_HOME':str(home/'.config'),'XDG_DATA_HOME':str(home/'.local/share'),'MOZ_REMOTE_ALLOW_SYSTEM_ACCESS':'1'};log=open(OUT/'visual-driver.log','w');proc=subprocess.Popen([str(driver),'--port','44448','--allow-system-access'],env=env,stdout=log,stderr=subprocess.STDOUT);sid=None
   try:
+   supplement=os.environ.get('PCMS_VISUAL_SUPPLEMENT')=='1'
    wait(driver_ready,15);sid,caps=account_session(binary,profile);receipt.update(browserVersion=caps['browserVersion'],buildId=caps.get('moz:buildID'));assert int(caps['browserVersion'].split('.')[0])>=155 and caps['acceptInsecureCerts'] is False
    context(sid,'chrome');script(sid,"Components.classes['@mozilla.org/security/x509certdb;1'].getService(Components.interfaces.nsIX509CertDB).addCertFromBase64(arguments[0],'C,,');return true;",[base64.b64encode(provider.ca).decode()]);prefs=script(sid,"return {sandbox:Services.prefs.getIntPref('security.sandbox.content.level'),remote:Services.appinfo.browserTabsRemoteAutostart}");assert prefs['sandbox']>=4 and prefs['remote'];receipt['sandbox']=prefs;context(sid,'content');assert call('POST',f'/session/{sid}/moz/addon/install',{'path':str(xpi),'temporary':False})==ID;toolbar(sid);dashboard(sid)
    wait(lambda:script(sid,"return document.getElementById('queue-status').textContent==='Running'"));state_matrix(sid,'home-permission-needed',receipt)
@@ -50,9 +51,21 @@ def main():
     wait(lambda:script(sid,"return document.getElementById('account-state')?.textContent.startsWith('Preparing')"));state_matrix(sid,'account-real-preparing',receipt)
    finally:provider.prepare_release.set()
    settle(sid,owner,'LOGIN_REQUIRED');login(sid,owner,'visual@fixture.test');state_matrix(sid,'account-awaiting-confirm',receipt);click(sid,'#account-confirm');settle(sid,owner,'READY')
-   matrix(sid,receipt,click,set_input,owner);viewport(sid,1280)
+   if not supplement:matrix(sid,receipt,click,set_input,owner)
+   viewport(sid,1280)
    real_sleep(sid,provider,owner,expected,receipt)
-   account_page(sid,owner);click(sid,'#account-archive');settle(sid,owner,'ARCHIVED');state_matrix(sid,'account-archived',receipt);receipt['result']='CAPTURED — VISION REVIEW REQUIRED'
+   if supplement:
+    click(sid,'nav a[href="#home"]')
+    def measured_home():
+     return script(sid,r"const s=document.getElementById('home-directory')?.textContent;return /^Directory measured · Top 50: \d+ · Top 100: \d+ · Full list: \d+ · \d+ displayed$/.test(s);")
+    state_matrix(sid,'home-directory-measured',receipt,prepare=lambda:wait(measured_home,30))
+    receipt['checks'].append('Home real directory observation: separate Top 50, Top 100 and full-list counts at all widths')
+   account_page(sid,owner);click(sid,'#account-archive');settle(sid,owner,'ARCHIVED')
+   def archived():
+    return script(sid,"const s=document.getElementById('account-state'),b=document.getElementById('account-reactivate');return s?.textContent==='Archived'&&b&&!b.hidden&&!b.disabled&&!document.getElementById('account-open')?.getClientRects().length;")
+   state_matrix(sid,'account-archived',receipt,prepare=lambda:wait(archived,30))
+   receipt['checks'].append('settled archived projection and enabled Reactivate at each viewport')
+   receipt['result']='CAPTURED — VISION REVIEW REQUIRED'
   except Exception as error:
    receipt['error']=str(error)
    if sid:
