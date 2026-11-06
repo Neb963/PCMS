@@ -1,4 +1,4 @@
-name: R08 exact XPI visual supplement
+name: R08 exact XPI capacity and duration verification
 on:
   pull_request:
     branches: [remediation/r06-ui]
@@ -6,8 +6,9 @@ permissions:
   contents: read
   actions: read
 jobs:
-  visual-supplement:
+  capacity-and-duration:
     runs-on: ubuntu-latest
+    timeout-minutes: 85
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,16 +39,12 @@ jobs:
           else
             bash scripts/setup-firefox.sh
           fi
-      - name: Capture settled Archived and measured Home
+      - name: Run representative capacity, production export and two real Journal rounds
         env:
-          PCMS_VISUAL_SUPPLEMENT: '1'
-        run: python3 tests/installed_visual.py tested/build/pcms-dev.xpi
+          PCMS_REAL_JOURNAL_ROUNDS: '2'
+        run: python3 tests/installed_capacity.py tested/build/pcms-dev.xpi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: visual-supplement-365
-          path: |
-            test-results/installed-visual.json
-            test-results/visual-driver.log
-            test-results/visual/journey-account-archived/
-            test-results/visual/journey-home-directory-measured/
+          name: capacity-duration-365
+          path: test-results/
